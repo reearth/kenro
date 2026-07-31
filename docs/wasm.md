@@ -11,20 +11,20 @@ cannot drift.
 
 ## Size
 
-Measured on the release build (`wasm-pack build --target web --release`,
+Measured on release builds (`wasm-pack build --target web --release`,
 `wasm-opt -Oz`); enforced by a CI size gate (fails above 1.5 MB raw /
-500 KB gzip):
+500 KB gzip). The default (lite) build covers everything except
+overlay/buffer/MVT; the `full` feature adds them (i_overlay's mesh is the
+single largest contributor):
 
-| artifact | size |
-|---|---|
-| `kenro_wasm_bg.wasm` | 946 KB |
-| gzipped (wire size) | 353 KB |
+| build | raw | gzipped (wire) |
+|---|---|---|
+| default (lite) | 589 KB | 240 KB |
+| `--features full` | 946 KB | 353 KB |
 
-(The step up from v0.2's 485 KB bought the whole overlay/buffer engine —
-i_overlay's mesh — plus the predicate family, processing functions and the
-MVT encoder.) For comparison, DuckDB-WASM's spatial extension alone is
-~23.5 MB (~6.3 MB wire) — kenro is still roughly **18× smaller**, at the
-cost of the GEOS/GDAL feature classes kenro doesn't cover.
+For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
+(~6.3 MB wire) — kenro is **25–40× smaller** depending on the build, at
+the cost of the GEOS/GDAL feature classes kenro doesn't cover.
 
 ## Host support matrix
 
