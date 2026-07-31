@@ -91,6 +91,51 @@ pub fn st_within(a: &[u8], b: &[u8]) -> R<bool> {
     predicates::st_within(a, b).map_err(err)
 }
 
+#[wasm_bindgen(js_name = stDisjoint)]
+pub fn st_disjoint(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_disjoint(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stTouches)]
+pub fn st_touches(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_touches(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stCrosses)]
+pub fn st_crosses(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_crosses(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stOverlaps)]
+pub fn st_overlaps(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_overlaps(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stEquals)]
+pub fn st_equals(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_equals(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stCovers)]
+pub fn st_covers(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_covers(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stCoveredBy)]
+pub fn st_covered_by(a: &[u8], b: &[u8]) -> R<bool> {
+    predicates::st_covered_by(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRelate)]
+pub fn st_relate(a: &[u8], b: &[u8]) -> R<String> {
+    predicates::st_relate(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRelatePattern)]
+pub fn st_relate_pattern(a: &[u8], b: &[u8], pattern: &str) -> R<bool> {
+    predicates::st_relate_pattern(a, b, pattern).map_err(err)
+}
+
 #[wasm_bindgen(js_name = stDistance)]
 pub fn st_distance(a: &[u8], b: &[u8]) -> R<Option<f64>> {
     predicates::st_distance(a, b).map_err(err)
@@ -294,6 +339,15 @@ mod tests {
             "stIntersects",
             "stContains",
             "stWithin",
+            "stDisjoint",
+            "stTouches",
+            "stCrosses",
+            "stOverlaps",
+            "stEquals",
+            "stCovers",
+            "stCoveredBy",
+            "stRelate",
+            "stRelatePattern",
             "stDistance",
             "stDwithin",
             "stMinX",

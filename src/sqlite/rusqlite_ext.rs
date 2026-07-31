@@ -86,6 +86,36 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_predicate(conn, "ST_Intersects", predicates::st_intersects)?;
     register_predicate(conn, "ST_Contains", predicates::st_contains)?;
     register_predicate(conn, "ST_Within", predicates::st_within)?;
+    register_predicate(conn, "ST_Disjoint", predicates::st_disjoint)?;
+    register_predicate(conn, "ST_Touches", predicates::st_touches)?;
+    register_predicate(conn, "ST_Crosses", predicates::st_crosses)?;
+    register_predicate(conn, "ST_Overlaps", predicates::st_overlaps)?;
+    register_predicate(conn, "ST_Equals", predicates::st_equals)?;
+    register_predicate(conn, "ST_Covers", predicates::st_covers)?;
+    register_predicate(conn, "ST_CoveredBy", predicates::st_covered_by)?;
+    conn.create_scalar_function("ST_Relate", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_Relate")?,
+            blob_or_null(ctx, 1, "ST_Relate")?,
+        ) else {
+            return Ok(None);
+        };
+        predicates::st_relate(a, b)
+            .map(|s| Some(Value::Text(s)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_Relate", 3, FLAGS, |ctx| {
+        let (Some(a), Some(b), Some(pattern)) = (
+            blob_or_null(ctx, 0, "ST_Relate")?,
+            blob_or_null(ctx, 1, "ST_Relate")?,
+            text_or_null(ctx, 2, "ST_Relate")?,
+        ) else {
+            return Ok(None);
+        };
+        predicates::st_relate_pattern(a, b, pattern)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
     conn.create_scalar_function("ST_Distance", 2, FLAGS, |ctx| {
         let (Some(a), Some(b)) = (
             blob_or_null(ctx, 0, "ST_Distance")?,

@@ -1,144 +1,440 @@
 {"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/predicates.sql"}
+{"id":"empty_empty:contains","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"contains","expected":false}
+{"id":"empty_empty:coveredby","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"coveredby","expected":false}
+{"id":"empty_empty:covers","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"covers","expected":false}
+{"id":"empty_empty:crosses","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"crosses","expected":false}
+{"id":"empty_empty:disjoint","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"disjoint","expected":true}
+{"id":"empty_empty:distance","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"distance","expected":null}
+{"id":"empty_empty:equals","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"equals","expected":true}
+{"id":"empty_empty:intersects","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"intersects","expected":false}
+{"id":"empty_empty:overlaps","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"overlaps","expected":false}
+{"id":"empty_empty:relate","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"relate","expected":"FFFFFFFF2"}
+{"id":"empty_empty:touches","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"touches","expected":false}
+{"id":"empty_empty:within","a":"LINESTRING EMPTY","b":"POLYGON EMPTY","fn":"within","expected":false}
 {"id":"empty_poly_pt:contains","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"contains","expected":false}
+{"id":"empty_poly_pt:coveredby","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"coveredby","expected":false}
+{"id":"empty_poly_pt:covers","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"covers","expected":false}
+{"id":"empty_poly_pt:crosses","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"crosses","expected":false}
+{"id":"empty_poly_pt:disjoint","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"disjoint","expected":true}
 {"id":"empty_poly_pt:distance","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"distance","expected":null}
+{"id":"empty_poly_pt:equals","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"equals","expected":false}
 {"id":"empty_poly_pt:intersects","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"intersects","expected":false}
+{"id":"empty_poly_pt:overlaps","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"overlaps","expected":false}
+{"id":"empty_poly_pt:relate","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"relate","expected":"FFFFFF0F2"}
+{"id":"empty_poly_pt:touches","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"touches","expected":false}
 {"id":"empty_poly_pt:within","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"within","expected":false}
 {"id":"hole_pt_hole_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"contains","expected":false}
+{"id":"hole_pt_hole_edge:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"coveredby","expected":false}
+{"id":"hole_pt_hole_edge:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"covers","expected":true}
+{"id":"hole_pt_hole_edge:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"crosses","expected":false}
+{"id":"hole_pt_hole_edge:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"disjoint","expected":false}
 {"id":"hole_pt_hole_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"distance","expected":0}
+{"id":"hole_pt_hole_edge:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"equals","expected":false}
 {"id":"hole_pt_hole_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"intersects","expected":true}
+{"id":"hole_pt_hole_edge:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"overlaps","expected":false}
+{"id":"hole_pt_hole_edge:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"relate","expected":"FF20F1FF2"}
+{"id":"hole_pt_hole_edge:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"touches","expected":true}
 {"id":"hole_pt_hole_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"within","expected":false}
 {"id":"hole_pt_in_hole:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"contains","expected":false}
+{"id":"hole_pt_in_hole:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"coveredby","expected":false}
+{"id":"hole_pt_in_hole:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"covers","expected":false}
+{"id":"hole_pt_in_hole:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"crosses","expected":false}
+{"id":"hole_pt_in_hole:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"disjoint","expected":true}
 {"id":"hole_pt_in_hole:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"distance","expected":3}
+{"id":"hole_pt_in_hole:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"equals","expected":false}
 {"id":"hole_pt_in_hole:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"intersects","expected":false}
+{"id":"hole_pt_in_hole:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"overlaps","expected":false}
+{"id":"hole_pt_in_hole:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"relate","expected":"FF2FF10F2"}
+{"id":"hole_pt_in_hole:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"touches","expected":false}
 {"id":"hole_pt_in_hole:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"within","expected":false}
 {"id":"hole_pt_in_ring:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"contains","expected":true}
+{"id":"hole_pt_in_ring:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"coveredby","expected":false}
+{"id":"hole_pt_in_ring:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"covers","expected":true}
+{"id":"hole_pt_in_ring:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"crosses","expected":false}
+{"id":"hole_pt_in_ring:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"disjoint","expected":false}
 {"id":"hole_pt_in_ring:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"distance","expected":0}
+{"id":"hole_pt_in_ring:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"equals","expected":false}
 {"id":"hole_pt_in_ring:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"intersects","expected":true}
+{"id":"hole_pt_in_ring:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"overlaps","expected":false}
+{"id":"hole_pt_in_ring:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"relate","expected":"0F2FF1FF2"}
+{"id":"hole_pt_in_ring:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"touches","expected":false}
 {"id":"hole_pt_in_ring:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"within","expected":false}
 {"id":"line_line_collinear:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"contains","expected":false}
+{"id":"line_line_collinear:coveredby","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"coveredby","expected":false}
+{"id":"line_line_collinear:covers","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"covers","expected":false}
+{"id":"line_line_collinear:crosses","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"crosses","expected":false}
+{"id":"line_line_collinear:disjoint","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"disjoint","expected":false}
 {"id":"line_line_collinear:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"distance","expected":0}
+{"id":"line_line_collinear:equals","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"equals","expected":false}
 {"id":"line_line_collinear:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"intersects","expected":true}
+{"id":"line_line_collinear:overlaps","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"overlaps","expected":true}
+{"id":"line_line_collinear:relate","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"relate","expected":"1010F0102"}
+{"id":"line_line_collinear:touches","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"touches","expected":false}
 {"id":"line_line_collinear:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"within","expected":false}
 {"id":"line_line_cross:contains","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"contains","expected":false}
+{"id":"line_line_cross:coveredby","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"coveredby","expected":false}
+{"id":"line_line_cross:covers","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"covers","expected":false}
+{"id":"line_line_cross:crosses","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"crosses","expected":true}
+{"id":"line_line_cross:disjoint","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"disjoint","expected":false}
 {"id":"line_line_cross:distance","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"distance","expected":0}
+{"id":"line_line_cross:equals","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"equals","expected":false}
 {"id":"line_line_cross:intersects","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"intersects","expected":true}
+{"id":"line_line_cross:overlaps","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"overlaps","expected":false}
+{"id":"line_line_cross:relate","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"relate","expected":"0F1FF0102"}
+{"id":"line_line_cross:touches","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"touches","expected":false}
 {"id":"line_line_cross:within","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"within","expected":false}
 {"id":"line_line_disjoint:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"contains","expected":false}
+{"id":"line_line_disjoint:coveredby","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"coveredby","expected":false}
+{"id":"line_line_disjoint:covers","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"covers","expected":false}
+{"id":"line_line_disjoint:crosses","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"crosses","expected":false}
+{"id":"line_line_disjoint:disjoint","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"disjoint","expected":true}
 {"id":"line_line_disjoint:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"distance","expected":1}
+{"id":"line_line_disjoint:equals","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"equals","expected":false}
 {"id":"line_line_disjoint:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"intersects","expected":false}
+{"id":"line_line_disjoint:overlaps","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"overlaps","expected":false}
+{"id":"line_line_disjoint:relate","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"relate","expected":"FF1FF0102"}
+{"id":"line_line_disjoint:touches","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"touches","expected":false}
 {"id":"line_line_disjoint:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"within","expected":false}
 {"id":"line_line_endpoint:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"contains","expected":false}
+{"id":"line_line_endpoint:coveredby","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"coveredby","expected":false}
+{"id":"line_line_endpoint:covers","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"covers","expected":false}
+{"id":"line_line_endpoint:crosses","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"crosses","expected":false}
+{"id":"line_line_endpoint:disjoint","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"disjoint","expected":false}
 {"id":"line_line_endpoint:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"distance","expected":0}
+{"id":"line_line_endpoint:equals","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"equals","expected":false}
 {"id":"line_line_endpoint:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"intersects","expected":true}
+{"id":"line_line_endpoint:overlaps","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"overlaps","expected":false}
+{"id":"line_line_endpoint:relate","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"relate","expected":"FF1F00102"}
+{"id":"line_line_endpoint:touches","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"touches","expected":true}
 {"id":"line_line_endpoint:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"within","expected":false}
 {"id":"line_line_sub:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"contains","expected":true}
+{"id":"line_line_sub:coveredby","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"coveredby","expected":false}
+{"id":"line_line_sub:covers","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"covers","expected":true}
+{"id":"line_line_sub:crosses","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"crosses","expected":false}
+{"id":"line_line_sub:disjoint","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"disjoint","expected":false}
 {"id":"line_line_sub:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"distance","expected":0}
+{"id":"line_line_sub:equals","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"equals","expected":false}
 {"id":"line_line_sub:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"intersects","expected":true}
+{"id":"line_line_sub:overlaps","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"overlaps","expected":false}
+{"id":"line_line_sub:relate","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"relate","expected":"101FF0FF2"}
+{"id":"line_line_sub:touches","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"touches","expected":false}
 {"id":"line_line_sub:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"within","expected":false}
 {"id":"line_pt_endpoint:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"contains","expected":false}
+{"id":"line_pt_endpoint:coveredby","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"coveredby","expected":false}
+{"id":"line_pt_endpoint:covers","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"covers","expected":true}
+{"id":"line_pt_endpoint:crosses","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"crosses","expected":false}
+{"id":"line_pt_endpoint:disjoint","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"disjoint","expected":false}
 {"id":"line_pt_endpoint:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"distance","expected":0}
+{"id":"line_pt_endpoint:equals","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"equals","expected":false}
 {"id":"line_pt_endpoint:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"intersects","expected":true}
+{"id":"line_pt_endpoint:overlaps","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"overlaps","expected":false}
+{"id":"line_pt_endpoint:relate","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"relate","expected":"FF10F0FF2"}
+{"id":"line_pt_endpoint:touches","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"touches","expected":true}
 {"id":"line_pt_endpoint:within","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"within","expected":false}
 {"id":"line_pt_off:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"contains","expected":false}
+{"id":"line_pt_off:coveredby","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"coveredby","expected":false}
+{"id":"line_pt_off:covers","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"covers","expected":false}
+{"id":"line_pt_off:crosses","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"crosses","expected":false}
+{"id":"line_pt_off:disjoint","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"disjoint","expected":true}
 {"id":"line_pt_off:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"distance","expected":0.7071067811865476}
+{"id":"line_pt_off:equals","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"equals","expected":false}
 {"id":"line_pt_off:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"intersects","expected":false}
+{"id":"line_pt_off:overlaps","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"overlaps","expected":false}
+{"id":"line_pt_off:relate","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"relate","expected":"FF1FF00F2"}
+{"id":"line_pt_off:touches","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"touches","expected":false}
 {"id":"line_pt_off:within","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"within","expected":false}
 {"id":"line_pt_on:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"contains","expected":true}
+{"id":"line_pt_on:coveredby","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"coveredby","expected":false}
+{"id":"line_pt_on:covers","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"covers","expected":true}
+{"id":"line_pt_on:crosses","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"crosses","expected":false}
+{"id":"line_pt_on:disjoint","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"disjoint","expected":false}
 {"id":"line_pt_on:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"distance","expected":0}
+{"id":"line_pt_on:equals","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"equals","expected":false}
 {"id":"line_pt_on:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"intersects","expected":true}
+{"id":"line_pt_on:overlaps","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"overlaps","expected":false}
+{"id":"line_pt_on:relate","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"relate","expected":"0F1FF0FF2"}
+{"id":"line_pt_on:touches","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"touches","expected":false}
 {"id":"line_pt_on:within","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"within","expected":false}
 {"id":"mline_line:contains","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"contains","expected":false}
+{"id":"mline_line:coveredby","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"coveredby","expected":false}
+{"id":"mline_line:covers","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"covers","expected":false}
+{"id":"mline_line:crosses","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"crosses","expected":true}
+{"id":"mline_line:disjoint","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"disjoint","expected":false}
 {"id":"mline_line:distance","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"distance","expected":0}
+{"id":"mline_line:equals","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"equals","expected":false}
 {"id":"mline_line:intersects","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"intersects","expected":true}
+{"id":"mline_line:overlaps","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"overlaps","expected":false}
+{"id":"mline_line:relate","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"relate","expected":"0F1FF0102"}
+{"id":"mline_line:touches","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"touches","expected":false}
 {"id":"mline_line:within","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"within","expected":false}
 {"id":"mpoly_pt:contains","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"contains","expected":true}
+{"id":"mpoly_pt:coveredby","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"coveredby","expected":false}
+{"id":"mpoly_pt:covers","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"covers","expected":true}
+{"id":"mpoly_pt:crosses","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"crosses","expected":false}
+{"id":"mpoly_pt:disjoint","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"disjoint","expected":false}
 {"id":"mpoly_pt:distance","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"distance","expected":0}
+{"id":"mpoly_pt:equals","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"equals","expected":false}
 {"id":"mpoly_pt:intersects","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"intersects","expected":true}
+{"id":"mpoly_pt:overlaps","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"overlaps","expected":false}
+{"id":"mpoly_pt:relate","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"relate","expected":"0F2FF1FF2"}
+{"id":"mpoly_pt:touches","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"touches","expected":false}
 {"id":"mpoly_pt:within","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"within","expected":false}
 {"id":"mpt_sq:contains","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":false}
+{"id":"mpt_sq:coveredby","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"coveredby","expected":false}
+{"id":"mpt_sq:covers","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"covers","expected":false}
+{"id":"mpt_sq:crosses","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"crosses","expected":true}
+{"id":"mpt_sq:disjoint","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"disjoint","expected":false}
 {"id":"mpt_sq:distance","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"mpt_sq:equals","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"equals","expected":false}
 {"id":"mpt_sq:intersects","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"mpt_sq:overlaps","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"overlaps","expected":false}
+{"id":"mpt_sq:relate","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"relate","expected":"0F0FFF212"}
+{"id":"mpt_sq:touches","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"touches","expected":false}
 {"id":"mpt_sq:within","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":false}
 {"id":"mpt_sq_all_in:contains","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":false}
+{"id":"mpt_sq_all_in:coveredby","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"coveredby","expected":true}
+{"id":"mpt_sq_all_in:covers","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"covers","expected":false}
+{"id":"mpt_sq_all_in:crosses","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"crosses","expected":false}
+{"id":"mpt_sq_all_in:disjoint","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"disjoint","expected":false}
 {"id":"mpt_sq_all_in:distance","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"mpt_sq_all_in:equals","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"equals","expected":false}
 {"id":"mpt_sq_all_in:intersects","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"mpt_sq_all_in:overlaps","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"overlaps","expected":false}
+{"id":"mpt_sq_all_in:relate","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"relate","expected":"0FFFFF212"}
+{"id":"mpt_sq_all_in:touches","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"touches","expected":false}
 {"id":"mpt_sq_all_in:within","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":true}
 {"id":"pt_pt_diff:contains","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"contains","expected":false}
+{"id":"pt_pt_diff:coveredby","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"coveredby","expected":false}
+{"id":"pt_pt_diff:covers","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"covers","expected":false}
+{"id":"pt_pt_diff:crosses","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"crosses","expected":false}
+{"id":"pt_pt_diff:disjoint","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"disjoint","expected":true}
 {"id":"pt_pt_diff:distance","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"distance","expected":0.00000009999999983634211}
+{"id":"pt_pt_diff:equals","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"equals","expected":false}
 {"id":"pt_pt_diff:intersects","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"intersects","expected":false}
+{"id":"pt_pt_diff:overlaps","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"overlaps","expected":false}
+{"id":"pt_pt_diff:relate","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"relate","expected":"FF0FFF0F2"}
+{"id":"pt_pt_diff:touches","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"touches","expected":false}
 {"id":"pt_pt_diff:within","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"within","expected":false}
 {"id":"pt_pt_same:contains","a":"POINT(3 4)","b":"POINT(3 4)","fn":"contains","expected":true}
+{"id":"pt_pt_same:coveredby","a":"POINT(3 4)","b":"POINT(3 4)","fn":"coveredby","expected":true}
+{"id":"pt_pt_same:covers","a":"POINT(3 4)","b":"POINT(3 4)","fn":"covers","expected":true}
+{"id":"pt_pt_same:crosses","a":"POINT(3 4)","b":"POINT(3 4)","fn":"crosses","expected":false}
+{"id":"pt_pt_same:disjoint","a":"POINT(3 4)","b":"POINT(3 4)","fn":"disjoint","expected":false}
 {"id":"pt_pt_same:distance","a":"POINT(3 4)","b":"POINT(3 4)","fn":"distance","expected":0}
+{"id":"pt_pt_same:equals","a":"POINT(3 4)","b":"POINT(3 4)","fn":"equals","expected":true}
 {"id":"pt_pt_same:intersects","a":"POINT(3 4)","b":"POINT(3 4)","fn":"intersects","expected":true}
+{"id":"pt_pt_same:overlaps","a":"POINT(3 4)","b":"POINT(3 4)","fn":"overlaps","expected":false}
+{"id":"pt_pt_same:relate","a":"POINT(3 4)","b":"POINT(3 4)","fn":"relate","expected":"0FFFFFFF2"}
+{"id":"pt_pt_same:touches","a":"POINT(3 4)","b":"POINT(3 4)","fn":"touches","expected":false}
 {"id":"pt_pt_same:within","a":"POINT(3 4)","b":"POINT(3 4)","fn":"within","expected":true}
 {"id":"sq_empty_line:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"contains","expected":false}
+{"id":"sq_empty_line:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"coveredby","expected":false}
+{"id":"sq_empty_line:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"covers","expected":false}
+{"id":"sq_empty_line:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"crosses","expected":false}
+{"id":"sq_empty_line:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"disjoint","expected":true}
 {"id":"sq_empty_line:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"distance","expected":null}
+{"id":"sq_empty_line:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"equals","expected":false}
 {"id":"sq_empty_line:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"intersects","expected":false}
+{"id":"sq_empty_line:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"overlaps","expected":false}
+{"id":"sq_empty_line:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"relate","expected":"FF2FF1FF2"}
+{"id":"sq_empty_line:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"touches","expected":false}
 {"id":"sq_empty_line:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"within","expected":false}
 {"id":"sq_line_crossing:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"contains","expected":false}
+{"id":"sq_line_crossing:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"coveredby","expected":false}
+{"id":"sq_line_crossing:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"covers","expected":false}
+{"id":"sq_line_crossing:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"crosses","expected":true}
+{"id":"sq_line_crossing:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"disjoint","expected":false}
 {"id":"sq_line_crossing:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"distance","expected":0}
+{"id":"sq_line_crossing:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"equals","expected":false}
 {"id":"sq_line_crossing:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"intersects","expected":true}
+{"id":"sq_line_crossing:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"overlaps","expected":false}
+{"id":"sq_line_crossing:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"relate","expected":"1F20F1102"}
+{"id":"sq_line_crossing:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"touches","expected":false}
 {"id":"sq_line_crossing:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"within","expected":false}
 {"id":"sq_line_inside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"contains","expected":true}
+{"id":"sq_line_inside:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"coveredby","expected":false}
+{"id":"sq_line_inside:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"covers","expected":true}
+{"id":"sq_line_inside:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"crosses","expected":false}
+{"id":"sq_line_inside:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"disjoint","expected":false}
 {"id":"sq_line_inside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"distance","expected":0}
+{"id":"sq_line_inside:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"equals","expected":false}
 {"id":"sq_line_inside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"intersects","expected":true}
+{"id":"sq_line_inside:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"overlaps","expected":false}
+{"id":"sq_line_inside:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"relate","expected":"102FF1FF2"}
+{"id":"sq_line_inside:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"touches","expected":false}
 {"id":"sq_line_inside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"within","expected":false}
 {"id":"sq_line_on_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"contains","expected":false}
+{"id":"sq_line_on_edge:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"coveredby","expected":false}
+{"id":"sq_line_on_edge:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"covers","expected":true}
+{"id":"sq_line_on_edge:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"crosses","expected":false}
+{"id":"sq_line_on_edge:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"disjoint","expected":false}
 {"id":"sq_line_on_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"distance","expected":0}
+{"id":"sq_line_on_edge:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"equals","expected":false}
 {"id":"sq_line_on_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"intersects","expected":true}
+{"id":"sq_line_on_edge:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"overlaps","expected":false}
+{"id":"sq_line_on_edge:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"relate","expected":"FF2101FF2"}
+{"id":"sq_line_on_edge:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"touches","expected":true}
 {"id":"sq_line_on_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"within","expected":false}
 {"id":"sq_line_outside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"contains","expected":false}
+{"id":"sq_line_outside:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"coveredby","expected":false}
+{"id":"sq_line_outside:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"covers","expected":false}
+{"id":"sq_line_outside:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"crosses","expected":false}
+{"id":"sq_line_outside:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"disjoint","expected":true}
 {"id":"sq_line_outside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"distance","expected":14.142135623730951}
+{"id":"sq_line_outside:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"equals","expected":false}
 {"id":"sq_line_outside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"intersects","expected":false}
+{"id":"sq_line_outside:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"overlaps","expected":false}
+{"id":"sq_line_outside:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"relate","expected":"FF2FF1102"}
+{"id":"sq_line_outside:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"touches","expected":false}
 {"id":"sq_line_outside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"within","expected":false}
 {"id":"sq_pt_corner:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"contains","expected":false}
+{"id":"sq_pt_corner:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"coveredby","expected":false}
+{"id":"sq_pt_corner:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"covers","expected":true}
+{"id":"sq_pt_corner:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"crosses","expected":false}
+{"id":"sq_pt_corner:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"disjoint","expected":false}
 {"id":"sq_pt_corner:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"distance","expected":0}
+{"id":"sq_pt_corner:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"equals","expected":false}
 {"id":"sq_pt_corner:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"intersects","expected":true}
+{"id":"sq_pt_corner:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"overlaps","expected":false}
+{"id":"sq_pt_corner:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"relate","expected":"FF20F1FF2"}
+{"id":"sq_pt_corner:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"touches","expected":true}
 {"id":"sq_pt_corner:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"within","expected":false}
 {"id":"sq_pt_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"contains","expected":false}
+{"id":"sq_pt_edge:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"coveredby","expected":false}
+{"id":"sq_pt_edge:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"covers","expected":true}
+{"id":"sq_pt_edge:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"crosses","expected":false}
+{"id":"sq_pt_edge:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"disjoint","expected":false}
 {"id":"sq_pt_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"distance","expected":0}
+{"id":"sq_pt_edge:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"equals","expected":false}
 {"id":"sq_pt_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"intersects","expected":true}
+{"id":"sq_pt_edge:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"overlaps","expected":false}
+{"id":"sq_pt_edge:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"relate","expected":"FF20F1FF2"}
+{"id":"sq_pt_edge:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"touches","expected":true}
 {"id":"sq_pt_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"within","expected":false}
 {"id":"sq_pt_inside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"contains","expected":true}
+{"id":"sq_pt_inside:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"coveredby","expected":false}
+{"id":"sq_pt_inside:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"covers","expected":true}
+{"id":"sq_pt_inside:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"crosses","expected":false}
+{"id":"sq_pt_inside:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"disjoint","expected":false}
 {"id":"sq_pt_inside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"distance","expected":0}
+{"id":"sq_pt_inside:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"equals","expected":false}
 {"id":"sq_pt_inside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"intersects","expected":true}
+{"id":"sq_pt_inside:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"overlaps","expected":false}
+{"id":"sq_pt_inside:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"relate","expected":"0F2FF1FF2"}
+{"id":"sq_pt_inside:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"touches","expected":false}
 {"id":"sq_pt_inside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"within","expected":false}
 {"id":"sq_pt_near_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"contains","expected":false}
+{"id":"sq_pt_near_edge:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"coveredby","expected":false}
+{"id":"sq_pt_near_edge:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"covers","expected":false}
+{"id":"sq_pt_near_edge:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"crosses","expected":false}
+{"id":"sq_pt_near_edge:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"disjoint","expected":true}
 {"id":"sq_pt_near_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"distance","expected":0.000000001000000082740371}
+{"id":"sq_pt_near_edge:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"equals","expected":false}
 {"id":"sq_pt_near_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"intersects","expected":false}
+{"id":"sq_pt_near_edge:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"overlaps","expected":false}
+{"id":"sq_pt_near_edge:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"relate","expected":"FF2FF10F2"}
+{"id":"sq_pt_near_edge:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"touches","expected":false}
 {"id":"sq_pt_near_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"within","expected":false}
 {"id":"sq_pt_outside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"contains","expected":false}
+{"id":"sq_pt_outside:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"coveredby","expected":false}
+{"id":"sq_pt_outside:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"covers","expected":false}
+{"id":"sq_pt_outside:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"crosses","expected":false}
+{"id":"sq_pt_outside:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"disjoint","expected":true}
 {"id":"sq_pt_outside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"distance","expected":14.142135623730951}
+{"id":"sq_pt_outside:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"equals","expected":false}
 {"id":"sq_pt_outside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"intersects","expected":false}
+{"id":"sq_pt_outside:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"overlaps","expected":false}
+{"id":"sq_pt_outside:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"relate","expected":"FF2FF10F2"}
+{"id":"sq_pt_outside:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"touches","expected":false}
 {"id":"sq_pt_outside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"within","expected":false}
 {"id":"sq_sq_corner_touch:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"contains","expected":false}
+{"id":"sq_sq_corner_touch:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"coveredby","expected":false}
+{"id":"sq_sq_corner_touch:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"covers","expected":false}
+{"id":"sq_sq_corner_touch:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"crosses","expected":false}
+{"id":"sq_sq_corner_touch:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"disjoint","expected":false}
 {"id":"sq_sq_corner_touch:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"distance","expected":0}
+{"id":"sq_sq_corner_touch:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"equals","expected":false}
 {"id":"sq_sq_corner_touch:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"intersects","expected":true}
+{"id":"sq_sq_corner_touch:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"overlaps","expected":false}
+{"id":"sq_sq_corner_touch:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"relate","expected":"FF2F01212"}
+{"id":"sq_sq_corner_touch:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"touches","expected":true}
 {"id":"sq_sq_corner_touch:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"within","expected":false}
 {"id":"sq_sq_disjoint:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"contains","expected":false}
+{"id":"sq_sq_disjoint:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"coveredby","expected":false}
+{"id":"sq_sq_disjoint:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"covers","expected":false}
+{"id":"sq_sq_disjoint:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"crosses","expected":false}
+{"id":"sq_sq_disjoint:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"disjoint","expected":true}
 {"id":"sq_sq_disjoint:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"distance","expected":14.142135623730951}
+{"id":"sq_sq_disjoint:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"equals","expected":false}
 {"id":"sq_sq_disjoint:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"intersects","expected":false}
+{"id":"sq_sq_disjoint:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"overlaps","expected":false}
+{"id":"sq_sq_disjoint:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"relate","expected":"FF2FF1212"}
+{"id":"sq_sq_disjoint:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"touches","expected":false}
 {"id":"sq_sq_disjoint:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"within","expected":false}
 {"id":"sq_sq_edge_touch:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"contains","expected":false}
+{"id":"sq_sq_edge_touch:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"coveredby","expected":false}
+{"id":"sq_sq_edge_touch:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"covers","expected":false}
+{"id":"sq_sq_edge_touch:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"crosses","expected":false}
+{"id":"sq_sq_edge_touch:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"disjoint","expected":false}
 {"id":"sq_sq_edge_touch:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"distance","expected":0}
+{"id":"sq_sq_edge_touch:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"equals","expected":false}
 {"id":"sq_sq_edge_touch:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_edge_touch:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"overlaps","expected":false}
+{"id":"sq_sq_edge_touch:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"relate","expected":"FF2F11212"}
+{"id":"sq_sq_edge_touch:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"touches","expected":true}
 {"id":"sq_sq_edge_touch:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"within","expected":false}
 {"id":"sq_sq_identical:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":true}
+{"id":"sq_sq_identical:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"coveredby","expected":true}
+{"id":"sq_sq_identical:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"covers","expected":true}
+{"id":"sq_sq_identical:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"crosses","expected":false}
+{"id":"sq_sq_identical:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"disjoint","expected":false}
 {"id":"sq_sq_identical:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"sq_sq_identical:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"equals","expected":true}
 {"id":"sq_sq_identical:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_identical:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"overlaps","expected":false}
+{"id":"sq_sq_identical:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"relate","expected":"2FFF1FFF2"}
+{"id":"sq_sq_identical:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"touches","expected":false}
 {"id":"sq_sq_identical:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":true}
 {"id":"sq_sq_inner_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"contains","expected":true}
+{"id":"sq_sq_inner_edge:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"coveredby","expected":false}
+{"id":"sq_sq_inner_edge:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"covers","expected":true}
+{"id":"sq_sq_inner_edge:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"crosses","expected":false}
+{"id":"sq_sq_inner_edge:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"disjoint","expected":false}
 {"id":"sq_sq_inner_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"distance","expected":0}
+{"id":"sq_sq_inner_edge:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"equals","expected":false}
 {"id":"sq_sq_inner_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_inner_edge:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"overlaps","expected":false}
+{"id":"sq_sq_inner_edge:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"relate","expected":"212F11FF2"}
+{"id":"sq_sq_inner_edge:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"touches","expected":false}
 {"id":"sq_sq_inner_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"within","expected":false}
 {"id":"sq_sq_nested:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"contains","expected":true}
+{"id":"sq_sq_nested:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"coveredby","expected":false}
+{"id":"sq_sq_nested:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"covers","expected":true}
+{"id":"sq_sq_nested:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"crosses","expected":false}
+{"id":"sq_sq_nested:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"disjoint","expected":false}
 {"id":"sq_sq_nested:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"distance","expected":0}
+{"id":"sq_sq_nested:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"equals","expected":false}
 {"id":"sq_sq_nested:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"intersects","expected":true}
+{"id":"sq_sq_nested:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"overlaps","expected":false}
+{"id":"sq_sq_nested:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"relate","expected":"212FF1FF2"}
+{"id":"sq_sq_nested:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"touches","expected":false}
 {"id":"sq_sq_nested:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"within","expected":false}
 {"id":"sq_sq_overlap:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"contains","expected":false}
+{"id":"sq_sq_overlap:coveredby","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"coveredby","expected":false}
+{"id":"sq_sq_overlap:covers","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"covers","expected":false}
+{"id":"sq_sq_overlap:crosses","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"crosses","expected":false}
+{"id":"sq_sq_overlap:disjoint","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"disjoint","expected":false}
 {"id":"sq_sq_overlap:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"distance","expected":0}
+{"id":"sq_sq_overlap:equals","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"equals","expected":false}
 {"id":"sq_sq_overlap:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"intersects","expected":true}
+{"id":"sq_sq_overlap:overlaps","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"overlaps","expected":true}
+{"id":"sq_sq_overlap:relate","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"relate","expected":"212101212"}
+{"id":"sq_sq_overlap:touches","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"touches","expected":false}
 {"id":"sq_sq_overlap:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"within","expected":false}
+{"id":"rp_touch_hit:relate_pattern","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","arg_text":"FT*******","fn":"relate_pattern","expected":false}
+{"id":"rp_wildcard:relate_pattern","a":"LINESTRING(0 0,5 5)","b":"LINESTRING(0 5,5 0)","arg_text":"0********","fn":"relate_pattern","expected":true}
+{"id":"rp_within_hit:relate_pattern","a":"POINT(5 5)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","arg_text":"T*F**F***","fn":"relate_pattern","expected":true}
+{"id":"rp_within_miss:relate_pattern","a":"POINT(50 50)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","arg_text":"T*F**F***","fn":"relate_pattern","expected":false}
 {"id":"dw_exact:dwithin","a":"POINT(0 0)","b":"POINT(3 4)","fn":"dwithin","arg":5.0,"expected":true}
 {"id":"dw_just_under:dwithin","a":"POINT(0 0)","b":"POINT(3 4)","fn":"dwithin","arg":4.999999999,"expected":false}
 {"id":"dw_line_pt:dwithin","a":"LINESTRING(0 0,10 0)","b":"POINT(5 3)","fn":"dwithin","arg":3.0,"expected":true}

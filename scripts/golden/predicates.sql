@@ -53,9 +53,13 @@ WITH pairs(id, a, b) AS (VALUES
   ('mline_line',          'MULTILINESTRING((0 0,5 5),(10 10,15 15))', 'LINESTRING(0 5,5 0)'),
   -- empty operands (non-point empties only; see header note)
   ('sq_empty_line',       'POLYGON((0 0,10 0,10 10,0 10,0 0))', 'LINESTRING EMPTY'),
-  ('empty_poly_pt',       'POLYGON EMPTY', 'POINT(1 1)')
+  ('empty_poly_pt',       'POLYGON EMPTY', 'POINT(1 1)'),
+  ('empty_empty',         'LINESTRING EMPTY', 'POLYGON EMPTY')
 ),
-fns(f) AS (VALUES ('intersects'),('contains'),('within'),('distance'))
+fns(f) AS (VALUES
+  ('intersects'),('contains'),('within'),('distance'),
+  ('disjoint'),('touches'),('crosses'),('overlaps'),('equals'),
+  ('covers'),('coveredby'),('relate'))
 SELECT row_to_json(t)::text FROM (
   SELECT p.id || ':' || f.f AS id, p.a, p.b, f.f AS "fn",
     CASE f.f
@@ -63,9 +67,30 @@ SELECT row_to_json(t)::text FROM (
       WHEN 'contains'   THEN to_jsonb(ST_Contains(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
       WHEN 'within'     THEN to_jsonb(ST_Within(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
       WHEN 'distance'   THEN to_jsonb(ST_Distance(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'disjoint'   THEN to_jsonb(ST_Disjoint(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'touches'    THEN to_jsonb(ST_Touches(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'crosses'    THEN to_jsonb(ST_Crosses(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'overlaps'   THEN to_jsonb(ST_Overlaps(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'equals'     THEN to_jsonb(ST_Equals(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'covers'     THEN to_jsonb(ST_Covers(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'coveredby'  THEN to_jsonb(ST_CoveredBy(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
+      WHEN 'relate'     THEN to_jsonb(ST_Relate(ST_GeomFromText(p.a), ST_GeomFromText(p.b)))
     END AS expected
   FROM pairs p CROSS JOIN fns f
   ORDER BY p.id, f.f
+) t;
+
+-- ST_Relate 3-arg pattern form.
+WITH rp(id, a, b, arg_text) AS (VALUES
+  ('rp_within_hit',  'POINT(5 5)',  'POLYGON((0 0,10 0,10 10,0 10,0 0))', 'T*F**F***'),
+  ('rp_within_miss', 'POINT(50 50)','POLYGON((0 0,10 0,10 10,0 10,0 0))', 'T*F**F***'),
+  ('rp_touch_hit',   'POLYGON((0 0,10 0,10 10,0 10,0 0))', 'POLYGON((10 0,20 0,20 10,10 10,10 0))', 'FT*******'),
+  ('rp_wildcard',    'LINESTRING(0 0,5 5)', 'LINESTRING(0 5,5 0)', '0********')
+)
+SELECT row_to_json(t)::text FROM (
+  SELECT r.id || ':relate_pattern' AS id, r.a, r.b, r.arg_text, 'relate_pattern' AS "fn",
+    to_jsonb(ST_Relate(ST_GeomFromText(r.a), ST_GeomFromText(r.b), r.arg_text)) AS expected
+  FROM rp r ORDER BY r.id
 ) t;
 
 WITH dw(id, a, b, arg) AS (VALUES

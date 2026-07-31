@@ -24,6 +24,8 @@ struct Vector {
     func: String,
     #[serde(default)]
     arg: Option<f64>,
+    #[serde(default)]
+    arg_text: Option<String>,
     expected: serde_json::Value,
     #[serde(default)]
     kenro_expected: Option<serde_json::Value>,
@@ -78,6 +80,15 @@ fn golden_vectors_through_sql() {
             "intersects" => "SELECT ST_Intersects(ST_GeomFromText(?1), ST_GeomFromText(?2))",
             "contains" => "SELECT ST_Contains(ST_GeomFromText(?1), ST_GeomFromText(?2))",
             "within" => "SELECT ST_Within(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "disjoint" => "SELECT ST_Disjoint(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "touches" => "SELECT ST_Touches(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "crosses" => "SELECT ST_Crosses(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "overlaps" => "SELECT ST_Overlaps(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "equals" => "SELECT ST_Equals(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "covers" => "SELECT ST_Covers(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "coveredby" => "SELECT ST_CoveredBy(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "relate" => "SELECT ST_Relate(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "relate_pattern" => "SELECT ST_Relate(ST_GeomFromText(?1), ST_GeomFromText(?2), ?3)",
             "distance" => "SELECT ST_Distance(ST_GeomFromText(?1), ST_GeomFromText(?2))",
             "dwithin" => "SELECT ST_DWithin(ST_GeomFromText(?1), ST_GeomFromText(?2), ?3)",
             "astext" => "SELECT ST_AsText(ST_GeomFromText(?1))",
@@ -88,6 +99,11 @@ fn golden_vectors_through_sql() {
             "dwithin" => conn.query_row(
                 sql,
                 rusqlite::params![&v.a, v.b.as_ref().unwrap(), v.arg.unwrap()],
+                |r| r.get(0),
+            ),
+            "relate_pattern" => conn.query_row(
+                sql,
+                rusqlite::params![&v.a, v.b.as_ref().unwrap(), v.arg_text.as_ref().unwrap()],
                 |r| r.get(0),
             ),
             _ => conn.query_row(sql, [&v.a, v.b.as_ref().unwrap()], |r| r.get(0)),
@@ -125,20 +141,32 @@ fn golden_vectors_through_pure_functions() {
             let ga = io::st_geom_from_text(&v.a, None)?;
             Ok(match v.func.as_str() {
                 "astext" => serde_json::Value::String(io::st_as_text(&ga)?),
-                "intersects" | "contains" | "within" | "distance" | "dwithin" => {
+                _ => {
                     let gb = io::st_geom_from_text(v.b.as_ref().unwrap(), None)?;
                     match v.func.as_str() {
                         "intersects" => predicates::st_intersects(&ga, &gb)?.into(),
                         "contains" => predicates::st_contains(&ga, &gb)?.into(),
                         "within" => predicates::st_within(&ga, &gb)?.into(),
+                        "disjoint" => predicates::st_disjoint(&ga, &gb)?.into(),
+                        "touches" => predicates::st_touches(&ga, &gb)?.into(),
+                        "crosses" => predicates::st_crosses(&ga, &gb)?.into(),
+                        "overlaps" => predicates::st_overlaps(&ga, &gb)?.into(),
+                        "equals" => predicates::st_equals(&ga, &gb)?.into(),
+                        "covers" => predicates::st_covers(&ga, &gb)?.into(),
+                        "coveredby" => predicates::st_covered_by(&ga, &gb)?.into(),
+                        "relate" => predicates::st_relate(&ga, &gb)?.into(),
+                        "relate_pattern" => {
+                            predicates::st_relate_pattern(&ga, &gb, v.arg_text.as_ref().unwrap())?
+                                .into()
+                        }
                         "dwithin" => predicates::st_dwithin(&ga, &gb, v.arg.unwrap())?.into(),
-                        _ => match predicates::st_distance(&ga, &gb)? {
+                        "distance" => match predicates::st_distance(&ga, &gb)? {
                             Some(d) => serde_json::json!(d),
                             None => serde_json::Value::Null,
                         },
+                        other => panic!("{}: unknown fn {other}", v.id),
                     }
                 }
-                other => panic!("{}: unknown fn {other}", v.id),
             })
         })();
 

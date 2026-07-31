@@ -77,6 +77,21 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Intersects", "stIntersects", [Blob, Blob], Bool, None),
     entry!("ST_Contains", "stContains", [Blob, Blob], Bool, None),
     entry!("ST_Within", "stWithin", [Blob, Blob], Bool, None),
+    entry!("ST_Disjoint", "stDisjoint", [Blob, Blob], Bool, None),
+    entry!("ST_Touches", "stTouches", [Blob, Blob], Bool, None),
+    entry!("ST_Crosses", "stCrosses", [Blob, Blob], Bool, None),
+    entry!("ST_Overlaps", "stOverlaps", [Blob, Blob], Bool, None),
+    entry!("ST_Equals", "stEquals", [Blob, Blob], Bool, None),
+    entry!("ST_Covers", "stCovers", [Blob, Blob], Bool, None),
+    entry!("ST_CoveredBy", "stCoveredBy", [Blob, Blob], Bool, None),
+    entry!("ST_Relate", "stRelate", [Blob, Blob], Text, None),
+    entry!(
+        "ST_Relate",
+        "stRelatePattern",
+        [Blob, Blob, Text],
+        Bool,
+        None
+    ),
     entry!("ST_Distance", "stDistance", [Blob, Blob], OptReal, None),
     entry!("ST_DWithin", "stDwithin", [Blob, Blob, Real], Bool, None),
     // GeoPackage R-tree.

@@ -166,6 +166,42 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_Within(ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
     check: (v) => Number(v) === 1,
   },
+  "ST_Disjoint/2": {
+    sql: "SELECT ST_Disjoint(ST_GeomFromText('POINT(100 100)'), ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Touches/2": {
+    sql: "SELECT ST_Touches(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), ST_GeomFromText('POLYGON((4 0,8 0,8 4,4 4,4 0))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Crosses/2": {
+    sql: "SELECT ST_Crosses(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), ST_GeomFromText('LINESTRING(-1 2,5 2)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Overlaps/2": {
+    sql: "SELECT ST_Overlaps(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), ST_GeomFromText('POLYGON((2 2,6 2,6 6,2 6,2 2))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Equals/2": {
+    sql: "SELECT ST_Equals(ST_GeomFromText('POINT(1 2)'), ST_GeomFromText('POINT(1 2)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Covers/2": {
+    sql: "SELECT ST_Covers(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), ST_GeomFromText('POINT(4 2)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_CoveredBy/2": {
+    sql: "SELECT ST_CoveredBy(ST_GeomFromText('POINT(4 2)'), ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Relate/2": {
+    sql: "SELECT ST_Relate(ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
+    check: (v) => v === "0FFFFF212",
+  },
+  "ST_Relate/3": {
+    sql: "SELECT ST_Relate(ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), 'T*F**F***')",
+    check: (v) => Number(v) === 1,
+  },
   "ST_Distance/2": {
     sql: "SELECT ST_Distance(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(3 4)'))",
     check: (v) => Number(v) === 5,

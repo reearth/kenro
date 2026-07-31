@@ -43,6 +43,24 @@ test("predicates vectors", () => {
           return wasm.stContains(a, b);
         case "within":
           return wasm.stWithin(a, b);
+        case "disjoint":
+          return wasm.stDisjoint(a, b);
+        case "touches":
+          return wasm.stTouches(a, b);
+        case "crosses":
+          return wasm.stCrosses(a, b);
+        case "overlaps":
+          return wasm.stOverlaps(a, b);
+        case "equals":
+          return wasm.stEquals(a, b);
+        case "covers":
+          return wasm.stCovers(a, b);
+        case "coveredby":
+          return wasm.stCoveredBy(a, b);
+        case "relate":
+          return wasm.stRelate(a, b);
+        case "relate_pattern":
+          return wasm.stRelatePattern(a, b, v.arg_text);
         case "distance":
           return wasm.stDistance(a, b);
         case "dwithin":
