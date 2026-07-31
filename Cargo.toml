@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/kenro-ext", "crates/kenro-ext-test", "crates/kenro-wasm"]
+members = [
+    "crates/kenro-abi",
+    "crates/kenro-ext",
+    "crates/kenro-ext-test",
+    "crates/kenro-wasm",
+]
 # WARNING: never build/test with `--workspace` (or multiple -p spanning kenro
 # and kenro-ext). kenro's dev-deps need rusqlite/bundled while kenro-ext needs
 # rusqlite/loadable_extension; unified in one cargo invocation,

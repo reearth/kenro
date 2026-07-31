@@ -620,6 +620,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "kenro-abi"
+version = "0.1.0"
+dependencies = [
+ "kenro",
+]
+
+[[package]]
 name = "kenro-ext"
 version = "0.1.0"
 dependencies = [

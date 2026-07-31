@@ -6,7 +6,7 @@
 [![npm](https://img.shields.io/npm/v/kenro-wasm)](https://www.npmjs.com/package/kenro-wasm)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-**SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
+**SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in pure Go with no cgo (modernc.org/sqlite + wazero), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, or *GeoPackage in pure Rust*: this is that crate.
 
@@ -105,6 +105,32 @@ measured sizes, and per-host limitations are in [docs/wasm.md](docs/wasm.md).
 **Live demo: <https://reearth.github.io/kenro/>** — drag a GeoPackage in
 and query it with spatial SQL, entirely client-side (source in
 `crates/kenro-wasm/demo/`).
+
+## Quickstart (pure Go — no cgo)
+
+[modernc.org/sqlite] is SQLite transpiled to Go, so it can't load a native
+extension — but it can register Go functions. kenro's core therefore runs as
+wasm inside [wazero], and both halves stay cgo-free: **spatial SQL in a
+`CGO_ENABLED=0` static binary.**
+
+```go
+import (
+    "database/sql"
+
+    kenro "github.com/reearth/kenro/go"
+    _ "modernc.org/sqlite"
+)
+
+kenro.Register() // once, before opening connections
+
+db, _ := sql.Open("sqlite", "parks.gpkg")
+db.QueryRow(`SELECT ST_AsText(ST_GeomFromGPB(geom)) FROM parks LIMIT 1`).Scan(&wkt)
+```
+
+GeoPackage R-tree triggers are maintained correctly here too (modernc is
+built with `SQLITE_ENABLE_RTREE`). The calling convention, the two driver
+limitations worth knowing about, and measured per-call costs are in
+[docs/go.md](docs/go.md).
 
 ## Function reference
 
@@ -229,4 +255,6 @@ MIT OR Apache-2.0, at your option.
 [georust/geo]: https://github.com/georust/geo
 [proj4rs]: https://github.com/3liz/proj4rs
 [h3-pg]: https://github.com/zachasme/h3-pg
+[modernc.org/sqlite]: https://pkg.go.dev/modernc.org/sqlite
+[wazero]: https://wazero.io
 [i_overlay]: https://github.com/iShape-Rust/iOverlay

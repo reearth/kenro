@@ -1,0 +1,31 @@
+[package]
+name = "kenro-abi"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "kenro spatial functions behind a plain C ABI, for wasm hosts without JS glue (wazero / Go, wasmtime, …)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/reearth/kenro"
+publish = false # until kenro itself is on crates.io
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Same tiers as kenro-wasm, so the Go and JS artifacts stay comparable.
+default = ["transform", "h3", "geojson", "mvt"]
+full = ["transform", "h3", "geojson", "mvt", "overlay"]
+transform = ["kenro/transform"]
+h3 = ["kenro/h3"]
+geojson = ["kenro/geojson"]
+overlay = ["kenro/overlay"]
+mvt = ["kenro/mvt"]
+crs-full = ["kenro/crs-full"]
+
+[dependencies]
+# No rusqlite, no wasm-bindgen, no serde: the whole point of this crate is a
+# module whose only imports are wasi_snapshot_preview1. Build for
+# wasm32-wasip1 — on wasm32-unknown-unknown, proj4rs declares a
+# `[target.wasm32-unknown-unknown.dependencies]` block on wasm-bindgen/js-sys,
+# which makes the module unloadable in a non-JS host like wazero.
+kenro = { path = "../..", default-features = false }

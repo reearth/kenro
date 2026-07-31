@@ -104,3 +104,37 @@ jobs:
         run: |
           npm ci
           npm test
+
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      # Separate cargo invocations, per the workspace warning in Cargo.toml.
+      - name: Clippy (kenro-abi, wasm target)
+        run: cargo clippy -p kenro-abi --features full --target wasm32-wasip1 -- -D warnings
+      - name: Test (kenro-abi, native)
+        run: cargo test -p kenro-abi --features full
+      - name: Vet
+        working-directory: go
+        run: go vet ./...
+      # First against the committed artifact: `go get` users get exactly this
+      # module, and a stale one fails registration (the manifest names an
+      # export the wasm does not have) or a smoke case. Byte-comparing a
+      # rebuild would be flaky instead — rustc and binaryen versions move.
+      - name: Test (committed wasm module)
+        working-directory: go
+        run: go test ./...
+      - name: Rebuild the embedded wasm module
+        run: scripts/build-go-wasm.sh full
+      - name: Test (freshly built wasm module)
+        working-directory: go
+        run: go test ./...
