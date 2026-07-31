@@ -14,7 +14,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **1.1 MB** file with zero dependencies, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~23× smaller**, measured); the wasm build starts at 412 KB (167 KB wire), 25–57× smaller than DuckDB-WASM spatial
+- **Tiny** — the loadable extension is a single **1.1 MB** file with zero dependencies, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~23× smaller**, measured); the wasm build starts at 412 KB (167 KB wire), 25–57× smaller than DuckDB-WASM spatial. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, GML/XML, spreadsheet import, datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
