@@ -94,9 +94,10 @@ db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
 
 Adapters for sql.js and wa-sqlite ship alongside; host support matrix,
 measured sizes, and per-host limitations are in [docs/wasm.md](docs/wasm.md).
-A drag-a-GeoPackage-and-query demo lives in `crates/kenro-wasm/demo/`
-(`./serve.sh` after building; deploys to GitHub Pages once the repo is
-public).
+
+**Live demo: <https://reearth.github.io/kenro/>** — drag a GeoPackage in
+and query it with spatial SQL, entirely client-side (source in
+`crates/kenro-wasm/demo/`).
 
 ## Function reference
 
@@ -199,7 +200,8 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
 5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
 6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
-7. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
+7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
+8. v0.x releases on crates.io (+ npm for kenro-wasm)
 
 ## License
 
