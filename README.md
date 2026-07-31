@@ -129,6 +129,48 @@ Function names, signatures, and semantics follow PostGIS (SQL/MM `ST_` prefix). 
 
 Divergent golden vectors carry a `kenro_expected` + `note` field in `predicates.jsonl`; that file is the source of truth for this table.
 
+## Comparison: kenro vs PostGIS vs DuckDB Spatial
+
+The three tools occupy different niches — this table is for choosing the
+right one, not for claiming parity. Verified against PostGIS 3.5 and DuckDB
+1.4.0 + spatial (July 2026); function presence checked against the official
+docs and a live DuckDB session.
+
+| Function | kenro | PostGIS | DuckDB Spatial | Notes |
+|---|---|---|---|---|
+| `ST_GeomFromText` / `ST_AsText` | ✅ | ✅ | ✅ | DuckDB's constructor takes no srid argument (see SRID row below) |
+| `ST_GeomFromWKB` | ✅ | ✅ | ✅ | |
+| `ST_AsBinary` | ✅ | ✅ | ❌ — named `ST_AsWKB` | PostGIS conversely has no `ST_AsWKB` |
+| `ST_GeomFromGPB` / `ST_AsGPB` (GeoPackage blobs) | ✅ | ❌ | ❌ | kenro operates on gpkg geometry BLOBs in SQL and maintains the gpkg R-tree; DuckDB imports gpkg **files** via GDAL `ST_Read`; PostGIS needs ogr2ogr |
+| `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Distance` / `ST_DWithin` | ✅ | ✅ | ✅ | |
+| bbox accessors | `ST_MinX` … | `ST_XMin` … | `ST_XMin` … | Three-way naming split: kenro uses the GeoPackage spec's trigger names (Annex F.3), the other two use `ST_XMin` |
+| `ST_IsEmpty` | ✅ | ✅ | ✅ | |
+| `ST_Transform` | ✅ `(geom, to_srid)` — source = embedded SRID; curated EPSG table ([accuracy](docs/accuracy.md)) | ✅ 4 overloads, full PROJ database | ✅ but `(geom, source_crs, target_crs [, always_xy])` — source must be spelled out every call | DuckDB's `GEOMETRY` carries **no SRID at all**, so its signature cannot match PostGIS; kenro matches PostGIS |
+| `ST_SetSRID` / `ST_SRID` | ✅ | ✅ | ❌ | Consequence of DuckDB's SRID-less geometry type |
+| `ST_AsGeoJSON` | ✅ byte-identical to PostGIS (golden-tested) | ✅ | ✅ returns a JSON fragment | |
+| `ST_GeomFromGeoJSON` | ✅ (2D only) | ✅ (keeps Z) | ✅ | |
+| H3 cells | ✅ built-in (`h3` feature) | via [h3-pg] extension | via community `h3` extension | `h3_latlng_to_cell` is common to all three; cell→string differs: kenro `h3_cell_to_string`, h3-pg casts the `h3index` type, DuckDB `h3_h3_to_string` |
+| `ST_Area` / `ST_Length` / `ST_Centroid` / `ST_Envelope` / `ST_X` / `ST_Y` / `ST_IsValid` | ✅ | ✅ | ✅ | All three: polygons have `ST_Length` 0. DuckDB additionally has scalar `ST_Extent` returning a `BOX_2D` |
+| `ST_NumPoints` | ✅ LINESTRING-only, NULL otherwise | same (as implemented; its docs lag) | ⚠️ synonym of `ST_NPoints` — counts **all** vertices of any type | Same name, different answer between DuckDB and PostGIS/kenro — kenro follows PostGIS |
+| `ST_NPoints` | stub (planned) | ✅ | ✅ | |
+| `ST_Simplify` | ✅ RDP, collapse allowed | ✅ + `preserveCollapsed` arg | ✅ no third arg; also `ST_SimplifyPreserveTopology` | |
+| `ST_Buffer` / `ST_Union` / `ST_Intersection` / `ST_Difference` | ❌ deliberate (GEOS-class) | ✅ | ✅ | kenro's stubs point you to the other two |
+| `ST_SymDifference` | ❌ deliberate | ✅ | ❌ not implemented | |
+
+Structural differences that matter more than any single function:
+
+- **SRID model** — PostGIS geometries and kenro's GeoPackage blobs both
+  carry their SRID; DuckDB's `GEOMETRY` does not, so CRS bookkeeping is the
+  user's job there (and `always_xy` axis-order care is needed for EPSG:4326).
+- **Where it runs / weight** — kenro lives *inside* SQLite: pure Rust,
+  KB–MB scale, no C toolchain, deterministic. PostGIS is a server-side
+  PostgreSQL extension. DuckDB spatial bundles GEOS + PROJ + GDAL (its
+  WASM build is ~23.5 MB uncompressed, ~6.3 MB over the wire).
+- **Division of labor** — heavyweight analytics, overlays and format
+  conversion belong to DuckDB spatial or PostGIS; predicates, R-tree
+  maintenance and CRS transforms *inside your app's SQLite file* are
+  kenro's seat. They compose rather than compete.
+
 ## Requirements & caveats
 
 - SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`).
