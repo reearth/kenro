@@ -1,4 +1,4 @@
-//! # kenro (間縄)
+//! # kenro
 //!
 //! SpatiaLite-style spatial SQL for SQLite in pure Rust — PostGIS-compatible
 //! `ST_` functions that work with rusqlite, as a loadable extension, and in
