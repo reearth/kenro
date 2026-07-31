@@ -109,6 +109,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the staleness check diffs against the base commit
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-wasip1
@@ -118,6 +120,13 @@ jobs:
         with:
           go-version: "1.25"
           cache-dependency-path: go/go.sum
+      # The embedded module is committed, so it can fall behind the sources it
+      # was built from; a behavior-only change to the core would otherwise go
+      # unnoticed until a user hit it.
+      - name: Embedded wasm module is not stale
+        run: |
+          base="${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}"
+          scripts/check-go-wasm-fresh.sh "$base"
       # Separate cargo invocations, per the workspace warning in Cargo.toml.
       - name: Clippy (kenro-abi, wasm target)
         run: cargo clippy -p kenro-abi --features full --target wasm32-wasip1 -- -D warnings

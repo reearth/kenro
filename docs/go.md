@@ -28,6 +28,11 @@ db.QueryRow(`SELECT ST_AsText(ST_GeomFromGPB(geom)) FROM parks LIMIT 1`).Scan(&w
 `Register` is process-global (so is modernc.org/sqlite's UDF registry) and
 affects connections opened afterwards — call it once at start-up.
 
+Runnable examples for the shapes you are most likely to need — storing and
+querying geometries, R-tree filter-then-refine, dissolve with the `ST_Union`
+aggregate, reprojection — are in [`go/example_test.go`](../go/example_test.go)
+and on [pkg.go.dev](https://pkg.go.dev/github.com/reearth/kenro/go).
+
 ## Why wasm32-wasip1, not wasm32-unknown-unknown
 
 The module the Go binding embeds is built for `wasm32-wasip1`. That is not a
@@ -140,6 +145,19 @@ to ignore for the query shape kenro is built for — filter on the R-tree
 index, then refine with a precise predicate on the survivors — and expensive
 enough that a full-table-scan `ST_Intersects` over millions of rows will be
 slower than a native extension.
+
+## Keeping the embedded module fresh
+
+`go/internal/wasmbin/kenro.wasm` is committed, so it can fall behind the Rust
+sources it was built from. A signature change is caught at run time —
+registration checks the manifest against the module's exports — but a
+behavior-only change to the core is not: the stale module still registers and
+still passes every test, just with yesterday's bug in it.
+
+CI therefore runs `scripts/check-go-wasm-fresh.sh`, which fails when a commit
+touches `src/`, `crates/kenro-abi/` or the manifest without also updating the
+artifact. It compares *what changed*, not bytes: a byte-for-byte rebuild is
+not reproducible across rustc and binaryen versions.
 
 ## Rebuilding the embedded module
 

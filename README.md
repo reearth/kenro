@@ -4,6 +4,7 @@
 [![crates.io](https://img.shields.io/crates/v/kenro)](https://crates.io/crates/kenro)
 [![docs.rs](https://img.shields.io/docsrs/kenro)](https://docs.rs/kenro)
 [![npm](https://img.shields.io/npm/v/kenro-wasm)](https://www.npmjs.com/package/kenro-wasm)
+[![Go Reference](https://pkg.go.dev/badge/github.com/reearth/kenro/go.svg)](https://pkg.go.dev/github.com/reearth/kenro/go)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
 **SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in pure Go with no cgo (modernc.org/sqlite + wazero), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
@@ -113,6 +114,10 @@ extension — but it can register Go functions. kenro's core therefore runs as
 wasm inside [wazero], and both halves stay cgo-free: **spatial SQL in a
 `CGO_ENABLED=0` static binary.**
 
+```sh
+go get github.com/reearth/kenro/go
+```
+
 ```go
 import (
     "database/sql"
@@ -121,16 +126,24 @@ import (
     _ "modernc.org/sqlite"
 )
 
-kenro.Register() // once, before opening connections
+kenro.Register() // once at start-up, before opening connections
 
 db, _ := sql.Open("sqlite", "parks.gpkg")
 db.QueryRow(`SELECT ST_AsText(ST_GeomFromGPB(geom)) FROM parks LIMIT 1`).Scan(&wkt)
 ```
 
-GeoPackage R-tree triggers are maintained correctly here too (modernc is
-built with `SQLITE_ENABLE_RTREE`). The calling convention, the two driver
-limitations worth knowing about, and measured per-call costs are in
-[docs/go.md](docs/go.md).
+The wasm module is committed to the repository, so `go get` needs no Rust
+toolchain. GeoPackage R-tree triggers are maintained correctly here too
+(modernc is built with `SQLITE_ENABLE_RTREE`).
+
+**Source: [`go/`](go/) · runnable examples:
+[`go/example_test.go`](go/example_test.go) ·
+[API docs](https://pkg.go.dev/github.com/reearth/kenro/go)** — storing and
+querying geometries, the R-tree filter-then-refine query, dissolve with the
+`ST_Union` aggregate, and reprojection.
+
+The calling convention, the two driver limitations worth knowing about, and
+measured per-call costs are in [docs/go.md](docs/go.md).
 
 ## Function reference
 
