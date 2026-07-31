@@ -134,7 +134,7 @@ fn line_endpoint(bytes: &[u8], func: &'static str, end: bool) -> Result<Option<V
         }
     };
     let coord = match &geom.geometry {
-        Geometry::Point(p) => (!geom::is_empty(&geom.geometry)).then(|| p.0),
+        Geometry::Point(p) => (!geom::is_empty(&geom.geometry)).then_some(p.0),
         Geometry::LineString(ls) => pick(ls),
         Geometry::Line(l) => Some(if end { l.end } else { l.start }),
         Geometry::MultiLineString(mls) => {
