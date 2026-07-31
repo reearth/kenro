@@ -10,11 +10,27 @@
 {"id":"centroid_mpt:centroid","a":"MULTIPOINT(0 0,1 0,1 1)","fn":"centroid","arg":null,"expected":"POINT(0.666666666666667 0.333333333333333)"}
 {"id":"centroid_square:centroid","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"centroid","arg":null,"expected":"POINT(2 2)"}
 {"id":"centroid_tri:centroid","a":"POLYGON((0 0,4 0,0 3,0 0))","fn":"centroid","arg":null,"expected":"POINT(1.333333333333333 1)"}
+{"id":"endpoint_line:endpoint","a":"LINESTRING(1 2,3 4,5 6)","fn":"endpoint","arg":null,"expected":"POINT(5 6)"}
+{"id":"endpoint_poly:endpoint","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"endpoint","arg":null,"expected":null}
 {"id":"envelope_diag:envelope","a":"LINESTRING(1 2,5 8)","fn":"envelope","arg":null,"expected":"POLYGON((1 2,1 8,5 8,5 2,1 2))"}
 {"id":"envelope_empty:envelope","a":"LINESTRING EMPTY","fn":"envelope","arg":null,"expected":"LINESTRING EMPTY"}
 {"id":"envelope_hline:envelope","a":"LINESTRING(1 2,5 2)","fn":"envelope","arg":null,"expected":"LINESTRING(1 2,5 2)"}
 {"id":"envelope_point:envelope","a":"POINT(3 4)","fn":"envelope","arg":null,"expected":"POINT(3 4)"}
 {"id":"envelope_poly:envelope","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"envelope","arg":null,"expected":"POLYGON((0 0,0 4,4 4,4 0,0 0))"}
+{"id":"geometryn_1:geometryn","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"geometryn","arg":1,"expected":"POLYGON((0 0,1 0,1 1,0 1,0 0))"}
+{"id":"geometryn_2:geometryn","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"geometryn","arg":2,"expected":"POLYGON((2 2,4 2,4 4,2 4,2 2))"}
+{"id":"geometryn_gc:geometryn","a":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))","fn":"geometryn","arg":2,"expected":"LINESTRING(0 0,1 1)"}
+{"id":"geometryn_oob:geometryn","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"geometryn","arg":3,"expected":null}
+{"id":"geometryn_single:geometryn","a":"POINT(1 2)","fn":"geometryn","arg":1,"expected":"POINT(1 2)"}
+{"id":"geometryn_zero:geometryn","a":"MULTIPOINT(1 2,3 4)","fn":"geometryn","arg":0,"expected":null}
+{"id":"geomtype_empty:geomtype","a":"POLYGON EMPTY","fn":"geomtype","arg":null,"expected":"ST_Polygon"}
+{"id":"geomtype_gc:geomtype","a":"GEOMETRYCOLLECTION(POINT(1 2))","fn":"geomtype","arg":null,"expected":"ST_GeometryCollection"}
+{"id":"geomtype_line:geomtype","a":"LINESTRING(0 0,1 1)","fn":"geomtype","arg":null,"expected":"ST_LineString"}
+{"id":"geomtype_mline:geomtype","a":"MULTILINESTRING((0 0,1 1))","fn":"geomtype","arg":null,"expected":"ST_MultiLineString"}
+{"id":"geomtype_mpoly:geomtype","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))","fn":"geomtype","arg":null,"expected":"ST_MultiPolygon"}
+{"id":"geomtype_mpt:geomtype","a":"MULTIPOINT(1 2)","fn":"geomtype","arg":null,"expected":"ST_MultiPoint"}
+{"id":"geomtype_poly:geomtype","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"geomtype","arg":null,"expected":"ST_Polygon"}
+{"id":"geomtype_pt:geomtype","a":"POINT(1 2)","fn":"geomtype","arg":null,"expected":"ST_Point"}
 {"id":"isvalid_bowtie:isvalid","a":"POLYGON((0 0,4 4,4 0,0 4,0 0))","fn":"isvalid","arg":null,"expected":false}
 {"id":"isvalid_hole_out:isvalid","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(5 5,6 5,6 6,5 6,5 5))","fn":"isvalid","arg":null,"expected":false}
 {"id":"isvalid_line:isvalid","a":"LINESTRING(0 0,1 1)","fn":"isvalid","arg":null,"expected":true}
@@ -24,15 +40,50 @@
 {"id":"length_mline:length","a":"MULTILINESTRING((0 0,3 4),(0 0,6 8))","fn":"length","arg":null,"expected":15}
 {"id":"length_point:length","a":"POINT(1 2)","fn":"length","arg":null,"expected":0}
 {"id":"length_polygon:length","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"length","arg":null,"expected":0}
+{"id":"npoints_empty:npoints","a":"POLYGON EMPTY","fn":"npoints","arg":null,"expected":0}
+{"id":"npoints_gc:npoints","a":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))","fn":"npoints","arg":null,"expected":3}
+{"id":"npoints_hole:npoints","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))","fn":"npoints","arg":null,"expected":10}
+{"id":"npoints_mpt:npoints","a":"MULTIPOINT(1 2,3 4)","fn":"npoints","arg":null,"expected":2}
+{"id":"npoints_square:npoints","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"npoints","arg":null,"expected":5}
+{"id":"numgeoms_empty:numgeoms","a":"MULTIPOLYGON EMPTY","fn":"numgeoms","arg":null,"expected":0}
+{"id":"numgeoms_gc:numgeoms","a":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1),POINT(5 5))","fn":"numgeoms","arg":null,"expected":3}
+{"id":"numgeoms_line_empty:numgeoms","a":"LINESTRING EMPTY","fn":"numgeoms","arg":null,"expected":0}
+{"id":"numgeoms_mpoly:numgeoms","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"numgeoms","arg":null,"expected":2}
+{"id":"numgeoms_point:numgeoms","a":"POINT(1 2)","fn":"numgeoms","arg":null,"expected":1}
 {"id":"numpoints_line:numpoints","a":"LINESTRING(0 0,1 1,2 2)","fn":"numpoints","arg":null,"expected":3}
 {"id":"numpoints_mline:numpoints","a":"MULTILINESTRING((0 0,1 1))","fn":"numpoints","arg":null,"expected":null}
 {"id":"numpoints_point:numpoints","a":"POINT(0 0)","fn":"numpoints","arg":null,"expected":null}
 {"id":"numpoints_poly:numpoints","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"numpoints","arg":null,"expected":null}
+{"id":"perimeter_hole:perimeter","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))","fn":"perimeter","arg":null,"expected":20}
+{"id":"perimeter_line:perimeter","a":"LINESTRING(0 0,3 4)","fn":"perimeter","arg":null,"expected":0}
+{"id":"perimeter_mpoly:perimeter","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"perimeter","arg":null,"expected":12}
+{"id":"perimeter_point:perimeter","a":"POINT(1 2)","fn":"perimeter","arg":null,"expected":0}
+{"id":"perimeter_square:perimeter","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"perimeter","arg":null,"expected":16}
+{"id":"pointn_first:pointn","a":"LINESTRING(1 2,3 4,5 6,7 8,9 10)","fn":"pointn","arg":1,"expected":"POINT(1 2)"}
+{"id":"pointn_last:pointn","a":"LINESTRING(1 2,3 4,5 6,7 8,9 10)","fn":"pointn","arg":5,"expected":"POINT(9 10)"}
+{"id":"pointn_neg:pointn","a":"LINESTRING(1 2,3 4,5 6,7 8,9 10)","fn":"pointn","arg":-1,"expected":"POINT(9 10)"}
+{"id":"pointn_oob:pointn","a":"LINESTRING(1 2,3 4,5 6,7 8,9 10)","fn":"pointn","arg":6,"expected":null}
+{"id":"pointn_poly:pointn","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"pointn","arg":1,"expected":null}
+{"id":"pointn_zero:pointn","a":"LINESTRING(1 2,3 4,5 6,7 8,9 10)","fn":"pointn","arg":0,"expected":null}
+{"id":"reverse_hole:reverse","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))","fn":"reverse","arg":null,"expected":"POLYGON((0 0,0 4,4 4,4 0,0 0),(1 1,1 2,2 2,2 1,1 1))"}
+{"id":"reverse_line:reverse","a":"LINESTRING(1 2,3 4,5 6)","fn":"reverse","arg":null,"expected":"LINESTRING(5 6,3 4,1 2)"}
+{"id":"reverse_mline:reverse","a":"MULTILINESTRING((0 0,1 1),(2 2,3 3))","fn":"reverse","arg":null,"expected":"MULTILINESTRING((1 1,0 0),(3 3,2 2))"}
+{"id":"reverse_point:reverse","a":"POINT(1 2)","fn":"reverse","arg":null,"expected":"POINT(1 2)"}
 {"id":"simplify_keep:simplify","a":"LINESTRING(0 0,1 5,2 0)","fn":"simplify","arg":0.1,"expected":"LINESTRING(0 0,1 5,2 0)"}
 {"id":"simplify_point:simplify","a":"POINT(1 2)","fn":"simplify","arg":10,"expected":"POINT(1 2)"}
 {"id":"simplify_poly:simplify","a":"POLYGON((0 0,2 0.01,4 0,4 4,0 4,0 0))","fn":"simplify","arg":0.1,"expected":"POLYGON((0 0,4 0,4 4,0 4,0 0))"}
 {"id":"simplify_zigzag:simplify","a":"LINESTRING(0 0,1 0.01,2 0,3 0.01,4 0)","fn":"simplify","arg":0.1,"expected":"LINESTRING(0 0,4 0)"}
+{"id":"startpoint_empty:startpoint","a":"LINESTRING EMPTY","fn":"startpoint","arg":null,"expected":null}
+{"id":"startpoint_line:startpoint","a":"LINESTRING(1 2,3 4,5 6)","fn":"startpoint","arg":null,"expected":"POINT(1 2)"}
+{"id":"startpoint_mline:startpoint","a":"MULTILINESTRING((1 2,3 4))","fn":"startpoint","arg":null,"expected":"POINT(1 2)"}
+{"id":"startpoint_pt:startpoint","a":"POINT(1 2)","fn":"startpoint","arg":null,"expected":"POINT(1 2)"}
 {"id":"x_point:x","a":"POINT(3.5 -4.25)","fn":"x","arg":null,"expected":3.5}
 {"id":"y_point:y","a":"POINT(3.5 -4.25)","fn":"y","arg":null,"expected":-4.25}
+{"id":"makepoint:makepoint","args":[1.5,2.5],"fn":"makepoint","expected":"POINT(1.5 2.5)"}
+{"id":"point2:point","args":[-3.25,4.0],"fn":"point","expected":"POINT(-3.25 4)"}
+{"id":"point3:point_srid","args":[1.0,2.0],"srid":6677,"fn":"point_srid","expected":6677}
+{"id":"envelope4:makeenvelope","args":[0.0,0.0,2.0,3.0],"fn":"makeenvelope","expected":"POLYGON((0 0,0 3,2 3,2 0,0 0))"}
+{"id":"envelope_degenerate:makeenvelope","args":[1.0,2.0,1.0,2.0],"fn":"makeenvelope","expected":"POLYGON((1 2,1 2,1 2,1 2,1 2))"}
+{"id":"envelope5:makeenvelope_srid","args":[0.0,0.0,2.0,3.0],"srid":4326,"fn":"makeenvelope_srid","expected":4326}
 {"id":"x_line:x","a":"LINESTRING(0 0,1 1)","fn":"x","expected":{"error": true},"note":"PostGIS: Argument to ST_X() must have type point; kenro raises too"}
 {"id":"y_poly:y","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"y","expected":{"error": true},"note":"PostGIS: Argument to ST_Y() must have type point; kenro raises too"}

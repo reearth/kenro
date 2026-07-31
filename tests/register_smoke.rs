@@ -50,6 +50,24 @@ fn every_implemented_function_is_callable() {
         "SELECT ST_NumPoints(ST_GeomFromText('LINESTRING(0 0,1 1)'))",
         "SELECT ST_IsValid(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
         "SELECT ST_AsText(ST_Simplify(ST_GeomFromText('LINESTRING(0 0,1 0.001,2 0)'), 0.1))",
+        "SELECT ST_Disjoint(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(9 9)'))",
+        "SELECT ST_Relate(ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('POINT(1 1)'))",
+        "SELECT ST_Relate(ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('POINT(1 1)'), '0FFFFFFF2')",
+        "SELECT ST_NPoints(ST_GeomFromText('LINESTRING(0 0,1 1)'))",
+        "SELECT ST_Perimeter(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+        "SELECT ST_GeometryType(ST_GeomFromText('POINT(1 2)'))",
+        "SELECT ST_NumGeometries(ST_GeomFromText('MULTIPOINT(1 2,3 4)'))",
+        "SELECT ST_AsText(ST_GeometryN(ST_GeomFromText('MULTIPOINT(1 2,3 4)'), 1))",
+        "SELECT ST_AsText(ST_StartPoint(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+        "SELECT ST_AsText(ST_EndPoint(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+        "SELECT ST_AsText(ST_PointN(ST_GeomFromText('LINESTRING(1 2,3 4)'), 2))",
+        "SELECT ST_AsText(ST_Reverse(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+        "SELECT ST_AsText(ST_MakePoint(1.5, 2.5))",
+        "SELECT ST_AsText(ST_Point(1, 2))",
+        "SELECT ST_SRID(ST_Point(1, 2, 4326))",
+        "SELECT ST_AsText(ST_MakeEnvelope(0, 0, 2, 3))",
+        "SELECT ST_SRID(ST_MakeEnvelope(0, 0, 2, 3, 4326))",
+        "SELECT GPKG_IsAssignable('GEOMETRY', 'POINT')",
     ];
     for sql in cases {
         assert!(
@@ -131,6 +149,22 @@ fn null_in_null_out_for_every_function() {
         "SELECT ST_NumPoints(NULL)",
         "SELECT ST_IsValid(NULL)",
         "SELECT ST_Simplify(NULL, 0.1)",
+        "SELECT ST_Disjoint(NULL, NULL)",
+        "SELECT ST_Relate(NULL, NULL)",
+        "SELECT ST_Relate(NULL, NULL, 'T*F**F***')",
+        "SELECT ST_NPoints(NULL)",
+        "SELECT ST_Perimeter(NULL)",
+        "SELECT ST_GeometryType(NULL)",
+        "SELECT ST_NumGeometries(NULL)",
+        "SELECT ST_GeometryN(NULL, 1)",
+        "SELECT ST_StartPoint(NULL)",
+        "SELECT ST_EndPoint(NULL)",
+        "SELECT ST_PointN(NULL, 1)",
+        "SELECT ST_Reverse(NULL)",
+        "SELECT ST_MakePoint(NULL, 2)",
+        "SELECT ST_Point(1, NULL)",
+        "SELECT ST_MakeEnvelope(NULL, 0, 2, 3)",
+        "SELECT GPKG_IsAssignable(NULL, 'POINT')",
     ];
     for sql in cases {
         assert!(
@@ -152,16 +186,8 @@ fn stubs_error_with_helpful_hints() {
     assert!(err.contains("ST_Buffer is not implemented"), "{err}");
     assert!(err.contains("SpatiaLite or DuckDB spatial"), "{err}");
 
-    let err = query_value(
-        &conn,
-        "SELECT ST_NPoints(ST_GeomFromText('LINESTRING(0 0,1 1)'))",
-    )
-    .unwrap_err()
-    .to_string();
-    assert!(err.contains("ST_NumPoints"), "{err}");
-
     // Stubs are loud for any arity, including NULL args.
-    assert!(query_value(&conn, "SELECT ST_Perimeter(NULL)").is_err());
+    assert!(query_value(&conn, "SELECT ST_AsMVTGeom(NULL, NULL)").is_err());
     assert!(query_value(&conn, "SELECT ST_Union()").is_err());
 
     let err = query_value(&conn, "SELECT ST_AsMVT(ST_GeomFromText('POINT(0 0)'))")

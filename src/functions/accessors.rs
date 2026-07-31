@@ -13,6 +13,217 @@ pub fn st_area(bytes: &[u8]) -> Result<f64> {
     Ok(geom::decode_auto(bytes)?.geometry.unsigned_area())
 }
 
+/// `ST_NPoints(geom)` — all vertices of any type, including ring-closure
+/// duplicates; 0 for empty geometries (incl. the NaN-coordinate POINT
+/// EMPTY, which `coords_count` would count as one).
+pub fn st_npoints(bytes: &[u8]) -> Result<i64> {
+    use geo::CoordsIter;
+    let geom = geom::decode_auto(bytes)?;
+    if geom::is_empty(&geom.geometry) {
+        return Ok(0);
+    }
+    Ok(geom.geometry.coords_count() as i64)
+}
+
+/// `ST_Perimeter(geom)` — boundary length of areal geometries; 0 for
+/// points and linestrings (as in PostGIS — use ST_Length for those).
+pub fn st_perimeter(bytes: &[u8]) -> Result<f64> {
+    fn perimeter(g: &Geometry<f64>) -> f64 {
+        fn polygon_perimeter(p: &Polygon<f64>) -> f64 {
+            std::iter::once(p.exterior())
+                .chain(p.interiors().iter())
+                .map(|ring| Euclidean.length(ring))
+                .sum()
+        }
+        match g {
+            Geometry::Polygon(p) => polygon_perimeter(p),
+            Geometry::MultiPolygon(mp) => mp.0.iter().map(polygon_perimeter).sum(),
+            Geometry::Rect(r) => polygon_perimeter(&r.to_polygon()),
+            Geometry::Triangle(t) => polygon_perimeter(&t.to_polygon()),
+            Geometry::GeometryCollection(gc) => gc.0.iter().map(perimeter).sum(),
+            _ => 0.0,
+        }
+    }
+    Ok(perimeter(&geom::decode_auto(bytes)?.geometry))
+}
+
+/// `ST_GeometryType(geom)` — PostGIS-style prefixed type names
+/// (`ST_Point`, …). GeoPackage triggers pair this with GPKG_IsAssignable,
+/// which normalizes both spellings.
+pub fn st_geometry_type(bytes: &[u8]) -> Result<String> {
+    let geom = geom::decode_auto(bytes)?;
+    Ok(match geom.geometry {
+        Geometry::Point(_) => "ST_Point",
+        Geometry::Line(_) | Geometry::LineString(_) => "ST_LineString",
+        Geometry::Polygon(_) | Geometry::Rect(_) | Geometry::Triangle(_) => "ST_Polygon",
+        Geometry::MultiPoint(_) => "ST_MultiPoint",
+        Geometry::MultiLineString(_) => "ST_MultiLineString",
+        Geometry::MultiPolygon(_) => "ST_MultiPolygon",
+        Geometry::GeometryCollection(_) => "ST_GeometryCollection",
+    }
+    .to_string())
+}
+
+/// `ST_NumGeometries(geom)` — element count for collections, 1 for
+/// non-empty single geometries (PostGIS ≥ 2.0), 0 for empty.
+pub fn st_num_geometries(bytes: &[u8]) -> Result<i64> {
+    let geom = geom::decode_auto(bytes)?;
+    Ok(match &geom.geometry {
+        Geometry::GeometryCollection(gc) => gc.0.len() as i64,
+        Geometry::MultiPoint(m) => m.0.len() as i64,
+        Geometry::MultiLineString(m) => m.0.len() as i64,
+        Geometry::MultiPolygon(m) => m.0.len() as i64,
+        single => {
+            if geom::is_empty(single) {
+                0
+            } else {
+                1
+            }
+        }
+    })
+}
+
+/// `ST_GeometryN(geom, n)` — 1-based element access; NULL when out of
+/// range; a non-empty single geometry is its own element 1 (PostGIS ≥ 2.0).
+pub fn st_geometry_n(bytes: &[u8], n: i64) -> Result<Option<Vec<u8>>> {
+    let geom = geom::decode_auto(bytes)?;
+    if n < 1 {
+        return Ok(None);
+    }
+    let idx = (n - 1) as usize;
+    let element: Option<Geometry<f64>> = match &geom.geometry {
+        Geometry::GeometryCollection(gc) => gc.0.get(idx).cloned(),
+        Geometry::MultiPoint(m) => m.0.get(idx).map(|p| Geometry::Point(*p)),
+        Geometry::MultiLineString(m) => m.0.get(idx).cloned().map(Geometry::LineString),
+        Geometry::MultiPolygon(m) => m.0.get(idx).cloned().map(Geometry::Polygon),
+        single => (idx == 0 && !geom::is_empty(single)).then(|| single.clone()),
+    };
+    element
+        .map(|geometry| {
+            geom::encode_canonical_gpb(
+                &Geom {
+                    geometry,
+                    srid: geom.srid,
+                    has_zm: false,
+                },
+                "ST_GeometryN",
+            )
+        })
+        .transpose()
+}
+
+/// `ST_StartPoint(geom)` / `ST_EndPoint(geom)` — PostGIS ≥ 3.2 semantics,
+/// golden-verified: points return themselves, linestrings their first/last
+/// vertex, multilinestrings the first point of the first member (resp.
+/// last of the last); areal and collection input → NULL.
+pub fn st_start_point(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    line_endpoint(bytes, "ST_StartPoint", false)
+}
+
+pub fn st_end_point(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
+    line_endpoint(bytes, "ST_EndPoint", true)
+}
+
+fn line_endpoint(bytes: &[u8], func: &'static str, end: bool) -> Result<Option<Vec<u8>>> {
+    let geom = geom::decode_auto(bytes)?;
+    let pick = |ls: &LineString<f64>| {
+        if end {
+            ls.0.last().copied()
+        } else {
+            ls.0.first().copied()
+        }
+    };
+    let coord = match &geom.geometry {
+        Geometry::Point(p) => (!geom::is_empty(&geom.geometry)).then(|| p.0),
+        Geometry::LineString(ls) => pick(ls),
+        Geometry::Line(l) => Some(if end { l.end } else { l.start }),
+        Geometry::MultiLineString(mls) => {
+            let member = if end { mls.0.last() } else { mls.0.first() };
+            member.and_then(pick)
+        }
+        _ => None,
+    };
+    coord
+        .map(|c| {
+            geom::encode_canonical_gpb(
+                &Geom {
+                    geometry: Geometry::Point(Point::from(c)),
+                    srid: geom.srid,
+                    has_zm: false,
+                },
+                func,
+            )
+        })
+        .transpose()
+}
+
+/// `ST_PointN(linestring, n)` — 1-based vertex access with negative
+/// indexing (-1 = last, PostGIS ≥ 2.3); NULL for non-LINESTRING input or
+/// out-of-range n.
+pub fn st_point_n(bytes: &[u8], n: i64) -> Result<Option<Vec<u8>>> {
+    let geom = geom::decode_auto(bytes)?;
+    let Geometry::LineString(ls) = &geom.geometry else {
+        return Ok(None);
+    };
+    let len = ls.0.len() as i64;
+    let resolved = if n < 0 { len + n + 1 } else { n };
+    if resolved < 1 || resolved > len {
+        return Ok(None);
+    }
+    let coord = ls.0[(resolved - 1) as usize];
+    Some(geom::encode_canonical_gpb(
+        &Geom {
+            geometry: Geometry::Point(Point::from(coord)),
+            srid: geom.srid,
+            has_zm: false,
+        },
+        "ST_PointN",
+    ))
+    .transpose()
+}
+
+/// `ST_Reverse(geom)` — reverse vertex order per component (member order
+/// of multi-geometries is preserved, matching PostGIS).
+pub fn st_reverse(bytes: &[u8]) -> Result<Vec<u8>> {
+    fn rev_ls(ls: &LineString<f64>) -> LineString<f64> {
+        LineString::new(ls.0.iter().rev().copied().collect())
+    }
+    fn rev_poly(p: &Polygon<f64>) -> Polygon<f64> {
+        Polygon::new(
+            rev_ls(p.exterior()),
+            p.interiors().iter().map(rev_ls).collect(),
+        )
+    }
+    fn rev(g: &Geometry<f64>) -> Geometry<f64> {
+        match g {
+            Geometry::LineString(ls) => Geometry::LineString(rev_ls(ls)),
+            Geometry::Line(l) => Geometry::Line(geo_types::Line::new(l.end, l.start)),
+            Geometry::Polygon(p) => Geometry::Polygon(rev_poly(p)),
+            Geometry::MultiLineString(m) => Geometry::MultiLineString(geo_types::MultiLineString(
+                m.0.iter().map(rev_ls).collect(),
+            )),
+            Geometry::MultiPolygon(m) => {
+                Geometry::MultiPolygon(geo_types::MultiPolygon(m.0.iter().map(rev_poly).collect()))
+            }
+            Geometry::Rect(r) => Geometry::Polygon(rev_poly(&r.to_polygon())),
+            Geometry::Triangle(t) => Geometry::Polygon(rev_poly(&t.to_polygon())),
+            Geometry::GeometryCollection(gc) => Geometry::GeometryCollection(
+                geo_types::GeometryCollection(gc.0.iter().map(rev).collect()),
+            ),
+            point => point.clone(),
+        }
+    }
+    let geom = geom::decode_auto(bytes)?;
+    geom::encode_canonical_gpb(
+        &Geom {
+            geometry: rev(&geom.geometry),
+            srid: geom.srid,
+            has_zm: false,
+        },
+        "ST_Reverse",
+    )
+}
+
 /// `ST_Length(geom)` — 2D cartesian length of linear geometries; 0 for
 /// points and polygons (as in PostGIS — polygon boundary length is
 /// ST_Perimeter's job).

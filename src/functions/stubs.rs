@@ -21,16 +21,6 @@ const GEOS_HINT: &str =
 pub const STUBS: &[Stub] = &[
     // Planned ("not yet").
     Stub {
-        name: "ST_NPoints",
-        hint: "Planned for a future release. For linestrings, ST_NumPoints works today \
-               (note the two are different functions in PostGIS too).",
-    },
-    Stub {
-        name: "ST_Perimeter",
-        hint: "Planned for a future release. Note ST_Length returns 0 for polygons, \
-               matching PostGIS.",
-    },
-    Stub {
         name: "ST_AsMVT",
         hint: "MVT tile generation is not implemented in kenro yet (in PostGIS this is an \
                aggregate paired with ST_AsMVTGeom); generate tiles with PostGIS or tippecanoe \

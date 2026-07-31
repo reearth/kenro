@@ -141,10 +141,42 @@ test("h3 vectors", () => {
 
 test("accessors vectors", () => {
   const geometric = new Set(["centroid", "envelope", "simplify"]);
+  const optText = (blob) => (blob === undefined ? undefined : wasm.stAsText(blob));
   for (const v of loadVectors("accessors")) {
     const run = () => {
+      // Constructors take numeric args instead of an input geometry.
+      switch (v.fn) {
+        case "makepoint":
+          return wasm.stAsText(wasm.stMakePoint(v.args[0], v.args[1]));
+        case "point":
+          return wasm.stAsText(wasm.stPoint(v.args[0], v.args[1]));
+        case "point_srid":
+          return wasm.stSrid(wasm.stPointSrid(v.args[0], v.args[1], v.srid));
+        case "makeenvelope":
+          return wasm.stAsText(wasm.stMakeEnvelope(...v.args));
+        case "makeenvelope_srid":
+          return wasm.stSrid(wasm.stMakeEnvelopeSrid(...v.args, v.srid));
+      }
       const g = geom(v.a);
       switch (v.fn) {
+        case "npoints":
+          return wasm.stNPoints(g);
+        case "perimeter":
+          return wasm.stPerimeter(g);
+        case "geomtype":
+          return wasm.stGeometryType(g);
+        case "numgeoms":
+          return wasm.stNumGeometries(g);
+        case "geometryn":
+          return optText(wasm.stGeometryN(g, v.arg));
+        case "startpoint":
+          return optText(wasm.stStartPoint(g));
+        case "endpoint":
+          return optText(wasm.stEndPoint(g));
+        case "pointn":
+          return optText(wasm.stPointN(g, v.arg));
+        case "reverse":
+          return wasm.stAsText(wasm.stReverse(g));
         case "area":
           return wasm.stArea(g);
         case "length":

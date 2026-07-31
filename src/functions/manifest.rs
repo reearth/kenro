@@ -22,6 +22,8 @@ pub enum Kind {
     Bool,
     OptReal,
     OptI64,
+    /// Nullable geometry return (`Option<Vec<u8>>` → SQL NULL). Return-only.
+    OptBlob,
 }
 
 pub struct FnEntry {
@@ -153,8 +155,43 @@ pub const FUNCTIONS: &[FnEntry] = &[
         I64,
         Some("h3")
     ),
+    // Constructors.
+    entry!("ST_MakePoint", "stMakePoint", [Real, Real], Blob, None),
+    entry!("ST_Point", "stPoint", [Real, Real], Blob, None),
+    entry!("ST_Point", "stPointSrid", [Real, Real, Int], Blob, None),
+    entry!(
+        "ST_MakeEnvelope",
+        "stMakeEnvelope",
+        [Real, Real, Real, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_MakeEnvelope",
+        "stMakeEnvelopeSrid",
+        [Real, Real, Real, Real, Int],
+        Blob,
+        None
+    ),
+    // GeoPackage geometry-type-trigger support (extension F.4).
+    entry!(
+        "GPKG_IsAssignable",
+        "gpkgIsAssignable",
+        [Text, Text],
+        Bool,
+        None
+    ),
     // Accessors.
     entry!("ST_Area", "stArea", [Blob], Real, None),
+    entry!("ST_NPoints", "stNPoints", [Blob], Int, None),
+    entry!("ST_Perimeter", "stPerimeter", [Blob], Real, None),
+    entry!("ST_GeometryType", "stGeometryType", [Blob], Text, None),
+    entry!("ST_NumGeometries", "stNumGeometries", [Blob], Int, None),
+    entry!("ST_GeometryN", "stGeometryN", [Blob, Int], OptBlob, None),
+    entry!("ST_StartPoint", "stStartPoint", [Blob], OptBlob, None),
+    entry!("ST_EndPoint", "stEndPoint", [Blob], OptBlob, None),
+    entry!("ST_PointN", "stPointN", [Blob, Int], OptBlob, None),
+    entry!("ST_Reverse", "stReverse", [Blob], Blob, None),
     entry!("ST_Length", "stLength", [Blob], Real, None),
     entry!("ST_Centroid", "stCentroid", [Blob], Blob, None),
     entry!("ST_Envelope", "stEnvelope", [Blob], Blob, None),
@@ -174,8 +211,6 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Intersection", &[2]),
     ("ST_Difference", &[2]),
     ("ST_SymDifference", &[2]),
-    ("ST_NPoints", &[1]),
-    ("ST_Perimeter", &[1]),
     ("ST_AsMVT", &[1, 2, 3, 4]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
     // Feature-off fallbacks.

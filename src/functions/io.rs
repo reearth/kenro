@@ -84,6 +84,53 @@ pub fn st_srid(bytes: &[u8]) -> Result<i32> {
     Ok(geom::decode_auto(bytes)?.srid)
 }
 
+/// `ST_MakePoint(x, y)` — POINT with unknown SRID. (The 3/4-arg z/m forms
+/// are not shipped; kenro is 2D.)
+pub fn st_make_point(x: f64, y: f64) -> Result<Vec<u8>> {
+    st_point(x, y, None)
+}
+
+/// `ST_Point(x, y [, srid])` — like ST_MakePoint; the srid arity is
+/// PostGIS ≥ 3.2.
+pub fn st_point(x: f64, y: f64, srid: Option<i32>) -> Result<Vec<u8>> {
+    geom::encode_canonical_gpb(
+        &crate::geom::Geom {
+            geometry: geo_types::Geometry::Point(geo_types::Point::new(x, y)),
+            srid: srid.unwrap_or(0),
+            has_zm: false,
+        },
+        "ST_Point",
+    )
+}
+
+/// `ST_MakeEnvelope(xmin, ymin, xmax, ymax [, srid])` — rectangular
+/// POLYGON in PostGIS vertex order; degenerate envelopes stay polygons
+/// (unlike ST_Envelope's output collapsing).
+pub fn st_make_envelope(
+    xmin: f64,
+    ymin: f64,
+    xmax: f64,
+    ymax: f64,
+    srid: Option<i32>,
+) -> Result<Vec<u8>> {
+    use geo_types::{Geometry, LineString, Polygon, coord};
+    let ring = LineString::new(vec![
+        coord! { x: xmin, y: ymin },
+        coord! { x: xmin, y: ymax },
+        coord! { x: xmax, y: ymax },
+        coord! { x: xmax, y: ymin },
+        coord! { x: xmin, y: ymin },
+    ]);
+    geom::encode_canonical_gpb(
+        &crate::geom::Geom {
+            geometry: Geometry::Polygon(Polygon::new(ring, vec![])),
+            srid: srid.unwrap_or(0),
+            has_zm: false,
+        },
+        "ST_MakeEnvelope",
+    )
+}
+
 /// Re-exported for binding layers that want header-only access.
 pub use crate::gpb::is_gpb;
 

@@ -227,11 +227,88 @@ pub fn h3_string_to_cell(s: &str) -> R<i64> {
     kenro::functions::h3::h3_string_to_cell(s).map_err(err)
 }
 
+// ---- Constructors ----
+
+#[wasm_bindgen(js_name = stMakePoint)]
+pub fn st_make_point(x: f64, y: f64) -> R<Vec<u8>> {
+    io::st_make_point(x, y).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPoint)]
+pub fn st_point(x: f64, y: f64) -> R<Vec<u8>> {
+    io::st_point(x, y, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointSrid)]
+pub fn st_point_srid(x: f64, y: f64, srid: i32) -> R<Vec<u8>> {
+    io::st_point(x, y, Some(srid)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMakeEnvelope)]
+pub fn st_make_envelope(xmin: f64, ymin: f64, xmax: f64, ymax: f64) -> R<Vec<u8>> {
+    io::st_make_envelope(xmin, ymin, xmax, ymax, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMakeEnvelopeSrid)]
+pub fn st_make_envelope_srid(xmin: f64, ymin: f64, xmax: f64, ymax: f64, srid: i32) -> R<Vec<u8>> {
+    io::st_make_envelope(xmin, ymin, xmax, ymax, Some(srid)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = gpkgIsAssignable)]
+pub fn gpkg_is_assignable(expected: &str, actual: &str) -> R<bool> {
+    rtree::gpkg_is_assignable(expected, actual).map_err(err)
+}
+
 // ---- Accessors ----
 
 #[wasm_bindgen(js_name = stArea)]
 pub fn st_area(geom: &[u8]) -> R<f64> {
     accessors::st_area(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stNPoints)]
+pub fn st_npoints(geom: &[u8]) -> R<i64> {
+    accessors::st_npoints(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPerimeter)]
+pub fn st_perimeter(geom: &[u8]) -> R<f64> {
+    accessors::st_perimeter(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeometryType)]
+pub fn st_geometry_type(geom: &[u8]) -> R<String> {
+    accessors::st_geometry_type(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stNumGeometries)]
+pub fn st_num_geometries(geom: &[u8]) -> R<i64> {
+    accessors::st_num_geometries(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeometryN)]
+pub fn st_geometry_n(geom: &[u8], n: i32) -> R<Option<Vec<u8>>> {
+    accessors::st_geometry_n(geom, n as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stStartPoint)]
+pub fn st_start_point(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    accessors::st_start_point(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stEndPoint)]
+pub fn st_end_point(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    accessors::st_end_point(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointN)]
+pub fn st_point_n(geom: &[u8], n: i32) -> R<Option<Vec<u8>>> {
+    accessors::st_point_n(geom, n as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stReverse)]
+pub fn st_reverse(geom: &[u8]) -> R<Vec<u8>> {
+    accessors::st_reverse(geom).map_err(err)
 }
 
 #[wasm_bindgen(js_name = stLength)]
@@ -287,6 +364,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::Bool => "bool",
         Kind::OptReal => "opt_real",
         Kind::OptI64 => "opt_i64",
+        Kind::OptBlob => "opt_blob",
     }
 }
 
@@ -363,6 +441,21 @@ mod tests {
             "h3CellToParent",
             "h3CellToString",
             "h3StringToCell",
+            "stMakePoint",
+            "stPoint",
+            "stPointSrid",
+            "stMakeEnvelope",
+            "stMakeEnvelopeSrid",
+            "gpkgIsAssignable",
+            "stNPoints",
+            "stPerimeter",
+            "stGeometryType",
+            "stNumGeometries",
+            "stGeometryN",
+            "stStartPoint",
+            "stEndPoint",
+            "stPointN",
+            "stReverse",
             "stArea",
             "stLength",
             "stCentroid",

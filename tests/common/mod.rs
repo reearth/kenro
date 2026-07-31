@@ -15,6 +15,10 @@ pub struct Vector {
     #[serde(default)]
     pub arg: Option<f64>,
     #[serde(default)]
+    pub arg_text: Option<String>,
+    #[serde(default)]
+    pub args: Option<Vec<f64>>,
+    #[serde(default)]
     pub cell: Option<i64>,
     #[serde(default)]
     pub src_srid: Option<i32>,

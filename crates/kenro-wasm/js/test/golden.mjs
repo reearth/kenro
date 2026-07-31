@@ -262,6 +262,66 @@ export const SMOKE_SQL = {
     sql: "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.767 35.681)', 4326), 9)))",
     check: (v) => typeof v === "bigint" || Number(v) > 0,
   },
+  "ST_MakePoint/2": {
+    sql: "SELECT ST_AsText(ST_MakePoint(1.5, 2.5))",
+    check: (v) => v === "POINT(1.5 2.5)",
+  },
+  "ST_Point/2": {
+    sql: "SELECT ST_AsText(ST_Point(1, 2))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_Point/3": {
+    sql: "SELECT ST_SRID(ST_Point(1, 2, 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MakeEnvelope/4": {
+    sql: "SELECT ST_AsText(ST_MakeEnvelope(0, 0, 2, 3))",
+    check: (v) => v === "POLYGON((0 0,0 3,2 3,2 0,0 0))",
+  },
+  "ST_MakeEnvelope/5": {
+    sql: "SELECT ST_SRID(ST_MakeEnvelope(0, 0, 2, 3, 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "GPKG_IsAssignable/2": {
+    sql: "SELECT GPKG_IsAssignable('GEOMETRY', ST_GeometryType(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_NPoints/1": {
+    sql: "SELECT ST_NPoints(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
+    check: (v) => Number(v) === 5,
+  },
+  "ST_Perimeter/1": {
+    sql: "SELECT ST_Perimeter(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
+    check: (v) => Number(v) === 16,
+  },
+  "ST_GeometryType/1": {
+    sql: "SELECT ST_GeometryType(ST_GeomFromText('POINT(1 2)'))",
+    check: (v) => v === "ST_Point",
+  },
+  "ST_NumGeometries/1": {
+    sql: "SELECT ST_NumGeometries(ST_GeomFromText('MULTIPOINT(1 2,3 4)'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_GeometryN/2": {
+    sql: "SELECT ST_AsText(ST_GeometryN(ST_GeomFromText('MULTIPOINT(1 2,3 4)'), 2))",
+    check: (v) => v === "POINT(3 4)",
+  },
+  "ST_StartPoint/1": {
+    sql: "SELECT ST_AsText(ST_StartPoint(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_EndPoint/1": {
+    sql: "SELECT ST_AsText(ST_EndPoint(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+    check: (v) => v === "POINT(3 4)",
+  },
+  "ST_PointN/2": {
+    sql: "SELECT ST_AsText(ST_PointN(ST_GeomFromText('LINESTRING(1 2,3 4,5 6)'), -1))",
+    check: (v) => v === "POINT(5 6)",
+  },
+  "ST_Reverse/1": {
+    sql: "SELECT ST_AsText(ST_Reverse(ST_GeomFromText('LINESTRING(1 2,3 4)')))",
+    check: (v) => v === "LINESTRING(3 4,1 2)",
+  },
   "ST_Area/1": {
     sql: "SELECT ST_Area(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))",
     check: (v) => Number(v) === 16,

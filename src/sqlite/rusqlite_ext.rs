@@ -294,6 +294,118 @@ fn register_geojson(conn: &Connection) -> rusqlite::Result<()> {
 fn register_accessors(conn: &Connection) -> rusqlite::Result<()> {
     use crate::functions::accessors;
     register_geom_to_real(conn, "ST_Area", accessors::st_area)?;
+    register_geom_to_real(conn, "ST_Perimeter", accessors::st_perimeter)?;
+    conn.create_scalar_function("ST_NPoints", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_NPoints")? else {
+            return Ok(None);
+        };
+        accessors::st_npoints(b)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeometryType", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_GeometryType")? else {
+            return Ok(None);
+        };
+        accessors::st_geometry_type(b)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_NumGeometries", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_NumGeometries")? else {
+            return Ok(None);
+        };
+        accessors::st_num_geometries(b)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeometryN", 2, FLAGS, |ctx| {
+        let (Some(b), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_GeometryN")?,
+            i64_or_null(ctx, 1, "ST_GeometryN")?,
+        ) else {
+            return Ok(None);
+        };
+        accessors::st_geometry_n(b, n)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    register_geom_to_opt_blob(conn, "ST_StartPoint", accessors::st_start_point)?;
+    register_geom_to_opt_blob(conn, "ST_EndPoint", accessors::st_end_point)?;
+    conn.create_scalar_function("ST_PointN", 2, FLAGS, |ctx| {
+        let (Some(b), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_PointN")?,
+            i64_or_null(ctx, 1, "ST_PointN")?,
+        ) else {
+            return Ok(None);
+        };
+        accessors::st_point_n(b, n)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    register_geom_to_blob(conn, "ST_Reverse", accessors::st_reverse)?;
+    conn.create_scalar_function("ST_MakePoint", 2, FLAGS, |ctx| {
+        let (Some(x), Some(y)) = (
+            real_or_null(ctx, 0, "ST_MakePoint")?,
+            real_or_null(ctx, 1, "ST_MakePoint")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_make_point(x, y))
+    })?;
+    conn.create_scalar_function("ST_Point", 2, FLAGS, |ctx| {
+        let (Some(x), Some(y)) = (
+            real_or_null(ctx, 0, "ST_Point")?,
+            real_or_null(ctx, 1, "ST_Point")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_point(x, y, None))
+    })?;
+    conn.create_scalar_function("ST_Point", 3, FLAGS, |ctx| {
+        let (Some(x), Some(y), Some(srid)) = (
+            real_or_null(ctx, 0, "ST_Point")?,
+            real_or_null(ctx, 1, "ST_Point")?,
+            int_or_null(ctx, 2, "ST_Point")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_point(x, y, Some(srid)))
+    })?;
+    conn.create_scalar_function("ST_MakeEnvelope", 4, FLAGS, |ctx| {
+        let (Some(xmin), Some(ymin), Some(xmax), Some(ymax)) = (
+            real_or_null(ctx, 0, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 1, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 2, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 3, "ST_MakeEnvelope")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_make_envelope(xmin, ymin, xmax, ymax, None))
+    })?;
+    conn.create_scalar_function("ST_MakeEnvelope", 5, FLAGS, |ctx| {
+        let (Some(xmin), Some(ymin), Some(xmax), Some(ymax), Some(srid)) = (
+            real_or_null(ctx, 0, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 1, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 2, "ST_MakeEnvelope")?,
+            real_or_null(ctx, 3, "ST_MakeEnvelope")?,
+            int_or_null(ctx, 4, "ST_MakeEnvelope")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_make_envelope(xmin, ymin, xmax, ymax, Some(srid)))
+    })?;
+    conn.create_scalar_function("GPKG_IsAssignable", 2, FLAGS, |ctx| {
+        let (Some(expected), Some(actual)) = (
+            text_or_null(ctx, 0, "GPKG_IsAssignable")?,
+            text_or_null(ctx, 1, "GPKG_IsAssignable")?,
+        ) else {
+            return Ok(None);
+        };
+        rtree::gpkg_is_assignable(expected, actual)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
     register_geom_to_real(conn, "ST_Length", accessors::st_length)?;
     register_geom_to_blob(conn, "ST_Centroid", accessors::st_centroid)?;
     register_geom_to_blob(conn, "ST_Envelope", accessors::st_envelope)?;
@@ -385,6 +497,19 @@ fn register_geom_to_blob(
             return Ok(None);
         };
         blob(f(b))
+    })
+}
+
+fn register_geom_to_opt_blob(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8]) -> crate::error::Result<Option<Vec<u8>>>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, name)? else {
+            return Ok(None);
+        };
+        f(b).map(|v| v.map(Value::Blob)).map_err(sql_err)
     })
 }
 

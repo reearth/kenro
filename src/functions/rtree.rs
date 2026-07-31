@@ -43,6 +43,40 @@ pub fn st_is_empty(blob: &[u8]) -> Result<bool> {
     Ok(geom::is_empty(&g.geometry))
 }
 
+/// `GPKG_IsAssignable(expected_type_name, actual_type_name)` — the function
+/// the GeoPackage geometry-type-trigger extension requires. Both the
+/// GeoPackage spellings (`POINT`, upper-case) and the PostGIS spellings
+/// kenro's `ST_GeometryType` produces (`ST_Point`) are accepted, so the
+/// spec's trigger DDL works verbatim against kenro's outputs. Assignability
+/// follows the GeoPackage core geometry hierarchy; unknown names are only
+/// assignable to themselves.
+pub fn gpkg_is_assignable(expected: &str, actual: &str) -> Result<bool> {
+    fn normalize(name: &str) -> String {
+        let upper = name.trim().to_ascii_uppercase();
+        upper.strip_prefix("ST_").unwrap_or(&upper).to_string()
+    }
+    fn parent(t: &str) -> Option<&'static str> {
+        match t {
+            "POINT" | "CURVE" | "SURFACE" | "GEOMETRYCOLLECTION" => Some("GEOMETRY"),
+            "LINESTRING" | "CIRCULARSTRING" | "COMPOUNDCURVE" => Some("CURVE"),
+            "POLYGON" | "CURVEPOLYGON" => Some("SURFACE"),
+            "MULTIPOINT" | "MULTICURVE" | "MULTISURFACE" => Some("GEOMETRYCOLLECTION"),
+            "MULTILINESTRING" => Some("MULTICURVE"),
+            "MULTIPOLYGON" => Some("MULTISURFACE"),
+            _ => None,
+        }
+    }
+    let expected = normalize(expected);
+    let mut current = Some(normalize(actual));
+    while let Some(t) = current {
+        if t == expected {
+            return Ok(true);
+        }
+        current = parent(&t).map(str::to_string);
+    }
+    Ok(false)
+}
+
 fn envelope_of(blob: &[u8]) -> Result<Option<Envelope>> {
     if gpb::is_gpb(blob) {
         let header = GpbHeader::parse(blob)?;
@@ -94,6 +128,27 @@ mod tests {
         assert_eq!(st_min_x(&wkb).unwrap(), Some(3.0));
         assert_eq!(st_max_y(&wkb).unwrap(), Some(9.0));
         assert!(!st_is_empty(&wkb).unwrap());
+    }
+
+    #[test]
+    fn is_assignable_hierarchy_and_both_spellings() {
+        let yes = |e: &str, a: &str| gpkg_is_assignable(e, a).unwrap();
+        // Exact and hierarchy.
+        assert!(yes("POINT", "POINT"));
+        assert!(yes("GEOMETRY", "POINT"));
+        assert!(yes("GEOMETRY", "MULTIPOLYGON"));
+        assert!(yes("CURVE", "LINESTRING"));
+        assert!(yes("SURFACE", "POLYGON"));
+        assert!(yes("GEOMETRYCOLLECTION", "MULTIPOINT"));
+        assert!(yes("GEOMETRYCOLLECTION", "MULTIPOLYGON")); // via MULTISURFACE
+        assert!(!yes("POINT", "GEOMETRY")); // supertype is not assignable down
+        assert!(!yes("POLYGON", "POINT"));
+        // PostGIS-style spellings from kenro's ST_GeometryType.
+        assert!(yes("POLYGON", "ST_Polygon"));
+        assert!(yes("ST_Geometry", "st_multilinestring"));
+        // Unknown names: only exact matches.
+        assert!(yes("WIDGET", "widget"));
+        assert!(!yes("WIDGET", "POINT"));
     }
 
     #[test]

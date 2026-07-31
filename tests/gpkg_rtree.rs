@@ -204,6 +204,78 @@ fn headline_query_rtree_filter_plus_predicate_refine() {
 }
 
 #[test]
+fn geometry_type_and_srs_id_triggers() {
+    // The GeoPackage geometry-type-trigger (extension F.4) and SRS-ID
+    // trigger (F.5) patterns: GPKG_IsAssignable + ST_GeometryType +
+    // ST_SRID guarding inserts against gpkg_geometry_columns. kenro's
+    // GPKG_IsAssignable normalizes both the gpkg ('POLYGON') and PostGIS
+    // ('ST_Polygon') spellings, so the spec pattern works with kenro's
+    // PostGIS-style ST_GeometryType output.
+    let conn = Connection::open_in_memory().unwrap();
+    kenro::register(&conn).unwrap();
+    conn.pragma_update(None, "trusted_schema", false).unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE parks (fid INTEGER PRIMARY KEY, geom BLOB);
+        CREATE TABLE gpkg_geometry_columns (
+          table_name TEXT, column_name TEXT, geometry_type_name TEXT,
+          srs_id INTEGER, z TINYINT, m TINYINT);
+        INSERT INTO gpkg_geometry_columns VALUES ('parks','geom','POLYGON',4326,0,0);
+
+        CREATE TRIGGER "fgti_parks_geom" BEFORE INSERT ON "parks"
+        FOR EACH ROW
+        BEGIN
+          SELECT RAISE (ABORT, 'insert on table parks violates constraint: geometry type is not assignable')
+          WHERE NEW.geom IS NOT NULL AND (
+            SELECT GPKG_IsAssignable(geometry_type_name, ST_GeometryType(NEW.geom))
+            FROM gpkg_geometry_columns
+            WHERE Lower(table_name) = Lower('parks') AND Lower(column_name) = Lower('geom')) = 0;
+        END;
+
+        CREATE TRIGGER "fgsi_parks_geom" BEFORE INSERT ON "parks"
+        FOR EACH ROW
+        BEGIN
+          SELECT RAISE (ABORT, 'insert on table parks violates constraint: srs_id does not match')
+          WHERE NEW.geom IS NOT NULL AND (
+            SELECT srs_id FROM gpkg_geometry_columns
+            WHERE Lower(table_name) = Lower('parks') AND Lower(column_name) = Lower('geom'))
+            <> ST_SRID(NEW.geom);
+        END;
+        "#,
+    )
+    .unwrap();
+
+    // Matching type + srid inserts fine.
+    conn.execute(
+        "INSERT INTO parks (geom) VALUES (ST_AsGPB(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 4326)))",
+        [],
+    )
+    .unwrap();
+    // Wrong geometry type aborts.
+    let err = conn
+        .execute(
+            "INSERT INTO parks (geom) VALUES (ST_AsGPB(ST_GeomFromText('POINT(1 2)', 4326)))",
+            [],
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("geometry type"), "{err}");
+    // Wrong SRID aborts.
+    let err = conn
+        .execute(
+            "INSERT INTO parks (geom) VALUES (ST_AsGPB(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 6677)))",
+            [],
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("srs_id"), "{err}");
+    let count: i64 = conn
+        .query_row("SELECT count(*) FROM parks", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
+#[test]
 fn externally_written_gpkg_interoperates() {
     // tests/fixtures/mini.gpkg is written by GDAL (ogr2ogr; generation
     // command in tests/fixtures/README.md): GDAL-written GPB headers carry
