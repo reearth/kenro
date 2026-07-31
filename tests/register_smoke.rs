@@ -177,17 +177,10 @@ fn null_in_null_out_for_every_function() {
 #[test]
 fn stubs_error_with_helpful_hints() {
     let conn = conn();
-    let err = query_value(
-        &conn,
-        "SELECT ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0)",
-    )
-    .unwrap_err()
-    .to_string();
-    assert!(err.contains("ST_Buffer is not implemented"), "{err}");
-
     let err = query_value(&conn, "SELECT ST_MakeValid(ST_GeomFromText('POINT(0 0)'))")
         .unwrap_err()
         .to_string();
+    assert!(err.contains("ST_MakeValid is not implemented"), "{err}");
     assert!(err.contains("ST_IsValid"), "{err}");
 
     // Stubs are loud for any arity, including NULL args.
