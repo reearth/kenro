@@ -262,6 +262,30 @@ export const SMOKE_SQL = {
     sql: "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.767 35.681)', 4326), 9)))",
     check: (v) => typeof v === "bigint" || Number(v) > 0,
   },
+  "ST_ClosestPoint/2": {
+    sql: "SELECT ST_AsText(ST_ClosestPoint(ST_GeomFromText('LINESTRING(0 0,10 0)'), ST_GeomFromText('POINT(5 3)')))",
+    check: (v) => v === "POINT(5 0)",
+  },
+  "ST_LineInterpolatePoint/2": {
+    sql: "SELECT ST_AsText(ST_LineInterpolatePoint(ST_GeomFromText('LINESTRING(0 0,10 0)'), 0.5))",
+    check: (v) => v === "POINT(5 0)",
+  },
+  "ST_LineLocatePoint/2": {
+    sql: "SELECT ST_LineLocatePoint(ST_GeomFromText('LINESTRING(0 0,10 0)'), ST_GeomFromText('POINT(2.5 4)'))",
+    check: (v) => Number(v) === 0.25,
+  },
+  "ST_HausdorffDistance/2": {
+    sql: "SELECT ST_HausdorffDistance(ST_GeomFromText('LINESTRING(0 0,10 0)'), ST_GeomFromText('LINESTRING(0 3,10 3)'))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_FrechetDistance/2": {
+    sql: "SELECT ST_FrechetDistance(ST_GeomFromText('LINESTRING(0 0,10 0)'), ST_GeomFromText('LINESTRING(0 3,10 3)'))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_Azimuth/2": {
+    sql: "SELECT ST_Azimuth(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(5 0)'))",
+    check: (v) => Math.abs(Number(v) - Math.PI / 2) < 1e-12,
+  },
   "ST_MakePoint/2": {
     sql: "SELECT ST_AsText(ST_MakePoint(1.5, 2.5))",
     check: (v) => v === "POINT(1.5 2.5)",

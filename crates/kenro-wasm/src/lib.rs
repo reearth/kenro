@@ -146,6 +146,38 @@ pub fn st_dwithin(a: &[u8], b: &[u8], d: f64) -> R<bool> {
     predicates::st_dwithin(a, b, d).map_err(err)
 }
 
+// ---- Measures ----
+
+#[wasm_bindgen(js_name = stClosestPoint)]
+pub fn st_closest_point(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    kenro::functions::measures::st_closest_point(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineInterpolatePoint)]
+pub fn st_line_interpolate_point(a: &[u8], fraction: f64) -> R<Vec<u8>> {
+    kenro::functions::measures::st_line_interpolate_point(a, fraction).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineLocatePoint)]
+pub fn st_line_locate_point(a: &[u8], b: &[u8]) -> R<f64> {
+    kenro::functions::measures::st_line_locate_point(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stHausdorffDistance)]
+pub fn st_hausdorff_distance(a: &[u8], b: &[u8]) -> R<f64> {
+    kenro::functions::measures::st_hausdorff_distance(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stFrechetDistance)]
+pub fn st_frechet_distance(a: &[u8], b: &[u8]) -> R<f64> {
+    kenro::functions::measures::st_frechet_distance(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAzimuth)]
+pub fn st_azimuth(a: &[u8], b: &[u8]) -> R<Option<f64>> {
+    kenro::functions::measures::st_azimuth(a, b).map_err(err)
+}
+
 // ---- GeoPackage R-tree ----
 
 #[wasm_bindgen(js_name = stMinX)]
@@ -441,6 +473,12 @@ mod tests {
             "h3CellToParent",
             "h3CellToString",
             "h3StringToCell",
+            "stClosestPoint",
+            "stLineInterpolatePoint",
+            "stLineLocatePoint",
+            "stHausdorffDistance",
+            "stFrechetDistance",
+            "stAzimuth",
             "stMakePoint",
             "stPoint",
             "stPointSrid",

@@ -181,6 +181,43 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Bool,
         None
     ),
+    // Measures.
+    entry!(
+        "ST_ClosestPoint",
+        "stClosestPoint",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_LineInterpolatePoint",
+        "stLineInterpolatePoint",
+        [Blob, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_LineLocatePoint",
+        "stLineLocatePoint",
+        [Blob, Blob],
+        Real,
+        None
+    ),
+    entry!(
+        "ST_HausdorffDistance",
+        "stHausdorffDistance",
+        [Blob, Blob],
+        Real,
+        None
+    ),
+    entry!(
+        "ST_FrechetDistance",
+        "stFrechetDistance",
+        [Blob, Blob],
+        Real,
+        None
+    ),
+    entry!("ST_Azimuth", "stAzimuth", [Blob, Blob], OptReal, None),
     // Accessors.
     entry!("ST_Area", "stArea", [Blob], Real, None),
     entry!("ST_NPoints", "stNPoints", [Blob], Int, None),

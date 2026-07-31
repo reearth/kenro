@@ -10,6 +10,7 @@ pub mod geojson;
 pub mod h3;
 pub mod io;
 pub mod manifest;
+pub mod measures;
 pub mod predicates;
 pub mod rtree;
 pub mod stubs;

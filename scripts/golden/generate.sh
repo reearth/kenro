@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 
 IMAGE=postgis/postgis:17-3.5
 CONTAINER=kenro-golden-postgis
-SUITES=(predicates transform geojson accessors)
+SUITES=(predicates transform geojson accessors processing)
 
 # --platform: the reference image is amd64-only; runs under emulation on
 # arm64 hosts (fine — this script is run rarely, offline from CI).

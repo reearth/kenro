@@ -103,3 +103,7 @@ required-features = ["rusqlite", "geojson"]
 [[test]]
 name = "golden_accessors"
 required-features = ["rusqlite"]
+
+[[test]]
+name = "golden_processing"
+required-features = ["rusqlite"]

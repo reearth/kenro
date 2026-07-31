@@ -139,6 +139,40 @@ test("h3 vectors", () => {
   }
 });
 
+test("processing vectors", () => {
+  const optText = (blob) => (blob === undefined ? undefined : wasm.stAsText(blob));
+  const geometric = new Set(["closestpoint", "lineinterpolate"]);
+  for (const v of loadVectors("processing")) {
+    const run = () => {
+      const a = geom(v.a);
+      switch (v.fn) {
+        case "closestpoint":
+          return optText(wasm.stClosestPoint(a, geom(v.b)));
+        case "lineinterpolate":
+          return wasm.stAsText(wasm.stLineInterpolatePoint(a, v.arg));
+        case "linelocate":
+          return wasm.stLineLocatePoint(a, geom(v.b));
+        case "hausdorff":
+          return wasm.stHausdorffDistance(a, geom(v.b));
+        case "frechet":
+          return wasm.stFrechetDistance(a, geom(v.b));
+        case "azimuth":
+          return wasm.stAzimuth(a, geom(v.b));
+        default:
+          throw new Error(`unknown fn ${v.fn}`);
+      }
+    };
+    if (runExpectingError(v, run)) continue;
+    const got = run();
+    const want = effective(v);
+    if (want === null) assert.equal(got, undefined, v.id);
+    else if (typeof want === "number") assertNumberClose(v.id, got, want);
+    else if (geometric.has(v.fn)) {
+      assert.ok(geomApproxEqual(got, want), `${v.id}: ${got} vs ${want}`);
+    } else assert.equal(got, want, v.id);
+  }
+});
+
 test("accessors vectors", () => {
   const geometric = new Set(["centroid", "envelope", "simplify"]);
   const optText = (blob) => (blob === undefined ? undefined : wasm.stAsText(blob));

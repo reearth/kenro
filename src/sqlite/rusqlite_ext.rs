@@ -140,6 +140,75 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
             .map_err(sql_err)
     })?;
 
+    // Measures.
+    {
+        use crate::functions::measures;
+        conn.create_scalar_function("ST_ClosestPoint", 2, FLAGS, |ctx| {
+            let (Some(a), Some(b)) = (
+                blob_or_null(ctx, 0, "ST_ClosestPoint")?,
+                blob_or_null(ctx, 1, "ST_ClosestPoint")?,
+            ) else {
+                return Ok(None);
+            };
+            measures::st_closest_point(a, b)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function("ST_LineInterpolatePoint", 2, FLAGS, |ctx| {
+            let (Some(a), Some(f)) = (
+                blob_or_null(ctx, 0, "ST_LineInterpolatePoint")?,
+                real_or_null(ctx, 1, "ST_LineInterpolatePoint")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(measures::st_line_interpolate_point(a, f))
+        })?;
+        conn.create_scalar_function("ST_LineLocatePoint", 2, FLAGS, |ctx| {
+            let (Some(a), Some(b)) = (
+                blob_or_null(ctx, 0, "ST_LineLocatePoint")?,
+                blob_or_null(ctx, 1, "ST_LineLocatePoint")?,
+            ) else {
+                return Ok(None);
+            };
+            measures::st_line_locate_point(a, b)
+                .map(|v| Some(Value::Real(v)))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function("ST_HausdorffDistance", 2, FLAGS, |ctx| {
+            let (Some(a), Some(b)) = (
+                blob_or_null(ctx, 0, "ST_HausdorffDistance")?,
+                blob_or_null(ctx, 1, "ST_HausdorffDistance")?,
+            ) else {
+                return Ok(None);
+            };
+            measures::st_hausdorff_distance(a, b)
+                .map(|v| Some(Value::Real(v)))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function("ST_FrechetDistance", 2, FLAGS, |ctx| {
+            let (Some(a), Some(b)) = (
+                blob_or_null(ctx, 0, "ST_FrechetDistance")?,
+                blob_or_null(ctx, 1, "ST_FrechetDistance")?,
+            ) else {
+                return Ok(None);
+            };
+            measures::st_frechet_distance(a, b)
+                .map(|v| Some(Value::Real(v)))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function("ST_Azimuth", 2, FLAGS, |ctx| {
+            let (Some(a), Some(b)) = (
+                blob_or_null(ctx, 0, "ST_Azimuth")?,
+                blob_or_null(ctx, 1, "ST_Azimuth")?,
+            ) else {
+                return Ok(None);
+            };
+            measures::st_azimuth(a, b)
+                .map(|v| v.map(Value::Real))
+                .map_err(sql_err)
+        })?;
+    }
+
     // R-tree helpers (GeoPackage Annex F.3 contract).
     register_rtree_minmax(conn, "ST_MinX", rtree::st_min_x)?;
     register_rtree_minmax(conn, "ST_MaxX", rtree::st_max_x)?;
