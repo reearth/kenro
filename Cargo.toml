@@ -73,6 +73,10 @@ name = "accuracy_report"
 required-features = ["transform"]
 
 [[test]]
+name = "manifest_consistency"
+required-features = ["rusqlite"]
+
+[[test]]
 name = "golden_predicates"
 required-features = ["rusqlite"]
 
