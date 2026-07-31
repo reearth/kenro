@@ -82,7 +82,7 @@ GEOS-class operations; use SpatiaLite or DuckDB spatial for this.
 ```
 
 - **Never**: `ST_Buffer`, `ST_Union`, `ST_Intersection`, `ST_Difference`, `ST_SymDifference` — GEOS-class computational geometry. Use SpatiaLite or DuckDB spatial; kenro stays small.
-- **Planned**: `ST_NPoints`, `ST_Perimeter`.
+- **Planned**: `ST_NPoints`, `ST_Perimeter`, `ST_AsMVT` / `ST_AsMVTGeom` (geozero has an MVT writer, so tile generation is on the table — but PostGIS's ST_AsMVT is an aggregate, which needs aggregate-function support first).
 - Also out of scope: raster, network analysis, full PROJ grid transforms, and any claim of full SpatiaLite/PostGIS compatibility.
 
 ## Supported CRS

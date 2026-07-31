@@ -30,6 +30,17 @@ pub const STUBS: &[Stub] = &[
         hint: "Planned for a future release. Note ST_Length returns 0 for polygons, \
                matching PostGIS.",
     },
+    Stub {
+        name: "ST_AsMVT",
+        hint: "MVT tile generation is not implemented in kenro yet (in PostGIS this is an \
+               aggregate paired with ST_AsMVTGeom); generate tiles with PostGIS or tippecanoe \
+               for now.",
+    },
+    Stub {
+        name: "ST_AsMVTGeom",
+        hint: "MVT tile generation is not implemented in kenro yet; generate tiles with \
+               PostGIS or tippecanoe for now.",
+    },
     // Deliberately out of scope ("never").
     Stub {
         name: "ST_Buffer",
