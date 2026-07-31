@@ -1,0 +1,45 @@
+[package]
+name = "kenro"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Spatial functions for SQLite in pure Rust — works with rusqlite, as a loadable extension, and in WASM"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/reearth/kenro"
+keywords = ["sqlite", "geo", "gis", "spatialite", "geopackage"]
+categories = ["database", "science::geo"]
+
+[features]
+default = []
+rusqlite = ["dep:rusqlite"]
+
+[dependencies]
+geo = "0.33"
+geo-types = "0.7"
+geozero = { version = "0.15", default-features = false, features = [
+    "with-wkb",
+    "with-wkt",
+    "with-geo",
+] }
+thiserror = "2"
+rusqlite = { version = "0.40", optional = true, default-features = false, features = [
+    "functions",
+] }
+
+[dev-dependencies]
+rusqlite = { version = "0.40", features = ["functions", "bundled"] }
+proptest = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[test]]
+name = "golden_predicates"
+required-features = ["rusqlite"]
+
+[[test]]
+name = "gpkg_rtree"
+required-features = ["rusqlite"]
+
+[[test]]
+name = "register_smoke"
+required-features = ["rusqlite"]

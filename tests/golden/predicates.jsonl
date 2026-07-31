@@ -1,0 +1,162 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/generate.sql"}
+{"id":"empty_poly_pt:contains","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"contains","expected":false}
+{"id":"empty_poly_pt:distance","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"distance","expected":null}
+{"id":"empty_poly_pt:intersects","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"intersects","expected":false}
+{"id":"empty_poly_pt:within","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"within","expected":false}
+{"id":"hole_pt_hole_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"contains","expected":false}
+{"id":"hole_pt_hole_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"distance","expected":0}
+{"id":"hole_pt_hole_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"intersects","expected":true}
+{"id":"hole_pt_hole_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(2 5)","fn":"within","expected":false}
+{"id":"hole_pt_in_hole:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"contains","expected":false}
+{"id":"hole_pt_in_hole:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"distance","expected":3}
+{"id":"hole_pt_in_hole:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"intersects","expected":false}
+{"id":"hole_pt_in_hole:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(5 5)","fn":"within","expected":false}
+{"id":"hole_pt_in_ring:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"contains","expected":true}
+{"id":"hole_pt_in_ring:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"distance","expected":0}
+{"id":"hole_pt_in_ring:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"intersects","expected":true}
+{"id":"hole_pt_in_ring:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","b":"POINT(1 1)","fn":"within","expected":false}
+{"id":"line_line_collinear:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"contains","expected":false}
+{"id":"line_line_collinear:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"distance","expected":0}
+{"id":"line_line_collinear:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"intersects","expected":true}
+{"id":"line_line_collinear:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(5 0,15 0)","fn":"within","expected":false}
+{"id":"line_line_cross:contains","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"contains","expected":false}
+{"id":"line_line_cross:distance","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"distance","expected":0}
+{"id":"line_line_cross:intersects","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"intersects","expected":true}
+{"id":"line_line_cross:within","a":"LINESTRING(0 0,10 10)","b":"LINESTRING(0 10,10 0)","fn":"within","expected":false}
+{"id":"line_line_disjoint:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"contains","expected":false}
+{"id":"line_line_disjoint:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"distance","expected":1}
+{"id":"line_line_disjoint:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"intersects","expected":false}
+{"id":"line_line_disjoint:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 1,10 1)","fn":"within","expected":false}
+{"id":"line_line_endpoint:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"contains","expected":false}
+{"id":"line_line_endpoint:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"distance","expected":0}
+{"id":"line_line_endpoint:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"intersects","expected":true}
+{"id":"line_line_endpoint:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 0,20 0)","fn":"within","expected":false}
+{"id":"line_line_sub:contains","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"contains","expected":true}
+{"id":"line_line_sub:distance","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"distance","expected":0}
+{"id":"line_line_sub:intersects","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"intersects","expected":true}
+{"id":"line_line_sub:within","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(2 0,8 0)","fn":"within","expected":false}
+{"id":"line_pt_endpoint:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"contains","expected":false}
+{"id":"line_pt_endpoint:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"distance","expected":0}
+{"id":"line_pt_endpoint:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"intersects","expected":true}
+{"id":"line_pt_endpoint:within","a":"LINESTRING(0 0,10 10)","b":"POINT(0 0)","fn":"within","expected":false}
+{"id":"line_pt_off:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"contains","expected":false}
+{"id":"line_pt_off:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"distance","expected":0.7071067811865476}
+{"id":"line_pt_off:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"intersects","expected":false}
+{"id":"line_pt_off:within","a":"LINESTRING(0 0,10 10)","b":"POINT(5 6)","fn":"within","expected":false}
+{"id":"line_pt_on:contains","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"contains","expected":true}
+{"id":"line_pt_on:distance","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"distance","expected":0}
+{"id":"line_pt_on:intersects","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"intersects","expected":true}
+{"id":"line_pt_on:within","a":"LINESTRING(0 0,10 10)","b":"POINT(5 5)","fn":"within","expected":false}
+{"id":"mline_line:contains","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"contains","expected":false}
+{"id":"mline_line:distance","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"distance","expected":0}
+{"id":"mline_line:intersects","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"intersects","expected":true}
+{"id":"mline_line:within","a":"MULTILINESTRING((0 0,5 5),(10 10,15 15))","b":"LINESTRING(0 5,5 0)","fn":"within","expected":false}
+{"id":"mpoly_pt:contains","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"contains","expected":true}
+{"id":"mpoly_pt:distance","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"distance","expected":0}
+{"id":"mpoly_pt:intersects","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"intersects","expected":true}
+{"id":"mpoly_pt:within","a":"MULTIPOLYGON(((0 0,5 0,5 5,0 5,0 0)),((20 20,25 20,25 25,20 25,20 20)))","b":"POINT(22 22)","fn":"within","expected":false}
+{"id":"mpt_sq:contains","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":false}
+{"id":"mpt_sq:distance","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"mpt_sq:intersects","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"mpt_sq:within","a":"MULTIPOINT(1 1,20 20)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":false}
+{"id":"mpt_sq_all_in:contains","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":false}
+{"id":"mpt_sq_all_in:distance","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"mpt_sq_all_in:intersects","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"mpt_sq_all_in:within","a":"MULTIPOINT(1 1,2 2)","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":true}
+{"id":"pt_pt_diff:contains","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"contains","expected":false}
+{"id":"pt_pt_diff:distance","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"distance","expected":0.00000009999999983634211}
+{"id":"pt_pt_diff:intersects","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"intersects","expected":false}
+{"id":"pt_pt_diff:within","a":"POINT(3 4)","b":"POINT(3.0000001 4)","fn":"within","expected":false}
+{"id":"pt_pt_same:contains","a":"POINT(3 4)","b":"POINT(3 4)","fn":"contains","expected":true}
+{"id":"pt_pt_same:distance","a":"POINT(3 4)","b":"POINT(3 4)","fn":"distance","expected":0}
+{"id":"pt_pt_same:intersects","a":"POINT(3 4)","b":"POINT(3 4)","fn":"intersects","expected":true}
+{"id":"pt_pt_same:within","a":"POINT(3 4)","b":"POINT(3 4)","fn":"within","expected":true}
+{"id":"sq_empty_line:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"contains","expected":false}
+{"id":"sq_empty_line:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"distance","expected":null}
+{"id":"sq_empty_line:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"intersects","expected":false}
+{"id":"sq_empty_line:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING EMPTY","fn":"within","expected":false}
+{"id":"sq_line_crossing:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"contains","expected":false}
+{"id":"sq_line_crossing:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"distance","expected":0}
+{"id":"sq_line_crossing:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"intersects","expected":true}
+{"id":"sq_line_crossing:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(-5 5,15 5)","fn":"within","expected":false}
+{"id":"sq_line_inside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"contains","expected":true}
+{"id":"sq_line_inside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"distance","expected":0}
+{"id":"sq_line_inside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"intersects","expected":true}
+{"id":"sq_line_inside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(2 2,8 8)","fn":"within","expected":false}
+{"id":"sq_line_on_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"contains","expected":false}
+{"id":"sq_line_on_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"distance","expected":0}
+{"id":"sq_line_on_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"intersects","expected":true}
+{"id":"sq_line_on_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(0 0,10 0)","fn":"within","expected":false}
+{"id":"sq_line_outside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"contains","expected":false}
+{"id":"sq_line_outside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"distance","expected":14.142135623730951}
+{"id":"sq_line_outside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"intersects","expected":false}
+{"id":"sq_line_outside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"LINESTRING(20 20,30 30)","fn":"within","expected":false}
+{"id":"sq_pt_corner:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"contains","expected":false}
+{"id":"sq_pt_corner:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"distance","expected":0}
+{"id":"sq_pt_corner:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"intersects","expected":true}
+{"id":"sq_pt_corner:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(0 0)","fn":"within","expected":false}
+{"id":"sq_pt_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"contains","expected":false}
+{"id":"sq_pt_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"distance","expected":0}
+{"id":"sq_pt_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"intersects","expected":true}
+{"id":"sq_pt_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10 5)","fn":"within","expected":false}
+{"id":"sq_pt_inside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"contains","expected":true}
+{"id":"sq_pt_inside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"distance","expected":0}
+{"id":"sq_pt_inside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"intersects","expected":true}
+{"id":"sq_pt_inside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(5 5)","fn":"within","expected":false}
+{"id":"sq_pt_near_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"contains","expected":false}
+{"id":"sq_pt_near_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"distance","expected":0.000000001000000082740371}
+{"id":"sq_pt_near_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"intersects","expected":false}
+{"id":"sq_pt_near_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(10.000000001 5)","fn":"within","expected":false}
+{"id":"sq_pt_outside:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"contains","expected":false}
+{"id":"sq_pt_outside:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"distance","expected":14.142135623730951}
+{"id":"sq_pt_outside:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"intersects","expected":false}
+{"id":"sq_pt_outside:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POINT(20 20)","fn":"within","expected":false}
+{"id":"sq_sq_corner_touch:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"contains","expected":false}
+{"id":"sq_sq_corner_touch:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"distance","expected":0}
+{"id":"sq_sq_corner_touch:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"intersects","expected":true}
+{"id":"sq_sq_corner_touch:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 10,20 10,20 20,10 20,10 10))","fn":"within","expected":false}
+{"id":"sq_sq_disjoint:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"contains","expected":false}
+{"id":"sq_sq_disjoint:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"distance","expected":14.142135623730951}
+{"id":"sq_sq_disjoint:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"intersects","expected":false}
+{"id":"sq_sq_disjoint:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((20 20,30 20,30 30,20 30,20 20))","fn":"within","expected":false}
+{"id":"sq_sq_edge_touch:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"contains","expected":false}
+{"id":"sq_sq_edge_touch:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"distance","expected":0}
+{"id":"sq_sq_edge_touch:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_edge_touch:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((10 0,20 0,20 10,10 10,10 0))","fn":"within","expected":false}
+{"id":"sq_sq_identical:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"contains","expected":true}
+{"id":"sq_sq_identical:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"distance","expected":0}
+{"id":"sq_sq_identical:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_identical:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,10 0,10 10,0 10,0 0))","fn":"within","expected":true}
+{"id":"sq_sq_inner_edge:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"contains","expected":true}
+{"id":"sq_sq_inner_edge:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"distance","expected":0}
+{"id":"sq_sq_inner_edge:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"intersects","expected":true}
+{"id":"sq_sq_inner_edge:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((0 0,5 0,5 5,0 5,0 0))","fn":"within","expected":false}
+{"id":"sq_sq_nested:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"contains","expected":true}
+{"id":"sq_sq_nested:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"distance","expected":0}
+{"id":"sq_sq_nested:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"intersects","expected":true}
+{"id":"sq_sq_nested:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((2 2,8 2,8 8,2 8,2 2))","fn":"within","expected":false}
+{"id":"sq_sq_overlap:contains","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"contains","expected":false}
+{"id":"sq_sq_overlap:distance","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"distance","expected":0}
+{"id":"sq_sq_overlap:intersects","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"intersects","expected":true}
+{"id":"sq_sq_overlap:within","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((5 5,15 5,15 15,5 15,5 5))","fn":"within","expected":false}
+{"id":"dw_exact:dwithin","a":"POINT(0 0)","b":"POINT(3 4)","fn":"dwithin","arg":5.0,"expected":true}
+{"id":"dw_just_under:dwithin","a":"POINT(0 0)","b":"POINT(3 4)","fn":"dwithin","arg":4.999999999,"expected":false}
+{"id":"dw_line_pt:dwithin","a":"LINESTRING(0 0,10 0)","b":"POINT(5 3)","fn":"dwithin","arg":3.0,"expected":true}
+{"id":"dw_poly_poly:dwithin","a":"POLYGON((0 0,10 0,10 10,0 10,0 0))","b":"POLYGON((13 0,20 0,20 10,13 10,13 0))","fn":"dwithin","arg":2.9,"expected":false}
+{"id":"dw_zero_touch:dwithin","a":"POINT(0 0)","b":"POINT(0 0)","fn":"dwithin","arg":0.0,"expected":true}
+{"id":"dw_negative:dwithin","a":"POINT(0 0)","b":"POINT(0 0)","fn":"dwithin","arg":-1.0,"expected":{"error":true},"note":"PostGIS raises on negative tolerance; kenro raises too"}
+{"id":"t_empty_line:astext","a":"LINESTRING EMPTY","fn":"astext","expected":"LINESTRING EMPTY"}
+{"id":"t_empty_mpoly:astext","a":"MULTIPOLYGON EMPTY","fn":"astext","expected":"MULTIPOLYGON EMPTY"}
+{"id":"t_empty_poly:astext","a":"POLYGON EMPTY","fn":"astext","expected":"POLYGON EMPTY"}
+{"id":"t_gc:astext","a":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))","fn":"astext","expected":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))"}
+{"id":"t_line:astext","a":"LINESTRING(0 0,1 1,2 0)","fn":"astext","expected":"LINESTRING(0 0,1 1,2 0)"}
+{"id":"t_mline:astext","a":"MULTILINESTRING((0 0,1 1),(2 2,3 3))","fn":"astext","expected":"MULTILINESTRING((0 0,1 1),(2 2,3 3))"}
+{"id":"t_mpoly:astext","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))","fn":"astext","expected":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))"}
+{"id":"t_mpt:astext","a":"MULTIPOINT(1 2,3 4)","fn":"astext","expected":"MULTIPOINT((1 2),(3 4))"}
+{"id":"t_poly_hole:astext","a":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))","fn":"astext","expected":"POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,8 2,8 8,2 8,2 2))"}
+{"id":"t_pt_15digits:astext","a":"POINT(139.766083865829 35.681382012208)","fn":"astext","expected":"POINT(139.766083865829 35.681382012208)"}
+{"id":"t_pt_big:astext","a":"POINT(1234567.891 7654321.123)","fn":"astext","expected":"POINT(1234567.891 7654321.123)"}
+{"id":"t_pt_frac:astext","a":"POINT(0.1 0.2)","fn":"astext","expected":"POINT(0.1 0.2)"}
+{"id":"t_pt_int:astext","a":"POINT(1 2)","fn":"astext","expected":"POINT(1 2)"}
+{"id":"t_pt_neg:astext","a":"POINT(-1.5 -2.5)","fn":"astext","expected":"POINT(-1.5 -2.5)"}
+{"id":"t_pt_small:astext","a":"POINT(0.000001 -0.000001)","fn":"astext","expected":"POINT(0.000001 -0.000001)"}

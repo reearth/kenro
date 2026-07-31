@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Build core without SQLite
+        run: cargo build --no-default-features
+      - name: Core must not depend on SQLite
+        run: '! cargo tree --no-default-features -e normal | grep -q rusqlite'
+      - name: Test (core only)
+        run: cargo test --no-default-features
+      - name: Test (all features)
+        run: cargo test --all-features
