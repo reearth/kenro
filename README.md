@@ -23,7 +23,7 @@ The headline: **with kenro registered, a plain SQLite build maintains a GeoPacka
 
 ```toml
 [dependencies]
-kenro = { version = "0.1", features = ["rusqlite"] }
+kenro = { version = "0.1", features = ["rusqlite"] }  # add "full" for overlay/repair
 ```
 
 ```rust
@@ -209,7 +209,7 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
 6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
 7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
-8. v0.x releases on crates.io (+ npm as `kenro-wasm`)
+8. ✅ v0.1.0 on [crates.io](https://crates.io/crates/kenro) + [npm as `kenro-wasm`](https://www.npmjs.com/package/kenro-wasm)
 
 ## License
 
