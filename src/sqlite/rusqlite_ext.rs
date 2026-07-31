@@ -225,6 +225,35 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
             };
             blob(overlay::st_buffer(b, d, None))
         })?;
+        // 1-arg aggregate ST_Union(geom): NULL rows skipped (PostGIS
+        // aggregate semantics), zero rows → NULL.
+        struct UnionAgg;
+        impl rusqlite::functions::Aggregate<overlay::UnionAggregate, Option<Value>> for UnionAgg {
+            fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<overlay::UnionAggregate> {
+                Ok(overlay::UnionAggregate::new())
+            }
+            fn step(
+                &self,
+                ctx: &mut Context<'_>,
+                acc: &mut overlay::UnionAggregate,
+            ) -> rusqlite::Result<()> {
+                match blob_or_null(ctx, 0, "ST_Union")? {
+                    None => Ok(()),
+                    Some(b) => acc.step(b).map_err(sql_err),
+                }
+            }
+            fn finalize(
+                &self,
+                _: &mut Context<'_>,
+                acc: Option<overlay::UnionAggregate>,
+            ) -> rusqlite::Result<Option<Value>> {
+                match acc {
+                    None => Ok(None),
+                    Some(agg) => agg.finish().map(|o| o.map(Value::Blob)).map_err(sql_err),
+                }
+            }
+        }
+        conn.create_aggregate_function("ST_Union", 1, FLAGS, UnionAgg)?;
         conn.create_scalar_function("ST_Buffer", 3, FLAGS, |ctx| {
             let (Some(b), Some(d), Some(opts)) = (
                 blob_or_null(ctx, 0, "ST_Buffer")?,

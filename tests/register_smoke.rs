@@ -221,6 +221,40 @@ fn errors_are_attributable_and_actionable() {
 }
 
 #[test]
+fn union_aggregate_dissolves_per_group() {
+    let conn = conn();
+    conn.execute_batch(
+        "CREATE TABLE zones (grp TEXT, geom BLOB);
+         INSERT INTO zones VALUES
+           ('a', ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))')),
+           ('a', ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')),
+           ('b', ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))')),
+           ('b', NULL);",
+    )
+    .unwrap();
+    let mut stmt = conn
+        .prepare("SELECT grp, ST_Area(ST_Union(geom)) FROM zones GROUP BY grp ORDER BY grp")
+        .unwrap();
+    let rows: Vec<(String, f64)> = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert!((rows[0].1 - 175.0).abs() < 1e-6, "{}", rows[0].1);
+    assert!((rows[1].1 - 4.0).abs() < 1e-6, "{}", rows[1].1); // NULL row skipped
+    // Zero rows aggregated → SQL NULL.
+    let empty: Value = conn
+        .query_row(
+            "SELECT ST_Union(geom) FROM zones WHERE grp = 'nope'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(matches!(empty, Value::Null));
+}
+
+#[test]
 fn functions_run_under_trusted_schema_off() {
     // The gpkg rtree triggers run kenro functions from schema context;
     // SQLITE_INNOCUOUS must make that legal under trusted_schema=off.

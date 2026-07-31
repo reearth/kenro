@@ -54,6 +54,39 @@ test("every function works through SQL", async () => {
   }
 });
 
+test("ST_Union aggregate dissolves per group", async () => {
+  const db = await sqlite3.open_v2(":memory:");
+  registerKenro(sqlite3, db, wasm);
+  try {
+    for await (const stmt of sqlite3.statements(
+      db,
+      `CREATE TABLE zones (grp TEXT, geom BLOB);
+       INSERT INTO zones VALUES
+         ('a', ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))')),
+         ('a', ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')),
+         ('b', ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))'));`,
+    )) {
+      while ((await sqlite3.step(stmt)) === SQLite.SQLITE_ROW) {
+        // no rows expected
+      }
+    }
+    const areas = [];
+    for await (const stmt of sqlite3.statements(
+      db,
+      "SELECT ST_Area(ST_Union(geom)) FROM zones GROUP BY grp ORDER BY grp",
+    )) {
+      while ((await sqlite3.step(stmt)) === SQLite.SQLITE_ROW) {
+        areas.push(sqlite3.column(stmt, 0));
+      }
+    }
+    assert.equal(areas.length, 2);
+    assert.ok(Math.abs(areas[0] - 175) < 1e-6, String(areas[0]));
+    assert.ok(Math.abs(areas[1] - 4) < 1e-6, String(areas[1]));
+  } finally {
+    await sqlite3.close(db);
+  }
+});
+
 test("h3 cells survive as 64-bit values", async () => {
   const db = await sqlite3.open_v2(":memory:");
   registerKenro(sqlite3, db, wasm);

@@ -472,6 +472,42 @@ pub fn st_simplify(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
     accessors::st_simplify(geom, tolerance).map_err(err)
 }
 
+// ---- Aggregates (accumulator classes; JS adapters drive step/finish) ----
+
+/// Accumulator for the `ST_Union(geom)` aggregate.
+#[wasm_bindgen]
+pub struct UnionAgg {
+    inner: Option<kenro::functions::overlay::UnionAggregate>,
+}
+
+#[wasm_bindgen]
+impl UnionAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> UnionAgg {
+        UnionAgg {
+            inner: Some(kenro::functions::overlay::UnionAggregate::new()),
+        }
+    }
+
+    pub fn step(&mut self, geom: &[u8]) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: ST_Union accumulator already finished"))?
+            .step(geom)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows aggregated).
+    pub fn finish(&mut self) -> Result<Option<Vec<u8>>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: ST_Union accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
+}
+
 // ---- Manifest ----
 
 fn kind_str(k: manifest::Kind) -> &'static str {
@@ -506,6 +542,16 @@ pub fn manifest() -> String {
             })
         })
         .collect();
+    let aggregates: Vec<serde_json::Value> = manifest::active_aggregates()
+        .map(|e| {
+            serde_json::json!({
+                "sql_name": e.sql_name,
+                "ctor_export": e.ctor_export,
+                "args": e.args.iter().map(|k| kind_str(*k)).collect::<Vec<_>>(),
+                "uses_i64": e.args.contains(&manifest::Kind::I64),
+            })
+        })
+        .collect();
     let stubs: Vec<serde_json::Value> = manifest::active_stubs()
         .iter()
         .map(|s| {
@@ -516,7 +562,8 @@ pub fn manifest() -> String {
             })
         })
         .collect();
-    serde_json::json!({ "functions": functions, "stubs": stubs }).to_string()
+    serde_json::json!({ "functions": functions, "aggregates": aggregates, "stubs": stubs })
+        .to_string()
 }
 
 #[cfg(test)]
@@ -616,6 +663,14 @@ mod tests {
                 known.contains(&entry.export),
                 "manifest export {} has no wasm-bindgen counterpart",
                 entry.export
+            );
+        }
+        let known_aggregates = ["UnionAgg"];
+        for entry in kenro::functions::manifest::active_aggregates() {
+            assert!(
+                known_aggregates.contains(&entry.ctor_export),
+                "manifest aggregate ctor {} has no wasm-bindgen counterpart",
+                entry.ctor_export
             );
         }
     }

@@ -17,7 +17,7 @@ const sqlite3 = await sqlite3InitModule();
 
 function openDb() {
   const db = new sqlite3.oo1.DB(":memory:");
-  registerKenro(db, wasm);
+  registerKenro(db, wasm, sqlite3);
   return db;
 }
 
@@ -66,6 +66,36 @@ test("gpkg rtree triggers run under trusted_schema=off", () => {
         "SELECT ST_Within(ST_GeomFromGPB(geom), ST_GeomFromText('POLYGON((-1 -1,5 -1,5 5,-1 5,-1 -1))', 4326)) FROM parks",
       ),
       1,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test("ST_Union aggregate dissolves per group", () => {
+  const db = openDb();
+  try {
+    db.exec(`
+      CREATE TABLE zones (grp TEXT, geom BLOB);
+      INSERT INTO zones VALUES
+        ('a', ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))')),
+        ('a', ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')),
+        ('b', ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))')),
+        ('b', NULL);
+    `);
+    const rows = [];
+    db.exec({
+      sql: "SELECT grp, ST_Area(ST_Union(geom)) FROM zones GROUP BY grp ORDER BY grp",
+      rowMode: "array",
+      callback: (row) => rows.push(row),
+    });
+    assert.equal(rows.length, 2);
+    assert.ok(Math.abs(rows[0][1] - 175) < 1e-6, String(rows[0][1]));
+    assert.ok(Math.abs(rows[1][1] - 4) < 1e-6, String(rows[1][1])); // NULL row skipped
+    // Zero rows → NULL.
+    assert.equal(
+      db.selectValue("SELECT ST_Union(geom) FROM zones WHERE grp = 'nope'"),
+      null,
     );
   } finally {
     db.close();

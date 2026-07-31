@@ -19,7 +19,13 @@
 // module, so GeoPackage spatial-index maintenance is not possible on this
 // host regardless of kenro (documented in docs/wasm.md).
 
-import { i64UnsupportedUdf, loadManifest, makeUdf, stubUdf } from "./core.mjs";
+import {
+  i64UnsupportedUdf,
+  loadManifest,
+  makeAggregate,
+  makeUdf,
+  stubUdf,
+} from "./core.mjs";
 
 /**
  * Locate sql.js's internal name → function-table-pointer registry. Its
@@ -84,6 +90,34 @@ export function registerKenro(db, wasm) {
       ? i64UnsupportedUdf(entry, "sql.js")
       : makeUdf(entry, wasm);
     register(entry.sql_name, stringThrows(udf), entry.args.length);
+  }
+  for (const entry of manifest.aggregates ?? []) {
+    // sql.js stores aggregate wrappers under BOTH `name` and
+    // `name__finalize` registry keys — rename both before re-registering.
+    for (const key of [entry.sql_name, `${entry.sql_name}__finalize`]) {
+      if (registry[key] !== undefined) {
+        registry[`${key}/kenro:${counter++}`] = registry[key];
+        delete registry[key];
+      }
+    }
+    if (entry.uses_i64) {
+      const loud = stringThrows(i64UnsupportedUdf(entry, "sql.js"));
+      Object.defineProperty(loud, "length", { value: entry.args.length });
+      db.create_function(entry.sql_name, loud);
+      continue;
+    }
+    const aggregate = makeAggregate(entry, wasm);
+    const step = stringThrows((state, ...args) => {
+      aggregate.step(state, args);
+      return state;
+    });
+    // sql.js derives the aggregate's SQL arity from step.length - 1.
+    Object.defineProperty(step, "length", { value: entry.args.length + 1 });
+    db.create_aggregate(entry.sql_name, {
+      init: () => aggregate.start(),
+      step,
+      finalize: stringThrows((state) => aggregate.finish(state)),
+    });
   }
   for (const stub of manifest.stubs) {
     // No variadic registration in sql.js: register each concrete arity.

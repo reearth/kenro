@@ -87,6 +87,34 @@ export function makeUdf(entry, wasm) {
   };
 }
 
+/**
+ * Build the driver for one aggregate entry. Aggregate NULL handling
+ * differs from scalars: NULL rows are SKIPPED (PostGIS aggregate
+ * semantics). `finish` frees the wasm accumulator in all paths.
+ */
+export function makeAggregate(entry, wasm) {
+  const Ctor = wasm[entry.ctor_export];
+  if (typeof Ctor !== "function") {
+    throw new Error(`kenro-wasm export missing: ${entry.ctor_export}`);
+  }
+  return {
+    start: () => new Ctor(),
+    step: (acc, args) => {
+      if (args.some((a) => a === null || a === undefined)) return;
+      const converted = args.map((a, i) => convertArg(entry, i, a));
+      acc.step(...converted);
+    },
+    finish: (acc) => {
+      try {
+        const result = acc.finish();
+        return result === undefined || result === null ? null : result;
+      } finally {
+        acc.free();
+      }
+    },
+  };
+}
+
 /** The loud-failure body shared by every stub registration. */
 export function stubUdf(stub) {
   const message = `kenro: ${stub.name} is not implemented in kenro. ${stub.hint}`;

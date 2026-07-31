@@ -35,7 +35,7 @@ function openFromBytes(bytes) {
     );
     next.checkRc(rc);
   }
-  registerKenro(next, kenroWasm);
+  registerKenro(next, kenroWasm, sqlite3);
   db?.close();
   db = next;
   refreshLayers();

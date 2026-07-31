@@ -33,6 +33,9 @@ fn registration_matches_the_manifest_exactly() {
     for entry in manifest::active_functions() {
         expected.insert((entry.sql_name.to_lowercase(), entry.args.len() as i32));
     }
+    for entry in manifest::active_aggregates() {
+        expected.insert((entry.sql_name.to_lowercase(), entry.args.len() as i32));
+    }
     for stub in manifest::active_stubs() {
         expected.insert((stub.name.to_lowercase(), -1));
     }

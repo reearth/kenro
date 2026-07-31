@@ -316,6 +316,35 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Simplify", "stSimplify", [Blob, Real], Blob, None),
 ];
 
+/// Aggregate functions: registered with xStep/xFinal on every host. Their
+/// NULL handling differs from the scalar rule — NULL rows are SKIPPED
+/// (PostGIS aggregate semantics), enforced by the binding layers.
+pub struct AggEntry {
+    pub sql_name: &'static str,
+    /// wasm-bindgen accumulator class name in kenro-wasm.
+    pub ctor_export: &'static str,
+    pub args: &'static [Kind],
+    pub feature: Option<&'static str>,
+}
+
+pub const AGGREGATES: &[AggEntry] = &[AggEntry {
+    sql_name: "ST_Union",
+    ctor_export: "UnionAgg",
+    args: &[Kind::Blob],
+    feature: None,
+}];
+
+/// The aggregate entries active under the current feature set.
+pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
+    AGGREGATES.iter().filter(|e| match e.feature {
+        None => true,
+        Some("transform") => cfg!(feature = "transform"),
+        Some("h3") => cfg!(feature = "h3"),
+        Some("geojson") => cfg!(feature = "geojson"),
+        Some(_) => false,
+    })
+}
+
 /// Concrete arities for stubs, for hosts that cannot register variadic
 /// (`n_args = -1`) functions. Names not listed here register at every arity
 /// in `DEFAULT_STUB_ARITIES`.

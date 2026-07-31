@@ -303,6 +303,108 @@ pub fn st_union(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
     encode(result, ga.srid.max(gb.srid), FUNC)
 }
 
+/// Accumulator for the 1-arg `ST_Union(geom)` aggregate (dissolve).
+///
+/// PostGIS aggregate semantics: NULL rows are skipped (the binding layers
+/// enforce this — a documented exception to the scalar NULL-strictness),
+/// zero rows yield SQL NULL. All-areal input is oriented and
+/// unary-unioned; all-puntal input deduplicates; lineal or
+/// collection members raise at the offending row.
+#[derive(Default)]
+pub struct UnionAggregate {
+    srid: Option<i32>,
+    polygons: Vec<Polygon<f64>>,
+    points: Vec<Point<f64>>,
+    seen_any: bool,
+}
+
+impl UnionAggregate {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn step(&mut self, bytes: &[u8]) -> Result<()> {
+        const FUNC: &str = "ST_Union";
+        let geom = geom::decode_auto(bytes)?;
+        ensure_finite(FUNC, &geom.geometry)?;
+        if let Some(existing) = self.srid {
+            if existing > 0 && geom.srid > 0 && existing != geom.srid {
+                return Err(Error::MixedSrid {
+                    func: FUNC,
+                    a: existing,
+                    b: geom.srid,
+                });
+            }
+        }
+        if geom.srid > 0 {
+            self.srid = Some(geom.srid);
+        } else {
+            self.srid.get_or_insert(geom.srid);
+        }
+        match classify(FUNC, &geom.geometry)? {
+            Class::Puntal => {
+                if !self.polygons.is_empty() {
+                    return Err(unsupported(
+                        FUNC,
+                        Class::Puntal,
+                        Class::Areal,
+                        "mixed-dimension aggregate unions produce a GeometryCollection",
+                    ));
+                }
+                for p in points_of(&geom.geometry) {
+                    if !self.points.contains(&p) {
+                        self.points.push(p);
+                    }
+                }
+            }
+            Class::Areal => {
+                if !self.points.is_empty() {
+                    return Err(unsupported(
+                        FUNC,
+                        Class::Areal,
+                        Class::Puntal,
+                        "mixed-dimension aggregate unions produce a GeometryCollection",
+                    ));
+                }
+                self.polygons.extend(to_multi_polygon(&geom.geometry).0);
+            }
+            Class::Lineal => {
+                return Err(unsupported(
+                    FUNC,
+                    Class::Lineal,
+                    Class::Lineal,
+                    "line unions need noding",
+                ));
+            }
+        }
+        self.seen_any = true;
+        Ok(())
+    }
+
+    /// `None` = SQL NULL (zero rows aggregated).
+    pub fn finish(self) -> Result<Option<Vec<u8>>> {
+        use geo::orient::{Direction, Orient};
+        const FUNC: &str = "ST_Union";
+        if !self.seen_any {
+            return Ok(None);
+        }
+        let srid = self.srid.unwrap_or(0);
+        let geometry = if !self.polygons.is_empty() {
+            // unary_union requires consistent winding across inputs; kenro
+            // decodes arbitrary user rings, so orient first.
+            let oriented: Vec<Polygon<f64>> = self
+                .polygons
+                .iter()
+                .map(|p| p.orient(Direction::Default))
+                .collect();
+            normalize_polygons(geo::unary_union(oriented.iter()))
+        } else {
+            normalize_points(self.points)
+        };
+        Some(encode(geometry, srid, FUNC)).transpose()
+    }
+}
+
 /// Options accepted by `ST_Buffer(geom, distance, options)`, PostGIS text
 /// syntax: `quad_segs=8 endcap=round|flat|butt|square join=round|mitre|bevel
 /// mitre_limit=5`. `side=` is not supported.
@@ -531,6 +633,34 @@ mod tests {
         assert!(st_sym_difference(&line_a, &g(SQUARE)).is_err());
         let gc = g("GEOMETRYCOLLECTION(POINT(1 1))");
         assert!(st_intersection(&gc, &g(SQUARE)).is_err());
+    }
+
+    #[test]
+    fn union_aggregate_dissolves() {
+        use geo::Area;
+        // Overlapping squares dissolve into one polygon of area 175.
+        let mut agg = UnionAggregate::new();
+        agg.step(&g(SQUARE)).unwrap();
+        agg.step(&g("POLYGON((5 5,15 5,15 15,5 15,5 5))")).unwrap();
+        let blob = agg.finish().unwrap().unwrap();
+        let decoded = crate::geom::decode_auto(&blob).unwrap();
+        assert!((decoded.geometry.unsigned_area() - 175.0).abs() < 1e-6);
+
+        // Zero rows → SQL NULL.
+        assert_eq!(UnionAggregate::new().finish().unwrap(), None);
+
+        // Points dedup; mixed dimensions and lines are loud.
+        let mut agg = UnionAggregate::new();
+        agg.step(&g("POINT(1 1)")).unwrap();
+        agg.step(&g("MULTIPOINT(1 1,2 2)")).unwrap();
+        let blob = agg.finish().unwrap().unwrap();
+        assert_eq!(text(&blob), "MULTIPOINT((1 1),(2 2))");
+
+        let mut agg = UnionAggregate::new();
+        agg.step(&g(SQUARE)).unwrap();
+        assert!(agg.step(&g("POINT(1 1)")).is_err());
+        let mut agg = UnionAggregate::new();
+        assert!(agg.step(&g("LINESTRING(0 0,1 1)")).is_err());
     }
 
     #[test]

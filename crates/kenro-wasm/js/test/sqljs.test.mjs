@@ -72,6 +72,36 @@ test("arity overloads coexist and close() survives the shim", () => {
   db.close(); // must not throw despite the renamed registry keys
 });
 
+test("ST_Union aggregate works through the __finalize shim", () => {
+  const db = openDb();
+  try {
+    db.exec(`
+      CREATE TABLE zones (grp TEXT, geom BLOB);
+      INSERT INTO zones VALUES
+        ('a', ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))')),
+        ('a', ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')),
+        ('b', ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))'));
+    `);
+    const rows = db.exec(
+      "SELECT grp, ST_Area(ST_Union(geom)) FROM zones GROUP BY grp ORDER BY grp",
+    )[0].values;
+    assert.ok(Math.abs(rows[0][1] - 175) < 1e-6, String(rows[0][1]));
+    assert.ok(Math.abs(rows[1][1] - 4) < 1e-6, String(rows[1][1]));
+    // The scalar 2-arg ST_Union coexists with the 1-arg aggregate.
+    assert.equal(
+      selectValue(
+        db,
+        "SELECT ST_Area(ST_Union(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'), ST_GeomFromText('POLYGON((2 2,3 2,3 3,2 3,2 2))')))",
+      ),
+      2,
+    );
+    db.close();
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+});
+
 test("h3 functions fail loudly, never lossily", () => {
   const db = openDb();
   try {
