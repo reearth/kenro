@@ -24,6 +24,9 @@ pub enum Kind {
     OptI64,
     /// Nullable geometry return (`Option<Vec<u8>>` → SQL NULL). Return-only.
     OptBlob,
+    /// TEXT accepted as-is; INTEGER n normalized to `quad_segs=n` by the
+    /// binding layer (ST_Buffer's third argument). Argument-only.
+    TextOrInt,
 }
 
 pub struct FnEntry {
@@ -235,6 +238,14 @@ pub const FUNCTIONS: &[FnEntry] = &[
         None
     ),
     entry!("ST_Union", "stUnion", [Blob, Blob], Blob, None),
+    entry!("ST_Buffer", "stBuffer", [Blob, Real], Blob, None),
+    entry!(
+        "ST_Buffer",
+        "stBufferOpts",
+        [Blob, Real, TextOrInt],
+        Blob,
+        None
+    ),
     // Processing.
     entry!("ST_ConvexHull", "stConvexHull", [Blob], Blob, None),
     entry!("ST_PointOnSurface", "stPointOnSurface", [Blob], Blob, None),
@@ -309,7 +320,6 @@ pub const FUNCTIONS: &[FnEntry] = &[
 /// (`n_args = -1`) functions. Names not listed here register at every arity
 /// in `DEFAULT_STUB_ARITIES`.
 pub const STUB_ARITIES: &[(&str, &[i32])] = &[
-    ("ST_Buffer", &[2, 3]),
     ("ST_MakeValid", &[1]),
     ("ST_AsMVT", &[1, 2, 3, 4]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),

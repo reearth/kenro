@@ -309,6 +309,16 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_Area(ST_Union(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
     check: (v) => Math.abs(Number(v) - 175) < 1e-9,
   },
+  "ST_Buffer/2": {
+    sql: "SELECT ST_Area(ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0))",
+    check: (v) => Math.abs(Number(v) - Math.PI) < 0.05,
+  },
+  "ST_Buffer/3": {
+    // Integer third arg → quad_segs normalization (conformance shared with
+    // the rusqlite binding); quad_segs=1 gives a 4-vertex "circle", area 2.
+    sql: "SELECT ST_Area(ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0, 1))",
+    check: (v) => Math.abs(Number(v) - 2) < 0.2,
+  },
   "ST_ConvexHull/1": {
     sql: "SELECT ST_AsText(ST_ConvexHull(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4,2 2)')))",
     check: (v) => typeof v === "string" && v.startsWith("POLYGON"),
@@ -500,7 +510,7 @@ export async function smokeAllFunctions(manifest, { run, expectError, skip }) {
   }
   // Stub behavior: helpful error, not "no such function".
   const stubMessage = await expectError(
-    "SELECT ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0)",
+    "SELECT ST_MakeValid(ST_GeomFromText('POINT(0 0)'))",
   );
   if (!/not implemented in kenro/.test(stubMessage)) {
     throw new Error(`stub error text wrong: ${stubMessage}`);

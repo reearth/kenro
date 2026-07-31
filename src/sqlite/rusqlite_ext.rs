@@ -216,6 +216,25 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         register_geom2_to_blob(conn, "ST_Difference", overlay::st_difference)?;
         register_geom2_to_blob(conn, "ST_SymDifference", overlay::st_sym_difference)?;
         register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
+        conn.create_scalar_function("ST_Buffer", 2, FLAGS, |ctx| {
+            let (Some(b), Some(d)) = (
+                blob_or_null(ctx, 0, "ST_Buffer")?,
+                real_or_null(ctx, 1, "ST_Buffer")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(overlay::st_buffer(b, d, None))
+        })?;
+        conn.create_scalar_function("ST_Buffer", 3, FLAGS, |ctx| {
+            let (Some(b), Some(d), Some(opts)) = (
+                blob_or_null(ctx, 0, "ST_Buffer")?,
+                real_or_null(ctx, 1, "ST_Buffer")?,
+                text_or_int_or_null(ctx, 2, "ST_Buffer")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(overlay::st_buffer(b, d, Some(&opts)))
+        })?;
     }
 
     // Processing + affine.
@@ -739,6 +758,29 @@ fn text_or_null<'a>(
         other => Err(sql_err(Error::Unsupported {
             func,
             reason: format!("expected TEXT, got {}", other.data_type()),
+        })),
+    }
+}
+
+/// `Kind::TextOrInt`: TEXT as-is; INTEGER n normalized to `quad_segs=n`
+/// (ST_Buffer's PostGIS integer overload).
+fn text_or_int_or_null(
+    ctx: &Context<'_>,
+    i: usize,
+    func: &'static str,
+) -> rusqlite::Result<Option<String>> {
+    match ctx.get_raw(i) {
+        ValueRef::Null => Ok(None),
+        ValueRef::Text(t) => std::str::from_utf8(t)
+            .map(|s| Some(s.to_string()))
+            .map_err(|e| sql_err(Error::InvalidWkt(e.to_string()))),
+        ValueRef::Integer(n) => Ok(Some(format!("quad_segs={n}"))),
+        other => Err(sql_err(Error::Unsupported {
+            func,
+            reason: format!(
+                "expected TEXT options or INTEGER, got {}",
+                other.data_type()
+            ),
         })),
     }
 }

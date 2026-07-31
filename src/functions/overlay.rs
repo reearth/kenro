@@ -303,6 +303,152 @@ pub fn st_union(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
     encode(result, ga.srid.max(gb.srid), FUNC)
 }
 
+/// Options accepted by `ST_Buffer(geom, distance, options)`, PostGIS text
+/// syntax: `quad_segs=8 endcap=round|flat|butt|square join=round|mitre|bevel
+/// mitre_limit=5`. `side=` is not supported.
+struct BufferOptions {
+    quad_segs: u32,
+    endcap: EndCap,
+    join: JoinStyle,
+    mitre_limit: f64,
+}
+
+enum EndCap {
+    Round,
+    Flat,
+    Square,
+}
+
+enum JoinStyle {
+    Round,
+    Mitre,
+    Bevel,
+}
+
+impl Default for BufferOptions {
+    fn default() -> Self {
+        // PostGIS defaults: quad_segs=8, round caps/joins, mitre_limit=5.
+        BufferOptions {
+            quad_segs: 8,
+            endcap: EndCap::Round,
+            join: JoinStyle::Round,
+            mitre_limit: 5.0,
+        }
+    }
+}
+
+fn parse_buffer_options(func: &'static str, text: &str) -> Result<BufferOptions> {
+    let mut options = BufferOptions::default();
+    for token in text.split_whitespace() {
+        let Some((key, value)) = token.split_once('=') else {
+            return Err(Error::Unsupported {
+                func,
+                reason: format!("malformed buffer option {token:?} (expected key=value)"),
+            });
+        };
+        match key.to_ascii_lowercase().as_str() {
+            "quad_segs" => {
+                options.quad_segs =
+                    value
+                        .parse::<u32>()
+                        .ok()
+                        .filter(|q| *q > 0)
+                        .ok_or_else(|| Error::Unsupported {
+                            func,
+                            reason: format!("quad_segs must be a positive integer, got {value:?}"),
+                        })?;
+            }
+            "endcap" => {
+                options.endcap = match value.to_ascii_lowercase().as_str() {
+                    "round" => EndCap::Round,
+                    "flat" | "butt" => EndCap::Flat,
+                    "square" => EndCap::Square,
+                    other => {
+                        return Err(Error::Unsupported {
+                            func,
+                            reason: format!("unknown endcap style {other:?}"),
+                        });
+                    }
+                };
+            }
+            "join" => {
+                options.join = match value.to_ascii_lowercase().as_str() {
+                    "round" => JoinStyle::Round,
+                    "mitre" | "miter" => JoinStyle::Mitre,
+                    "bevel" => JoinStyle::Bevel,
+                    other => {
+                        return Err(Error::Unsupported {
+                            func,
+                            reason: format!("unknown join style {other:?}"),
+                        });
+                    }
+                };
+            }
+            "mitre_limit" | "miter_limit" => {
+                options.mitre_limit =
+                    value
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|m| *m > 0.0)
+                        .ok_or_else(|| Error::Unsupported {
+                            func,
+                            reason: format!("mitre_limit must be positive, got {value:?}"),
+                        })?;
+            }
+            "side" => {
+                return Err(Error::Unsupported {
+                    func,
+                    reason: "side= buffers are not supported".into(),
+                });
+            }
+            other => {
+                return Err(Error::Unsupported {
+                    func,
+                    reason: format!("unknown buffer option {other:?}"),
+                });
+            }
+        }
+    }
+    Ok(options)
+}
+
+/// `ST_Buffer(geom, distance [, options])` — pure-Rust buffering via geo.
+/// Negative distances erode areal geometries (and empty everything else,
+/// as in PostGIS). Arc tessellation differs from GEOS; golden vectors
+/// bound the area difference.
+pub fn st_buffer(bytes: &[u8], distance: f64, options_text: Option<&str>) -> Result<Vec<u8>> {
+    use geo::algorithm::buffer::{Buffer, BufferStyle, LineCap, LineJoin};
+    const FUNC: &str = "ST_Buffer";
+    if !distance.is_finite() {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: "buffer distance must be finite".into(),
+        });
+    }
+    let options = match options_text {
+        Some(text) => parse_buffer_options(FUNC, text)?,
+        None => BufferOptions::default(),
+    };
+    let geom = geom::decode_auto(bytes)?;
+    ensure_finite(FUNC, &geom.geometry)?;
+    // quad_segs → arc step angle: θ = π / (2·quad_segs), exactly PostGIS's
+    // quarter-circle subdivision.
+    let angle = std::f64::consts::PI / (2.0 * f64::from(options.quad_segs));
+    let style = BufferStyle::new(distance)
+        .line_cap(match options.endcap {
+            EndCap::Round => LineCap::Round(angle),
+            EndCap::Flat => LineCap::Butt,
+            EndCap::Square => LineCap::Square,
+        })
+        .line_join(match options.join {
+            JoinStyle::Round => LineJoin::Round(angle),
+            JoinStyle::Mitre => LineJoin::Miter(options.mitre_limit),
+            JoinStyle::Bevel => LineJoin::Bevel,
+        });
+    let buffered = geom.geometry.buffer_with_style(style);
+    encode(normalize_polygons(buffered), geom.srid, FUNC)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,6 +531,34 @@ mod tests {
         assert!(st_sym_difference(&line_a, &g(SQUARE)).is_err());
         let gc = g("GEOMETRYCOLLECTION(POINT(1 1))");
         assert!(st_intersection(&gc, &g(SQUARE)).is_err());
+    }
+
+    #[test]
+    fn buffer_basics() {
+        use geo::Area;
+        // Round point buffer of r=1 approximates π.
+        let buffered = st_buffer(&g("POINT(0 0)"), 1.0, None).unwrap();
+        let decoded = crate::geom::decode_auto(&buffered).unwrap();
+        let area = decoded.geometry.unsigned_area();
+        assert!((area - std::f64::consts::PI).abs() < 0.05, "{area}");
+        // Erosion of a polygon shrinks it.
+        let eroded = st_buffer(&g(SQUARE), -1.0, None).unwrap();
+        let decoded = crate::geom::decode_auto(&eroded).unwrap();
+        assert!((decoded.geometry.unsigned_area() - 64.0).abs() < 0.5);
+        // Full erosion and negative non-areal buffers empty out.
+        assert_eq!(
+            text(&st_buffer(&g(SQUARE), -100.0, None).unwrap()),
+            "POLYGON EMPTY"
+        );
+        assert_eq!(
+            text(&st_buffer(&g("POINT(0 0)"), -1.0, None).unwrap()),
+            "POLYGON EMPTY"
+        );
+        // Options parse; side= and junk are loud.
+        assert!(st_buffer(&g("POINT(0 0)"), 1.0, Some("quad_segs=2 endcap=square")).is_ok());
+        assert!(st_buffer(&g("POINT(0 0)"), 1.0, Some("side=left")).is_err());
+        assert!(st_buffer(&g("POINT(0 0)"), 1.0, Some("nonsense")).is_err());
+        assert!(st_buffer(&g("POINT(0 0)"), 1.0, Some("quad_segs=0")).is_err());
     }
 
     #[test]

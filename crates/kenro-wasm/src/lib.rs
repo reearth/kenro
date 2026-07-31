@@ -281,6 +281,16 @@ pub fn st_union(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_union(a, b).map_err(err)
 }
 
+#[wasm_bindgen(js_name = stBuffer)]
+pub fn st_buffer(geom: &[u8], distance: f64) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_buffer(geom, distance, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stBufferOpts)]
+pub fn st_buffer_opts(geom: &[u8], distance: f64, options: &str) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_buffer(geom, distance, Some(options)).map_err(err)
+}
+
 // ---- Processing + affine ----
 
 #[wasm_bindgen(js_name = stConvexHull)]
@@ -476,6 +486,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::OptReal => "opt_real",
         Kind::OptI64 => "opt_i64",
         Kind::OptBlob => "opt_blob",
+        Kind::TextOrInt => "text_or_int",
     }
 }
 
@@ -556,6 +567,8 @@ mod tests {
             "stDifference",
             "stSymDifference",
             "stUnion",
+            "stBuffer",
+            "stBufferOpts",
             "stConvexHull",
             "stPointOnSurface",
             "stSimplifyVw",

@@ -42,6 +42,14 @@ function convertArg(entry, i, v) {
       if (typeof v === "bigint") return Number(v);
       if (typeof v === "number") return v;
       throw fail(name, "expected a numeric value");
+    case "text_or_int": {
+      // TEXT as-is; INTEGER n normalized to quad_segs=n (identical to the
+      // rusqlite binding — a shared smoke vector keeps the layers in sync).
+      if (typeof v === "string") return v;
+      const n = typeof v === "bigint" ? Number(v) : v;
+      if (typeof n === "number" && Number.isInteger(n)) return `quad_segs=${n}`;
+      throw fail(name, "expected TEXT options or INTEGER");
+    }
     default:
       throw fail(name, `unsupported argument kind ${kind}`);
   }

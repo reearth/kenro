@@ -34,10 +34,6 @@ pub const STUBS: &[Stub] = &[
         hint: "MVT tile generation is not implemented in kenro yet; generate tiles with \
                PostGIS or tippecanoe for now.",
     },
-    Stub {
-        name: "ST_Buffer",
-        hint: "Planned for the next release (geo's pure-Rust Buffer).",
-    },
 ];
 
 /// Stubs installed when a cargo feature is compiled out, so the failure mode
