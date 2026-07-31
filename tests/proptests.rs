@@ -5,7 +5,7 @@
 
 use proptest::prelude::*;
 
-use kenro::functions::{io, predicates, rtree};
+use kenro::functions::{io, mvt, overlay, predicates, rtree};
 use kenro::geom;
 use kenro::gpb::{self, GpbHeader};
 
@@ -155,6 +155,82 @@ proptest! {
         prop_assert!(cell > 0, "bit 63 must be clear: {cell}");
         let s = kenro::functions::h3::h3_cell_to_string(cell).unwrap();
         prop_assert_eq!(kenro::functions::h3::h3_string_to_cell(&s).unwrap(), cell);
+    }
+
+    // Overlay/buffer/MVT run through i_overlay's integer-grid mesh — the
+    // one dependency whose robustness contract we cannot inspect. These
+    // pin "any valid finite input returns Ok or Err, never panics" (on
+    // wasm a panic aborts the whole instance).
+
+    #[test]
+    fn overlay_ops_never_panic(wkt_a in geom_wkt(), wkt_b in geom_wkt()) {
+        let a = io::st_geom_from_text(&wkt_a, None).unwrap();
+        let b = io::st_geom_from_text(&wkt_b, None).unwrap();
+        let _ = overlay::st_intersection(&a, &b);
+        let _ = overlay::st_difference(&a, &b);
+        let _ = overlay::st_sym_difference(&a, &b);
+        let _ = overlay::st_union(&a, &b);
+    }
+
+    #[test]
+    fn areal_intersection_never_exceeds_operands(a in rect_wkt(), b in rect_wkt()) {
+        use kenro::functions::accessors;
+        let ga = io::st_geom_from_text(&a, None).unwrap();
+        let gb = io::st_geom_from_text(&b, None).unwrap();
+        let cap = accessors::st_area(&ga).unwrap().min(accessors::st_area(&gb).unwrap());
+        let out = overlay::st_intersection(&ga, &gb).unwrap();
+        let area = accessors::st_area(&out).unwrap();
+        // i_overlay snaps coordinates onto its internal grid, so the result
+        // boundary can exceed a razor-thin operand by ~1e-8 of the combined
+        // extent per vertex; allow that error band scaled by the result
+        // perimeter (with a wide safety factor), nothing more.
+        let span = [&ga, &gb]
+            .iter()
+            .flat_map(|g| {
+                [rtree::st_min_x(g), rtree::st_max_x(g), rtree::st_min_y(g), rtree::st_max_y(g)]
+            })
+            .map(|v| v.unwrap().unwrap().abs())
+            .fold(1.0f64, f64::max);
+        let allowance = 1e-7 * span * (accessors::st_perimeter(&out).unwrap() + 4.0);
+        prop_assert!(area <= cap + allowance + 1e-9, "{area} > {cap} (+{allowance})");
+    }
+
+    #[test]
+    fn buffer_never_panics(wkt in geom_wkt(), d in -50.0..50.0f64, quad in 1..16i32) {
+        let g = io::st_geom_from_text(&wkt, None).unwrap();
+        let _ = overlay::st_buffer(&g, d, None);
+        let _ = overlay::st_buffer(&g, d, Some(&format!("quad_segs={quad}")));
+    }
+
+    #[test]
+    fn union_aggregate_never_panics(
+        wkts in prop::collection::vec(geom_wkt(), 0..8),
+    ) {
+        let mut acc = overlay::UnionAggregate::new();
+        for wkt in &wkts {
+            let g = io::st_geom_from_text(wkt, None).unwrap();
+            let _ = acc.step(&g); // mixed dimension classes may Err — fine
+        }
+        let _ = acc.finish();
+    }
+
+    #[test]
+    fn mvt_pipeline_never_panics(
+        wkt in geom_wkt(),
+        bounds_wkt in rect_wkt(),
+        extent in 1..8192i32,
+        buffer in 0..1024i32,
+        clip in 0..2i32,
+    ) {
+        let g = io::st_geom_from_text(&wkt, None).unwrap();
+        let bounds = io::st_geom_from_text(&bounds_wkt, None).unwrap();
+        let result = mvt::st_as_mvt_geom(&g, &bounds, Some(extent), Some(buffer), Some(clip));
+        // Whatever survives the transform must also survive encoding.
+        if let Ok(Some(tile_geom)) = result {
+            let mut acc = mvt::MvtAggregate::new();
+            acc.step(&tile_geom, None, Some(extent), None).unwrap();
+            acc.finish().unwrap();
+        }
     }
 
     #[test]
