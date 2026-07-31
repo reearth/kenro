@@ -1,5 +1,11 @@
 # kenro
 
+[![CI](https://github.com/reearth/kenro/actions/workflows/ci.yml/badge.svg)](https://github.com/reearth/kenro/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/kenro)](https://crates.io/crates/kenro)
+[![docs.rs](https://img.shields.io/docsrs/kenro)](https://docs.rs/kenro)
+[![npm](https://img.shields.io/npm/v/kenro-wasm)](https://www.npmjs.com/package/kenro-wasm)
+[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
+
 **SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, or *GeoPackage in pure Rust*: this is that crate.
@@ -108,8 +114,8 @@ buffer, processing & affine transforms, accessors, constructors, GeoPackage
 trigger helpers, H3, and MVT vector tiles — plus two aggregates
 (`ST_Union(geom)`, `ST_AsMVT(…)`).
 
-**The full table — every function with its PostGIS / DuckDB Spatial
-comparison and documented behavior differences — lives in
+**The full table — every function with its PostGIS / DuckDB Spatial /
+SpatiaLite comparison and documented behavior differences — lives in
 [docs/functions.md](docs/functions.md).**
 
 All implemented functions are **deterministic and pure** (no I/O, no clock,
