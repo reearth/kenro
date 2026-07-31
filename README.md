@@ -45,13 +45,14 @@ Inserts, updates and deletes through SQL keep the spatial index in sync via the 
 
 ## Quickstart (every other platform — loadable extension)
 
-kenro also builds as a standard SQLite loadable extension — one binary,
-loadable from any language whose SQLite driver exposes extension loading:
+kenro ships as a standard SQLite loadable extension — one prebuilt binary
+per OS on the [releases page](https://github.com/reearth/kenro/releases)
+(Linux x86_64/arm64, macOS universal, Windows), loadable from any language
+whose SQLite driver exposes extension loading:
 
 ```sh
-cargo build -p kenro-ext --release
-# → target/release/libkenro_ext.so (Linux) / libkenro_ext.dylib (macOS)
-#   / target/release/kenro_ext.dll (Windows)
+curl -fsSL https://github.com/reearth/kenro/releases/latest/download/kenro-ext-x86_64-unknown-linux-gnu.tar.gz | tar xz
+# → libkenro_ext.so  (or build from source: cargo build -p kenro-ext --release)
 ```
 
 ```python
@@ -59,7 +60,7 @@ import sqlite3
 
 con = sqlite3.connect("parks.gpkg")
 con.enable_load_extension(True)
-con.load_extension("./target/release/libkenro_ext")
+con.load_extension("./libkenro_ext")
 
 print(con.execute(
     "SELECT ST_AsText(ST_GeomFromGPB(geom)) FROM parks LIMIT 1").fetchone())
@@ -197,7 +198,8 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
 5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
-6. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
+6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
+7. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
 
 ## License
 

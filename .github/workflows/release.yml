@@ -1,0 +1,158 @@
+# Builds the distributable artifacts and attaches them to a GitHub Release
+# on every v* tag. Asset filenames are version-less on purpose so
+# `releases/latest/download/<asset>` URLs stay stable (the release itself
+# carries the version). workflow_dispatch runs the builds without
+# publishing — a dry-run for the pipeline.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  ext:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            lib: libkenro_ext.so
+          - name: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            lib: libkenro_ext.so
+          - name: macos-universal
+            os: macos-latest
+            lib: libkenro_ext.dylib
+          - name: x86_64-pc-windows-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            lib: kenro_ext.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.name }}
+      - name: Set up cross toolchain (linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build (single target)
+        if: matrix.name != 'macos-universal'
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build -p kenro-ext --release --target ${{ matrix.target }}
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/${{ matrix.lib }} dist/
+        shell: bash
+      - name: Build (macOS universal)
+        if: matrix.name == 'macos-universal'
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo build -p kenro-ext --release --target x86_64-apple-darwin
+          cargo build -p kenro-ext --release --target aarch64-apple-darwin
+          mkdir -p dist
+          lipo -create -output dist/${{ matrix.lib }} \
+            target/x86_64-apple-darwin/release/${{ matrix.lib }} \
+            target/aarch64-apple-darwin/release/${{ matrix.lib }}
+          lipo -info dist/${{ matrix.lib }}
+
+      - name: Smoke-load through Python (native builds)
+        if: matrix.name == 'x86_64-unknown-linux-gnu'
+        run: |
+          python3 - <<'EOF'
+          import sqlite3
+          con = sqlite3.connect(":memory:")
+          con.enable_load_extension(True)
+          con.load_extension("./dist/libkenro_ext")
+          assert con.execute("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))").fetchone()[0] == "POINT(1 2)"
+          assert con.execute("SELECT ST_Area(ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0)) > 3").fetchone()[0] == 1
+          print("smoke OK (incl. overlay)")
+          EOF
+
+      - name: Package (tar.gz)
+        if: matrix.os != 'windows-latest'
+        # Members are listed explicitly (no `.`) so archives contain plain
+        # `libkenro_ext.so` paths — Dockerfiles can extract single members.
+        run: |
+          cp LICENSE-MIT LICENSE-APACHE dist/
+          tar czf kenro-ext-${{ matrix.name }}.tar.gz -C dist \
+            ${{ matrix.lib }} LICENSE-MIT LICENSE-APACHE
+      - name: Package (zip)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Copy-Item LICENSE-MIT,LICENSE-APACHE dist/
+          Compress-Archive -Path dist/* -DestinationPath kenro-ext-${{ matrix.name }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kenro-ext-${{ matrix.name }}
+          path: kenro-ext-${{ matrix.name }}.*
+          if-no-files-found: error
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-wasm
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Build (full)
+        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
+      - name: Package
+        run: |
+          cp LICENSE-MIT LICENSE-APACHE crates/kenro-wasm/js/
+          tar czf kenro-wasm.tar.gz -C crates/kenro-wasm/js \
+            package.json pkg src LICENSE-MIT LICENSE-APACHE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kenro-wasm
+          path: kenro-wasm.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: [ext, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        working-directory: assets
+        run: sha256sum * > SHA256SUMS
+      - name: Dry-run summary (workflow_dispatch)
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        working-directory: assets
+        run: |
+          echo "workflow_dispatch dry run — assets built, no release published:"
+          ls -la
+          cat SHA256SUMS
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true

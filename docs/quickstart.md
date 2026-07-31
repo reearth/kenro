@@ -19,19 +19,40 @@ Pick the row that matches your platform, then jump to its section:
 | Cloudflare Workers | kenro-wasm | [Cloudflare Workers](#cloudflare-workers) |
 | Browser | kenro-wasm | [docs/wasm.md](wasm.md) |
 
-Everything below assumes the extension binary exists — build it once:
+Everything below assumes the extension binary exists — grab it first:
 
-## Building the loadable extension
+## Getting the loadable extension
+
+Prebuilt binaries are attached to every [GitHub Release]. Download the
+one matching your OS/architecture (the `latest` URLs below always point
+at the newest release):
+
+| OS / arch | asset |
+|---|---|
+| Linux x86_64 (glibc) | `kenro-ext-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux arm64 (glibc) | `kenro-ext-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS (universal: Apple Silicon + Intel) | `kenro-ext-macos-universal.tar.gz` |
+| Windows x86_64 | `kenro-ext-x86_64-pc-windows-msvc.zip` |
 
 ```sh
-cargo build -p kenro-ext --release
-# → target/release/libkenro_ext.so    (Linux)
-#   target/release/libkenro_ext.dylib (macOS)
-#   target/release/kenro_ext.dll      (Windows)
+curl -fsSL -o kenro-ext.tar.gz \
+  https://github.com/reearth/kenro/releases/latest/download/kenro-ext-x86_64-unknown-linux-gnu.tar.gz
+tar xzf kenro-ext.tar.gz   # → libkenro_ext.so (+ licenses)
 ```
 
-No C toolchain and no SQLite development files are needed — any machine
-with Rust builds it. Notes that apply everywhere:
+`SHA256SUMS` on the release page verifies the download. Each archive
+contains the bare library — put it wherever your app can read it. The
+examples below assume it sits in the working directory (`./libkenro_ext.so`
+/ `.dylib` / `kenro_ext.dll`).
+
+Building from source works on any machine with Rust, no C toolchain or
+SQLite development files needed:
+
+```sh
+cargo build -p kenro-ext --release   # → target/release/libkenro_ext.*
+```
+
+Notes that apply everywhere:
 
 - The **host SQLite must be ≥ 3.34**; on older hosts the load fails with a
   clear version-mismatch message.
@@ -40,9 +61,6 @@ with Rust builds it. Notes that apply everywhere:
 - Renamed copies load fine (e.g. `libkenro.so`): the binary exports
   `sqlite3_extension_init`, `sqlite3_kenroext_init` and
   `sqlite3_kenro_init`.
-- Cross-compiling (e.g. a Linux `.so` from macOS for Lambda/Cloud Run):
-  add the Rust target and use [cargo-zigbuild] or a `rust` Docker image —
-  `cargo zigbuild -p kenro-ext --release --target x86_64-unknown-linux-gnu`.
 - The prebuilt extension ships the **full** function set including
   overlay/buffer/MVT (`kenro-ext`'s default features).
 
@@ -74,7 +92,7 @@ import sqlite3
 
 con = sqlite3.connect("parks.gpkg")
 con.enable_load_extension(True)
-con.load_extension("./target/release/libkenro_ext")  # suffix optional
+con.load_extension("./libkenro_ext")  # suffix optional
 con.enable_load_extension(False)
 
 print(con.execute(
@@ -91,13 +109,13 @@ macOS note: python.org installers ship a `sqlite3` module without
 // better-sqlite3
 const Database = require("better-sqlite3");
 const db = new Database("parks.gpkg");
-db.loadExtension("./target/release/libkenro_ext");
+db.loadExtension("./libkenro_ext");
 
 // or the built-in node:sqlite (Node ≥ 22.5)
 const { DatabaseSync } = require("node:sqlite");
 const db2 = new DatabaseSync("parks.gpkg", { allowExtension: true });
 db2.enableLoadExtension(true);
-db2.loadExtension("./target/release/libkenro_ext");
+db2.loadExtension("./libkenro_ext");
 ```
 
 ## Bun
@@ -110,7 +128,7 @@ import { Database } from "bun:sqlite";
 // Database.setCustomSQLite("/opt/homebrew/opt/sqlite/lib/libsqlite3.dylib");
 
 const db = new Database("parks.gpkg");
-db.loadExtension("./target/release/libkenro_ext");
+db.loadExtension("./libkenro_ext");
 ```
 
 ## Deno
@@ -122,7 +140,7 @@ With the FFI-based [`@db/sqlite`](https://jsr.io/@db/sqlite) driver
 import { Database } from "jsr:@db/sqlite";
 
 const db = new Database("parks.gpkg", { enableLoadExtension: true });
-db.loadExtension("./target/release/libkenro_ext");
+db.loadExtension("./libkenro_ext");
 ```
 
 ## Go
@@ -137,7 +155,7 @@ import (
 
 func init() {
     sql.Register("sqlite3_kenro", &sqlite3.SQLiteDriver{
-        Extensions: []string{"./target/release/libkenro_ext"},
+        Extensions: []string{"./libkenro_ext"},
     })
 }
 
@@ -164,7 +182,7 @@ require "sqlite3"
 
 db = SQLite3::Database.new("parks.gpkg")
 db.enable_load_extension(true)
-db.load_extension("./target/release/libkenro_ext")
+db.load_extension("./libkenro_ext")
 db.enable_load_extension(false)
 
 puts db.get_first_value(
@@ -178,14 +196,14 @@ sqlite3 *db;
 sqlite3_open("parks.gpkg", &db);
 sqlite3_enable_load_extension(db, 1);
 char *err = NULL;
-sqlite3_load_extension(db, "./target/release/libkenro_ext", NULL, &err);
+sqlite3_load_extension(db, "./libkenro_ext", NULL, &err);
 ```
 
 ## sqlite3 CLI
 
 ```
 $ sqlite3 parks.gpkg
-sqlite> .load ./target/release/libkenro_ext
+sqlite> .load ./libkenro_ext
 sqlite> SELECT ST_AsGeoJSON(ST_Transform(ST_GeomFromGPB(geom), 4326)) FROM parks LIMIT 1;
 ```
 
@@ -194,26 +212,24 @@ macOS: the system `/usr/bin/sqlite3` is compiled without extension loading —
 
 ## Containers (Cloud Run, Fly.io, ECS, …)
 
-Any platform that runs a container runs kenro: build the `.so` in a Rust
-stage, copy it next to your app, load it like on any Linux host. A Node
-example (the pattern is identical for Python/Go/Ruby images):
+Any platform that runs a container runs kenro: fetch the release binary
+into the image, load it like on any Linux host. A Node example (the
+pattern is identical for Python/Go/Ruby images):
 
 ```dockerfile
-FROM rust:1 AS kenro
-WORKDIR /src
-COPY . .
-RUN cargo build -p kenro-ext --release
-
 FROM node:22-slim
 WORKDIR /app
-COPY --from=kenro /src/target/release/libkenro_ext.so ./libkenro_ext.so
+ADD https://github.com/reearth/kenro/releases/latest/download/kenro-ext-x86_64-unknown-linux-gnu.tar.gz /tmp/kenro.tar.gz
+RUN tar xzf /tmp/kenro.tar.gz -C /app libkenro_ext.so && rm /tmp/kenro.tar.gz
 COPY . .
 RUN npm ci --omit=dev
 CMD ["node", "server.js"]   # server.js: db.loadExtension("./libkenro_ext.so")
 ```
 
-Build for the platform's architecture (`--platform linux/amd64` on Cloud
-Run's default; arm64 images work the same with an arm64 build stage).
+Match the asset to the image architecture (`aarch64-unknown-linux-gnu`
+for arm64 images). Pin a version by replacing `latest/download/…` with
+`download/vX.Y.Z/…`. If you prefer hermetic builds, a `rust:1` build
+stage running `cargo build -p kenro-ext --release` works too.
 
 ## AWS Lambda
 
@@ -221,10 +237,9 @@ Two routes:
 
 - **Container image** (simplest): exactly the Dockerfile pattern above on
   an AWS base image.
-- **Zip + layer**: build `libkenro_ext.so` for Amazon Linux
-  (`x86_64-unknown-linux-gnu` or `aarch64-unknown-linux-gnu`, matching the
-  function architecture — cross-compile with [cargo-zigbuild] or build in
-  an `amazonlinux:2023` container), ship it in a layer, and load it from
+- **Zip + layer**: put the release `libkenro_ext.so`
+  (`x86_64-unknown-linux-gnu` or `aarch64-unknown-linux-gnu`, matching
+  the function architecture) into a layer under `lib/`, and load it from
   `/opt`:
 
 ```python
@@ -264,7 +279,7 @@ See [docs/wasm.md](wasm.md) — adapters for the official SQLite WASM build,
 sql.js and wa-sqlite, plus a drag-a-GeoPackage demo in
 `crates/kenro-wasm/demo/`.
 
-[cargo-zigbuild]: https://github.com/rust-cross/cargo-zigbuild
+[GitHub Release]: https://github.com/reearth/kenro/releases
 [mattn/go-sqlite3]: https://github.com/mattn/go-sqlite3
 [sql.js]: https://github.com/sql-js/sql.js
 [wa-sqlite]: https://github.com/rhashimoto/wa-sqlite
