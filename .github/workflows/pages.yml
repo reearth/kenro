@@ -1,0 +1,50 @@
+name: Pages
+
+# NOTE: GitHub Pages is unavailable for this repository while it is private
+# on the current plan. When the repo goes public: enable Pages (Settings →
+# Pages → Source: GitHub Actions, or
+# `gh api -X POST repos/reearth/kenro/pages -f build_type=workflow`) and add
+#   push:
+#     branches: [main]
+# to the trigger below.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Build kenro-wasm
+        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+      - name: Assemble site
+        run: |
+          mkdir -p _site/pkg _site/adapters
+          cp crates/kenro-wasm/demo/index.html crates/kenro-wasm/demo/demo.mjs _site/
+          cp crates/kenro-wasm/js/pkg/kenro_wasm.js crates/kenro-wasm/js/pkg/kenro_wasm_bg.wasm _site/pkg/
+          cp crates/kenro-wasm/js/src/*.mjs _site/adapters/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

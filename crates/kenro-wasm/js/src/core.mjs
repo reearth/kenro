@@ -1,0 +1,93 @@
+// Host-independent UDF factory: turns kenro-wasm exports into plain JS
+// functions over JS values (null | Uint8Array | string | number | bigint)
+// implementing kenro's value-mapping contract exactly (the mirror of
+// src/sqlite/rusqlite_ext.rs). The adapters contain no function names —
+// everything is driven by the manifest.
+
+/** Parse the manifest JSON exported by the wasm module. */
+export function loadManifest(wasm) {
+  return JSON.parse(wasm.manifest());
+}
+
+function fail(name, message) {
+  return new Error(`kenro: ${name}: ${message}`);
+}
+
+function convertArg(entry, i, v) {
+  const kind = entry.args[i];
+  const name = entry.sql_name;
+  switch (kind) {
+    case "blob":
+      if (v instanceof Uint8Array) return v;
+      if (typeof v === "string") {
+        throw fail(
+          name,
+          "got TEXT where a geometry BLOB was expected (did you mean ST_GeomFromText?)",
+        );
+      }
+      throw fail(name, `expected a geometry BLOB, got ${typeof v}`);
+    case "text":
+      if (typeof v === "string") return v;
+      throw fail(name, `expected TEXT, got ${typeof v}`);
+    case "int": {
+      const n = typeof v === "bigint" ? Number(v) : v;
+      if (typeof n === "number" && Number.isInteger(n)) return n;
+      throw fail(name, "expected an INTEGER");
+    }
+    case "i64":
+      if (typeof v === "bigint") return v;
+      if (typeof v === "number" && Number.isSafeInteger(v)) return BigInt(v);
+      throw fail(name, "expected an INTEGER");
+    case "real":
+      if (typeof v === "bigint") return Number(v);
+      if (typeof v === "number") return v;
+      throw fail(name, "expected a numeric value");
+    default:
+      throw fail(name, `unsupported argument kind ${kind}`);
+  }
+}
+
+/**
+ * Build the UDF for one manifest entry: NULL-strict (any SQL NULL argument
+ * → NULL result, before wasm is called), argument kinds checked with
+ * kenro-worded errors, `undefined` (Rust `Option::None`) → SQL NULL,
+ * booleans → 0/1.
+ */
+export function makeUdf(entry, wasm) {
+  const f = wasm[entry.export];
+  if (typeof f !== "function") {
+    throw new Error(`kenro-wasm export missing: ${entry.export}`);
+  }
+  return (...args) => {
+    if (args.some((a) => a === null || a === undefined)) return null;
+    const converted = args.map((a, i) => convertArg(entry, i, a));
+    const result = f(...converted);
+    if (result === undefined || result === null) return null;
+    if (typeof result === "boolean") return result ? 1 : 0;
+    // Small integral results (vertex counts, SRIDs) come back as BigInt from
+    // wasm-bindgen i64 returns; hosts without BigInt support (sql.js) would
+    // drop them. True 64-bit values (Kind "i64", the h3 family) stay BigInt.
+    if (typeof result === "bigint" && entry.ret !== "i64") {
+      return Number(result);
+    }
+    return result;
+  };
+}
+
+/** The loud-failure body shared by every stub registration. */
+export function stubUdf(stub) {
+  const message = `kenro: ${stub.name} is not implemented in kenro. ${stub.hint}`;
+  return () => {
+    throw new Error(message);
+  };
+}
+
+/** The loud-failure body for hosts that cannot represent 64-bit integers. */
+export function i64UnsupportedUdf(entry, hostName) {
+  const message =
+    `kenro: ${entry.sql_name}: ${hostName} cannot represent 64-bit H3 cell ids; ` +
+    "use @sqlite.org/sqlite-wasm or wa-sqlite for the h3_* functions";
+  return () => {
+    throw new Error(message);
+  };
+}

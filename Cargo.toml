@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kenro-ext", "crates/kenro-ext-test"]
+members = ["crates/kenro-ext", "crates/kenro-ext-test", "crates/kenro-wasm"]
 # WARNING: never build/test with `--workspace` (or multiple -p spanning kenro
 # and kenro-ext). kenro's dev-deps need rusqlite/bundled while kenro-ext needs
 # rusqlite/loadable_extension; unified in one cargo invocation,
@@ -7,6 +7,17 @@ members = ["crates/kenro-ext", "crates/kenro-ext-test"]
 # SQLite, and test binaries crash at runtime (it is NOT a build error).
 # Use separate invocations: `cargo test` (root = kenro only),
 # `cargo build -p kenro-ext`, `cargo test -p kenro-ext-test`.
+# (kenro-wasm has no libsqlite3-sys in its graph and cannot participate in
+# the collision, but keep the per-package discipline anyway.)
+
+# Size-optimized release profile, shared by the wasm and loadable-extension
+# artifacts (measured in docs/wasm.md; wasm32 always aborts on panic, no
+# panic setting needed).
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
 
 [package]
 name = "kenro"

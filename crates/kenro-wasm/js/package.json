@@ -1,0 +1,23 @@
+{
+  "name": "kenro-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "kenro spatial functions for browser SQLite (sql.js / wa-sqlite / official SQLite WASM)",
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "exports": {
+    ".": "./pkg/kenro_wasm.js",
+    "./sqlite-wasm": "./src/sqlite-wasm.mjs",
+    "./sqljs": "./src/sqljs.mjs",
+    "./wa-sqlite": "./src/wa-sqlite.mjs",
+    "./core": "./src/core.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.50.0-build1",
+    "sql.js": "^1.13.0",
+    "wa-sqlite": "^1.0.0"
+  }
+}

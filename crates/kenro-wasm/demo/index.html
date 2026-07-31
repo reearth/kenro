@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>kenro — spatial SQL for SQLite, in your browser</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
+    --accent: #0f766e; --panel: #f9fafb; --error: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --fg: #e5e7eb; --muted: #9ca3af; --border: #2d333b;
+      --accent: #2dd4bf; --panel: #1a1f26; --error: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.6 ui-sans-serif, system-ui, sans-serif;
+  }
+  header { padding: 1.2rem 1.5rem 0.4rem; }
+  header h1 { margin: 0; font-size: 1.3rem; }
+  header h1 span { color: var(--muted); font-weight: normal; font-size: 0.95rem; margin-left: 0.6rem; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; padding: 1rem 1.5rem 2rem; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  #drop {
+    grid-column: 1 / -1; border: 2px dashed var(--border); border-radius: 10px;
+    padding: 1.2rem; text-align: center; color: var(--muted); cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  #drop.armed { border-color: var(--accent); color: var(--accent); }
+  #drop strong { color: var(--fg); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; min-width: 0; }
+  .panel h2 { margin: 0 0 0.6rem; font-size: 0.95rem; }
+  textarea {
+    width: 100%; min-height: 7.5rem; resize: vertical; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+    font: 13px/1.5 ui-monospace, monospace; padding: 0.6rem;
+  }
+  button {
+    margin-top: 0.5rem; border: 1px solid var(--accent); background: var(--accent);
+    color: var(--bg); font-weight: 600; padding: 0.4rem 1.1rem; border-radius: 8px; cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent); }
+  #layers { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+  #layers button { margin-top: 0; font-weight: normal; padding: 0.2rem 0.7rem; font-size: 0.85rem; }
+  #status { color: var(--muted); font-size: 0.85rem; min-height: 1.3rem; margin-top: 0.4rem; }
+  #status.error { color: var(--error); }
+  .results { overflow-x: auto; }
+  table { border-collapse: collapse; font: 12.5px/1.5 ui-monospace, monospace; width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 0.25rem 0.55rem; text-align: left; white-space: nowrap; max-width: 26rem; overflow: hidden; text-overflow: ellipsis; }
+  th { background: var(--panel); position: sticky; top: 0; }
+  td.blob { color: var(--accent); cursor: pointer; text-decoration: underline dotted; }
+  svg { width: 100%; height: 320px; display: block; background: var(--bg); border-radius: 8px; border: 1px solid var(--border); }
+  svg path, svg circle { fill: color-mix(in srgb, var(--accent) 25%, transparent); stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; }
+  footer { padding: 0 1.5rem 1.5rem; color: var(--muted); font-size: 0.8rem; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>kenro（間縄）<span>spatial SQL for SQLite — running entirely in your browser (~200 KB wasm)</span></h1>
+</header>
+<main>
+  <div id="drop">
+    <strong>Drop a GeoPackage (.gpkg) here</strong> or click to pick one —
+    it never leaves your machine. No file handy? A tiny sample database is loaded already.
+  </div>
+  <section class="panel">
+    <h2>SQL</h2>
+    <textarea id="sql" spellcheck="false"></textarea>
+    <div>
+      <button id="run">Run (⌘⏎)</button>
+      <button id="preview" class="secondary">Preview geometry</button>
+    </div>
+    <div id="layers"></div>
+    <div id="status"></div>
+  </section>
+  <section class="panel">
+    <h2>Preview</h2>
+    <svg id="map" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+  </section>
+  <section class="panel results" style="grid-column: 1 / -1">
+    <h2>Results <span id="rowcount" style="color: var(--muted); font-weight: normal"></span></h2>
+    <div id="table"></div>
+  </section>
+</main>
+<footer>
+  <a href="https://github.com/reearth/kenro">kenro</a> — pure-Rust spatial
+  functions for SQLite. SQLite runs via the official SQLite WASM build;
+  geometry BLOB cells are clickable (decoded with <code>ST_AsText</code>).
+</footer>
+<script type="module" src="./demo.mjs"></script>
+</body>
+</html>

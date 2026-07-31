@@ -69,3 +69,34 @@ jobs:
           assert con.execute("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))").fetchone()[0] == "POINT(1 2)"
           print("python load_extension OK")
           EOF
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Separate cargo invocations, per the workspace warning in Cargo.toml.
+      - name: Clippy (kenro-wasm, wasm target)
+        run: cargo clippy -p kenro-wasm --target wasm32-unknown-unknown -- -D warnings
+      - name: Manifest consistency (rusqlite registration == manifest)
+        run: cargo test --all-features --test manifest_consistency
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Build (wasm-pack, release)
+        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+      - name: Size gate
+        run: node crates/kenro-wasm/js/test/size-gate.mjs
+      - name: Golden vectors + host smokes (Node)
+        working-directory: crates/kenro-wasm/js
+        run: |
+          npm ci
+          npm test

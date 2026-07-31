@@ -1,6 +1,6 @@
 # kenro（間縄）
 
-**Spatial functions for SQLite in pure Rust** — works with rusqlite and as a loadable extension (Python / Node / sqlite3 CLI) today; a WASM build is on the roadmap.
+**Spatial functions for SQLite in pure Rust** — works with rusqlite, as a loadable extension (Python / Node / sqlite3 CLI), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, or *GeoPackage in pure Rust*: this is that crate.
 
@@ -102,6 +102,31 @@ use `brew install sqlite` and run `$(brew --prefix sqlite)/bin/sqlite3`.
 
 Renamed copies load too (e.g. `libkenro.so`): the binary exports
 `sqlite3_extension_init`, `sqlite3_kenroext_init` and `sqlite3_kenro_init`.
+
+## Quickstart (browser — kenro-wasm)
+
+Browser SQLite builds can't load native extensions, but they all accept
+JS-level user-defined functions — so kenro's SQLite-free core compiles to a
+**~485 KB wasm (~200 KB wire)** module with one adapter per host:
+
+```js
+import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
+import initKenro, * as kenroWasm from "kenro-wasm";
+import { registerKenro } from "kenro-wasm/sqlite-wasm";
+
+await initKenro();
+const sqlite3 = await sqlite3InitModule();
+const db = new sqlite3.oo1.DB(":memory:");
+registerKenro(db, kenroWasm);
+
+db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
+```
+
+Adapters for sql.js and wa-sqlite ship alongside; host support matrix,
+measured sizes, and per-host limitations are in [docs/wasm.md](docs/wasm.md).
+A drag-a-GeoPackage-and-query demo lives in `crates/kenro-wasm/demo/`
+(`./serve.sh` after building; deploys to GitHub Pages once the repo is
+public).
 
 ## Function reference
 
@@ -259,8 +284,8 @@ enables `kenro::register`.
 1. ✅ Core: GeoPackage blobs, WKB/WKT, predicates, R-tree functions, rusqlite registration, PostGIS golden tests
 2. ✅ `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
 3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
-4. `kenro-wasm`: sql.js / wa-sqlite builds, browser demo
-5. v0.x releases on crates.io
+4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
+5. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
 
 ## License
 

@@ -1,0 +1,29 @@
+[package]
+name = "kenro-wasm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "kenro spatial functions for browser SQLite (sql.js / wa-sqlite / official SQLite WASM)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/reearth/kenro"
+publish = false # until kenro itself is on crates.io
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["transform", "h3", "geojson"]
+transform = ["kenro/transform"]
+h3 = ["kenro/h3"]
+geojson = ["kenro/geojson"]
+crs-full = ["kenro/crs-full"]
+
+[dependencies]
+# No rusqlite anywhere in this graph: the host SQLite lives in JS, and these
+# exports are wired in as JS-level UDFs by the adapters in js/src/.
+kenro = { path = "../..", default-features = false }
+wasm-bindgen = "0.2"
+serde_json = "1"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
