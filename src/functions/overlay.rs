@@ -19,13 +19,13 @@ use crate::geom::{self, Geom};
 
 /// Dimension class of an operand.
 #[derive(Clone, Copy, PartialEq)]
-enum Class {
+pub(crate) enum Class {
     Puntal,
     Lineal,
     Areal,
 }
 
-fn classify(func: &'static str, g: &Geometry<f64>) -> Result<Class> {
+pub(crate) fn classify(func: &'static str, g: &Geometry<f64>) -> Result<Class> {
     Ok(match g {
         Geometry::Point(_) | Geometry::MultiPoint(_) => Class::Puntal,
         Geometry::Line(_) | Geometry::LineString(_) | Geometry::MultiLineString(_) => Class::Lineal,
@@ -45,7 +45,7 @@ fn classify(func: &'static str, g: &Geometry<f64>) -> Result<Class> {
 /// Reject NaN/Inf coordinates before anything reaches i_overlay (whose
 /// robustness contract does not cover non-finite input; on wasm a panic
 /// would abort the instance).
-fn ensure_finite(func: &'static str, g: &Geometry<f64>) -> Result<()> {
+pub(crate) fn ensure_finite(func: &'static str, g: &Geometry<f64>) -> Result<()> {
     use geo::CoordsIter;
     if geom::is_empty(g) {
         return Ok(());
@@ -61,7 +61,7 @@ fn ensure_finite(func: &'static str, g: &Geometry<f64>) -> Result<()> {
     Ok(())
 }
 
-fn points_of(g: &Geometry<f64>) -> Vec<Point<f64>> {
+pub(crate) fn points_of(g: &Geometry<f64>) -> Vec<Point<f64>> {
     match g {
         Geometry::Point(p) => vec![*p],
         Geometry::MultiPoint(mp) => mp.0.clone(),
@@ -69,7 +69,7 @@ fn points_of(g: &Geometry<f64>) -> Vec<Point<f64>> {
     }
 }
 
-fn to_multi_polygon(g: &Geometry<f64>) -> MultiPolygon<f64> {
+pub(crate) fn to_multi_polygon(g: &Geometry<f64>) -> MultiPolygon<f64> {
     match g {
         Geometry::Polygon(p) => MultiPolygon(vec![p.clone()]),
         Geometry::MultiPolygon(mp) => mp.clone(),
@@ -79,7 +79,7 @@ fn to_multi_polygon(g: &Geometry<f64>) -> MultiPolygon<f64> {
     }
 }
 
-fn to_multi_line(g: &Geometry<f64>) -> MultiLineString<f64> {
+pub(crate) fn to_multi_line(g: &Geometry<f64>) -> MultiLineString<f64> {
     match g {
         Geometry::LineString(ls) => MultiLineString(vec![ls.clone()]),
         Geometry::MultiLineString(mls) => mls.clone(),
@@ -90,7 +90,7 @@ fn to_multi_line(g: &Geometry<f64>) -> MultiLineString<f64> {
 
 /// Unwrap single-member multi geometries to their singular type and map
 /// empty results to the PostGIS-typed empties (golden-verified).
-fn normalize_points(points: Vec<Point<f64>>) -> Geometry<f64> {
+pub(crate) fn normalize_points(points: Vec<Point<f64>>) -> Geometry<f64> {
     match points.len() {
         0 => Geometry::Point(Point::new(f64::NAN, f64::NAN)), // POINT EMPTY
         1 => Geometry::Point(points[0]),
@@ -98,7 +98,7 @@ fn normalize_points(points: Vec<Point<f64>>) -> Geometry<f64> {
     }
 }
 
-fn normalize_lines(lines: MultiLineString<f64>) -> Geometry<f64> {
+pub(crate) fn normalize_lines(lines: MultiLineString<f64>) -> Geometry<f64> {
     let mut non_empty: Vec<LineString<f64>> =
         lines.0.into_iter().filter(|ls| !ls.0.is_empty()).collect();
     match non_empty.len() {
@@ -108,7 +108,7 @@ fn normalize_lines(lines: MultiLineString<f64>) -> Geometry<f64> {
     }
 }
 
-fn normalize_polygons(polys: MultiPolygon<f64>) -> Geometry<f64> {
+pub(crate) fn normalize_polygons(polys: MultiPolygon<f64>) -> Geometry<f64> {
     let mut non_empty: Vec<Polygon<f64>> = polys
         .0
         .into_iter()

@@ -1,6 +1,8 @@
 //! Shared helpers for the golden-test harnesses.
 #![allow(dead_code)]
 
+pub mod mvt_decode;
+
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -20,6 +22,9 @@ pub struct Vector {
     pub args: Option<Vec<f64>>,
     #[serde(default)]
     pub mode: Option<String>,
+    /// MVT aggregate input rows: `[[wkt, props|null], ...]`.
+    #[serde(default)]
+    pub rows: Option<serde_json::Value>,
     #[serde(default)]
     pub cell: Option<i64>,
     #[serde(default)]

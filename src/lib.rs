@@ -38,6 +38,7 @@ pub mod error;
 pub mod functions;
 pub mod geom;
 pub mod gpb;
+pub mod mvt;
 
 #[cfg(feature = "rusqlite")]
 mod sqlite;

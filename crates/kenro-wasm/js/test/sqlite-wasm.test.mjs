@@ -102,6 +102,27 @@ test("ST_Union aggregate dissolves per group", () => {
   }
 });
 
+test("ST_AsMVT aggregate produces a tile", () => {
+  const db = openDb();
+  try {
+    const tile = db.selectValue(`
+      SELECT ST_AsMVT(
+        ST_AsMVTGeom(ST_GeomFromText(wkt), ST_GeomFromText('POLYGON((0 0,100 0,100 100,0 100,0 0))'), 100, 0),
+        'parks', 100, props)
+      FROM (SELECT 'POINT(50 90)' AS wkt, json_object('name', 'yoyogi', 'rank', 3) AS props
+            UNION ALL
+            SELECT 'POINT(500 500)', json_object('name', 'out'))
+    `);
+    assert.ok(tile instanceof Uint8Array && tile.length > 0);
+    const text = new TextDecoder("latin1").decode(tile);
+    assert.ok(text.includes("parks"), "layer name embedded");
+    assert.ok(text.includes("yoyogi"), "in-tile feature kept");
+    assert.ok(!text.includes("out"), "clipped-away row skipped");
+  } finally {
+    db.close();
+  }
+});
+
 test("h3 cells survive as 64-bit values", () => {
   const db = openDb();
   try {

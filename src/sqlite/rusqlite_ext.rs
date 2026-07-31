@@ -266,6 +266,89 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         })?;
     }
 
+    // MVT.
+    {
+        use crate::functions::mvt as fmvt;
+        // ST_AsMVTGeom /2../5: trailing Int args are optional.
+        for arity in 2..=5 {
+            conn.create_scalar_function("ST_AsMVTGeom", arity, FLAGS, move |ctx| {
+                const NAME: &str = "ST_AsMVTGeom";
+                let (Some(g), Some(bounds)) =
+                    (blob_or_null(ctx, 0, NAME)?, blob_or_null(ctx, 1, NAME)?)
+                else {
+                    return Ok(None);
+                };
+                let mut opts = [None, None, None];
+                for (slot, opt) in opts.iter_mut().enumerate().take(arity as usize - 2) {
+                    let Some(v) = int_or_null(ctx, slot + 2, NAME)? else {
+                        return Ok(None);
+                    };
+                    *opt = Some(v);
+                }
+                fmvt::st_as_mvt_geom(g, bounds, opts[0], opts[1], opts[2])
+                    .map(|v| v.map(Value::Blob))
+                    .map_err(sql_err)
+            })?;
+        }
+        // ST_AsMVT /1../4 aggregate: (geom [, name [, extent [, props_json]]]).
+        struct MvtAgg;
+        impl rusqlite::functions::Aggregate<fmvt::MvtAggregate, Option<Value>> for MvtAgg {
+            fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<fmvt::MvtAggregate> {
+                Ok(fmvt::MvtAggregate::new())
+            }
+            fn step(
+                &self,
+                ctx: &mut Context<'_>,
+                acc: &mut fmvt::MvtAggregate,
+            ) -> rusqlite::Result<()> {
+                const NAME: &str = "ST_AsMVT";
+                // Any NULL argument skips the row (aggregate convention,
+                // identical across all bindings).
+                let Some(geom) = blob_or_null(ctx, 0, NAME)? else {
+                    return Ok(());
+                };
+                let name = if ctx.len() > 1 {
+                    match text_or_null(ctx, 1, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                let extent = if ctx.len() > 2 {
+                    match int_or_null(ctx, 2, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                let props = if ctx.len() > 3 {
+                    match text_or_null(ctx, 3, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                acc.step(geom, name, extent, props).map_err(sql_err)
+            }
+            fn finalize(
+                &self,
+                _: &mut Context<'_>,
+                acc: Option<fmvt::MvtAggregate>,
+            ) -> rusqlite::Result<Option<Value>> {
+                match acc {
+                    None => Ok(None),
+                    Some(agg) => agg.finish().map(|o| o.map(Value::Blob)).map_err(sql_err),
+                }
+            }
+        }
+        for arity in 1..=4 {
+            conn.create_aggregate_function("ST_AsMVT", arity, FLAGS, MvtAgg)?;
+        }
+    }
+
     // Processing + affine.
     {
         use crate::functions::{affine, processing};

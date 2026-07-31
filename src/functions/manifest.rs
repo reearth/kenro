@@ -246,6 +246,29 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Blob,
         None
     ),
+    // MVT.
+    entry!("ST_AsMVTGeom", "stAsMvtGeom", [Blob, Blob], OptBlob, None),
+    entry!(
+        "ST_AsMVTGeom",
+        "stAsMvtGeomExtent",
+        [Blob, Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_AsMVTGeom",
+        "stAsMvtGeomBuffer",
+        [Blob, Blob, Int, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_AsMVTGeom",
+        "stAsMvtGeomClip",
+        [Blob, Blob, Int, Int, Int],
+        OptBlob,
+        None
+    ),
     // Processing.
     entry!("ST_ConvexHull", "stConvexHull", [Blob], Blob, None),
     entry!("ST_PointOnSurface", "stPointOnSurface", [Blob], Blob, None),
@@ -327,12 +350,40 @@ pub struct AggEntry {
     pub feature: Option<&'static str>,
 }
 
-pub const AGGREGATES: &[AggEntry] = &[AggEntry {
-    sql_name: "ST_Union",
-    ctor_export: "UnionAgg",
-    args: &[Kind::Blob],
-    feature: None,
-}];
+pub const AGGREGATES: &[AggEntry] = &[
+    AggEntry {
+        sql_name: "ST_Union",
+        ctor_export: "UnionAgg",
+        args: &[Kind::Blob],
+        feature: None,
+    },
+    // ST_AsMVT's signature deliberately diverges from PostGIS (SQLite has no
+    // record type): (geom [, name [, extent [, props_json]]]).
+    AggEntry {
+        sql_name: "ST_AsMVT",
+        ctor_export: "MvtAgg",
+        args: &[Kind::Blob],
+        feature: None,
+    },
+    AggEntry {
+        sql_name: "ST_AsMVT",
+        ctor_export: "MvtAgg",
+        args: &[Kind::Blob, Kind::Text],
+        feature: None,
+    },
+    AggEntry {
+        sql_name: "ST_AsMVT",
+        ctor_export: "MvtAgg",
+        args: &[Kind::Blob, Kind::Text, Kind::Int],
+        feature: None,
+    },
+    AggEntry {
+        sql_name: "ST_AsMVT",
+        ctor_export: "MvtAgg",
+        args: &[Kind::Blob, Kind::Text, Kind::Int, Kind::Text],
+        feature: None,
+    },
+];
 
 /// The aggregate entries active under the current feature set.
 pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
@@ -350,8 +401,6 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
 /// in `DEFAULT_STUB_ARITIES`.
 pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_MakeValid", &[1]),
-    ("ST_AsMVT", &[1, 2, 3, 4]),
-    ("ST_AsMVTGeom", &[2, 3, 4, 5]),
     // Feature-off fallbacks.
     ("ST_Transform", &[2]),
     ("ST_AsGeoJSON", &[1, 2]),

@@ -12,6 +12,7 @@ pub mod h3;
 pub mod io;
 pub mod manifest;
 pub mod measures;
+pub mod mvt;
 pub mod overlay;
 pub mod predicates;
 pub mod processing;

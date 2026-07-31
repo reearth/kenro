@@ -319,6 +319,25 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_Area(ST_Buffer(ST_GeomFromText('POINT(0 0)'), 1.0, 1))",
     check: (v) => Math.abs(Number(v) - 2) < 0.2,
   },
+  "ST_AsMVTGeom/2": {
+    // Default extent 4096 over a (0,0)-(100,100) tile: (50,90) → (2048,410).
+    sql: "SELECT ST_AsText(ST_AsMVTGeom(ST_GeomFromText('POINT(50 90)'), ST_GeomFromText('POLYGON((0 0,100 0,100 100,0 100,0 0))')))",
+    check: (v) => v === "POINT(2048 410)",
+  },
+  "ST_AsMVTGeom/3": {
+    sql: "SELECT ST_AsText(ST_AsMVTGeom(ST_GeomFromText('POINT(50 90)'), ST_GeomFromText('POLYGON((0 0,100 0,100 100,0 100,0 0))'), 10))",
+    check: (v) => v === "POINT(5 1)",
+  },
+  "ST_AsMVTGeom/4": {
+    // buffer 0 → the outside point clips away to NULL.
+    sql: "SELECT ST_AsMVTGeom(ST_GeomFromText('POINT(200 0)'), ST_GeomFromText('POLYGON((0 0,100 0,100 100,0 100,0 0))'), 10, 0)",
+    check: (v) => v === null,
+  },
+  "ST_AsMVTGeom/5": {
+    // clip=false keeps the outside point.
+    sql: "SELECT ST_AsText(ST_AsMVTGeom(ST_GeomFromText('POINT(200 0)'), ST_GeomFromText('POLYGON((0 0,100 0,100 100,0 100,0 0))'), 10, 0, 0))",
+    check: (v) => v === "POINT(20 10)",
+  },
   "ST_ConvexHull/1": {
     sql: "SELECT ST_AsText(ST_ConvexHull(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4,2 2)')))",
     check: (v) => typeof v === "string" && v.startsWith("POLYGON"),

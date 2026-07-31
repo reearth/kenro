@@ -184,13 +184,7 @@ fn stubs_error_with_helpful_hints() {
     assert!(err.contains("ST_IsValid"), "{err}");
 
     // Stubs are loud for any arity, including NULL args.
-    assert!(query_value(&conn, "SELECT ST_AsMVTGeom(NULL, NULL)").is_err());
     assert!(query_value(&conn, "SELECT ST_MakeValid(NULL)").is_err());
-
-    let err = query_value(&conn, "SELECT ST_AsMVT(ST_GeomFromText('POINT(0 0)'))")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("tippecanoe"), "{err}");
 }
 
 #[test]

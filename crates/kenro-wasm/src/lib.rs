@@ -472,6 +472,41 @@ pub fn st_simplify(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
     accessors::st_simplify(geom, tolerance).map_err(err)
 }
 
+// ---- MVT ----
+
+#[wasm_bindgen(js_name = stAsMvtGeom)]
+pub fn st_as_mvt_geom(geom: &[u8], bounds: &[u8]) -> R<Option<Vec<u8>>> {
+    kenro::functions::mvt::st_as_mvt_geom(geom, bounds, None, None, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsMvtGeomExtent)]
+pub fn st_as_mvt_geom_extent(geom: &[u8], bounds: &[u8], extent: i32) -> R<Option<Vec<u8>>> {
+    kenro::functions::mvt::st_as_mvt_geom(geom, bounds, Some(extent), None, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsMvtGeomBuffer)]
+pub fn st_as_mvt_geom_buffer(
+    geom: &[u8],
+    bounds: &[u8],
+    extent: i32,
+    buffer: i32,
+) -> R<Option<Vec<u8>>> {
+    kenro::functions::mvt::st_as_mvt_geom(geom, bounds, Some(extent), Some(buffer), None)
+        .map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsMvtGeomClip)]
+pub fn st_as_mvt_geom_clip(
+    geom: &[u8],
+    bounds: &[u8],
+    extent: i32,
+    buffer: i32,
+    clip: i32,
+) -> R<Option<Vec<u8>>> {
+    kenro::functions::mvt::st_as_mvt_geom(geom, bounds, Some(extent), Some(buffer), Some(clip))
+        .map_err(err)
+}
+
 // ---- Aggregates (accumulator classes; JS adapters drive step/finish) ----
 
 /// Accumulator for the `ST_Union(geom)` aggregate.
@@ -503,6 +538,48 @@ impl UnionAgg {
         self.inner
             .take()
             .ok_or_else(|| JsError::new("kenro: ST_Union accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
+}
+
+/// Accumulator for the `ST_AsMVT(geom [, name [, extent [, props_json]]])`
+/// aggregate. Trailing arguments the SQL call omits arrive as `undefined`
+/// (→ `None`), so one class serves all four arities.
+#[wasm_bindgen]
+pub struct MvtAgg {
+    inner: Option<kenro::functions::mvt::MvtAggregate>,
+}
+
+#[wasm_bindgen]
+impl MvtAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> MvtAgg {
+        MvtAgg {
+            inner: Some(kenro::functions::mvt::MvtAggregate::new()),
+        }
+    }
+
+    pub fn step(
+        &mut self,
+        geom: &[u8],
+        name: Option<String>,
+        extent: Option<i32>,
+        props: Option<String>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: ST_AsMVT accumulator already finished"))?
+            .step(geom, name.as_deref(), extent, props.as_deref())
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows aggregated).
+    pub fn finish(&mut self) -> Result<Option<Vec<u8>>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: ST_AsMVT accumulator already finished"))?
             .finish()
             .map_err(err)
     }
@@ -657,6 +734,10 @@ mod tests {
             "stNumPoints",
             "stIsValid",
             "stSimplify",
+            "stAsMvtGeom",
+            "stAsMvtGeomExtent",
+            "stAsMvtGeomBuffer",
+            "stAsMvtGeomClip",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(
@@ -665,7 +746,7 @@ mod tests {
                 entry.export
             );
         }
-        let known_aggregates = ["UnionAgg"];
+        let known_aggregates = ["UnionAgg", "MvtAgg"];
         for entry in kenro::functions::manifest::active_aggregates() {
             assert!(
                 known_aggregates.contains(&entry.ctor_export),

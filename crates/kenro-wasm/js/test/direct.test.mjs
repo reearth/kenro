@@ -317,3 +317,49 @@ test("accessors vectors", () => {
     }
   }
 });
+
+test("mvt asmvtgeom vectors", () => {
+  // asmvt (aggregate) vectors need the full tile decoder and are validated
+  // in the Rust harness over the identical core; the wasm pass replays the
+  // ST_AsMVTGeom transform with the same ±1 integer-coordinate tolerance.
+  const close = (got, want) => {
+    if (got === want) return true;
+    const type = (s) => s.split(/[ (]/)[0];
+    if (type(got) !== type(want)) return false;
+    const coords = (s) => {
+      const pairs = [];
+      const nums = (s.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+      for (let i = 0; i + 1 < nums.length; i += 2) pairs.push([nums[i], nums[i + 1]]);
+      pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      return pairs.filter((p, i) => i === 0 || p[0] !== pairs[i - 1][0] || p[1] !== pairs[i - 1][1]);
+    };
+    const cg = coords(got);
+    const cw = coords(want);
+    return (
+      cg.length === cw.length &&
+      cg.every((p, i) => Math.abs(p[0] - cw[i][0]) <= 1 && Math.abs(p[1] - cw[i][1]) <= 1)
+    );
+  };
+  for (const v of loadVectors("mvt")) {
+    if (v.fn !== "asmvtgeom") continue;
+    const run = () => {
+      const g = geom(v.a);
+      const b = geom(v.b);
+      const args = v.args ?? [];
+      let out;
+      if (args.length === 0) out = wasm.stAsMvtGeom(g, b);
+      else if (args.length === 1) out = wasm.stAsMvtGeomExtent(g, b, args[0]);
+      else if (args.length === 2) out = wasm.stAsMvtGeomBuffer(g, b, args[0], args[1]);
+      else out = wasm.stAsMvtGeomClip(g, b, args[0], args[1], args[2]);
+      return out === undefined || out === null ? null : wasm.stAsText(out);
+    };
+    if (runExpectingError(v, run)) continue;
+    const got = run();
+    const want = effective(v);
+    if (want === null) {
+      assert.equal(got, null, v.id);
+    } else {
+      assert.ok(close(got, want), `${v.id}: ${got} vs ${want}`);
+    }
+  }
+});

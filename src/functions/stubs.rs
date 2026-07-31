@@ -23,17 +23,6 @@ pub const STUBS: &[Stub] = &[
                triangulation-based and structurally different); validate with ST_IsValid \
                and repair in PostGIS for now.",
     },
-    Stub {
-        name: "ST_AsMVT",
-        hint: "MVT tile generation is not implemented in kenro yet (in PostGIS this is an \
-               aggregate paired with ST_AsMVTGeom); generate tiles with PostGIS or tippecanoe \
-               for now.",
-    },
-    Stub {
-        name: "ST_AsMVTGeom",
-        hint: "MVT tile generation is not implemented in kenro yet; generate tiles with \
-               PostGIS or tippecanoe for now.",
-    },
 ];
 
 /// Stubs installed when a cargo feature is compiled out, so the failure mode
