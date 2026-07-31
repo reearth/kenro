@@ -17,7 +17,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
-> 間縄 (kenro): the measuring rope used in historical Japanese land surveys — the tool for turning land into ledgers.
+> kenro = 間縄 (kennawa) × rope — two words for the same cord, twisted into one. Named after the measuring rope of historical Japanese land surveys: the tool for turning land into ledgers.
 
 ## Quickstart (Rust / rusqlite)
 
