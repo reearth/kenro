@@ -50,9 +50,11 @@ function sampleDatabase() {
       ('ueno',     ST_AsGPB(ST_GeomFromText('POLYGON((139.770 35.712,139.776 35.712,139.776 35.718,139.770 35.718,139.770 35.712))', 4326))),
       ('fountain', ST_AsGPB(ST_GeomFromText('POINT(139.697 35.672)', 4326)));
   `);
+  // The sample query keeps a raw geometry column in the result so "Preview
+  // geometry" works on the first click (it renders BLOB columns).
   $("sql").value =
     "SELECT name,\n" +
-    "       ST_AsText(ST_Centroid(geom)) AS centroid,\n" +
+    "       geom,\n" +
     "       round(ST_Area(ST_Transform(ST_GeomFromGPB(geom), 32654))) AS area_m2,\n" +
     "       h3_cell_to_string(h3_latlng_to_cell(ST_Centroid(geom), 9)) AS h3\n" +
     "FROM parks";
@@ -191,7 +193,10 @@ function previewGeometries() {
     return;
   }
   if (!geoms.length) {
-    setStatus("no geometry BLOB column in the result — nothing to preview", true);
+    setStatus(
+      "no geometry BLOB column in the result — add one to the SELECT (e.g. `geom`) to preview",
+      true,
+    );
     return;
   }
   const all = [];
