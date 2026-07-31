@@ -14,6 +14,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
+- **Tiny** — the loadable extension is a single **1.1 MB** file with zero dependencies, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~23× smaller**, measured); the wasm build starts at 412 KB (167 KB wire), 25–57× smaller than DuckDB-WASM spatial
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -137,8 +138,9 @@ Structural differences that matter more than any single function:
 - **SRID model** — PostGIS geometries and kenro's GeoPackage blobs both
   carry their SRID; DuckDB's `GEOMETRY` does not, so CRS bookkeeping is the
   user's job there (and `always_xy` axis-order care is needed for EPSG:4326).
-- **Where it runs / weight** — kenro lives *inside* SQLite: pure Rust,
-  KB–MB scale, no C toolchain, deterministic. PostGIS is a server-side
+- **Where it runs / weight** — kenro lives *inside* SQLite: pure Rust, a
+  single 1.1 MB extension (SpatiaLite's GEOS/PROJ/proj.db chain is ~25 MB
+  across 9 files), no C toolchain, deterministic. PostGIS is a server-side
   PostgreSQL extension. DuckDB spatial bundles GEOS + PROJ + GDAL (its
   WASM build is ~23.5 MB uncompressed, ~6.3 MB over the wire).
 - **Division of labor** — kenro covers spatial SQL end-to-end inside your
