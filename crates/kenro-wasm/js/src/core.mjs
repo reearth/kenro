@@ -59,6 +59,11 @@ export function makeUdf(entry, wasm) {
     throw new Error(`kenro-wasm export missing: ${entry.export}`);
   }
   return (...args) => {
+    if (args.length !== entry.args.length) {
+      // Defense against host arity miswiring (e.g. a registry shim failure):
+      // fail loudly instead of letting wasm coerce missing arguments.
+      throw fail(entry.sql_name, `expected ${entry.args.length} arguments, got ${args.length}`);
+    }
     if (args.some((a) => a === null || a === undefined)) return null;
     const converted = args.map((a, i) => convertArg(entry, i, a));
     const result = f(...converted);

@@ -21,6 +21,34 @@
 
 import { i64UnsupportedUdf, loadManifest, makeUdf, stubUdf } from "./core.mjs";
 
+/**
+ * Locate sql.js's internal name → function-table-pointer registry. Its
+ * property name is minified in dist builds (e.g. `Sa` in 1.14), so it is
+ * detected by planting a sentinel registration and finding the object that
+ * contains it. Without the registry, arity overloads would free live
+ * function-table slots — better to fail loudly at registration time.
+ */
+function findUdfRegistry(db) {
+  const sentinel = "kenro_registry_probe";
+  db.create_function(sentinel, () => null);
+  const prop = Object.getOwnPropertyNames(db).find((p) => {
+    const value = db[p];
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      Object.prototype.hasOwnProperty.call(value, sentinel)
+    );
+  });
+  if (prop === undefined) {
+    throw new Error(
+      "kenro: cannot locate sql.js's UDF registry in this build — arity " +
+        "overloads would corrupt the function table. Pin sql.js ^1.14 or " +
+        "use @sqlite.org/sqlite-wasm / wa-sqlite.",
+    );
+  }
+  return db[prop];
+}
+
 /** sql.js keeps string throws but empties Error throws — rethrow strings. */
 function stringThrows(fn) {
   return (...args) => {
@@ -40,12 +68,14 @@ function stringThrows(fn) {
  */
 export function registerKenro(db, wasm) {
   const manifest = loadManifest(wasm);
+  const registry = findUdfRegistry(db);
+  let counter = 0;
   const register = (name, fn, arity) => {
     // sql.js derives the SQL arity from Function.prototype.length.
     Object.defineProperty(fn, "length", { value: arity });
-    if (db.functions && db.functions[name] !== undefined) {
-      db.functions[`${name}/kenro:${arity}`] = db.functions[name];
-      delete db.functions[name];
+    if (registry[name] !== undefined) {
+      registry[`${name}/kenro:${counter++}`] = registry[name];
+      delete registry[name];
     }
     db.create_function(name, fn);
   };
