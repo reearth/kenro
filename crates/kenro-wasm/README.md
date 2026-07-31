@@ -6,8 +6,8 @@ and wa-sqlite.
 
 Browser SQLite builds cannot load native extensions, but they all expose
 JS-level user-defined-function registration. kenro-wasm is kenro's
-SQLite-free pure core compiled to `wasm32-unknown-unknown` (~485 KB,
-~200 KB gzipped — no SQLite inside), plus one small manifest-driven adapter
+SQLite-free pure core compiled to `wasm32-unknown-unknown` (~950 KB,
+~350 KB gzipped — no SQLite inside), plus one small manifest-driven adapter
 per host in `js/src/`.
 
 ## Build
@@ -26,7 +26,7 @@ import { registerKenro } from "kenro-wasm/sqlite-wasm";
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
 const db = new sqlite3.oo1.DB(":memory:");
-registerKenro(db, kenroWasm);
+registerKenro(db, kenroWasm, sqlite3); // sqlite3 namespace needed for aggregates
 ```
 
 Adapters: `kenro-wasm/sqlite-wasm` (primary), `kenro-wasm/wa-sqlite`,

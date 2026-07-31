@@ -4,8 +4,9 @@
 //! loadable extension, and in WASM.
 //!
 //! kenro provides the "20% of SpatiaLite everyone actually uses" with zero C
-//! dependencies: WKB/WKT/GeoPackage-blob I/O, DE-9IM predicates, and the
-//! helper functions the GeoPackage R-tree spatial index triggers require —
+//! dependencies: WKB/WKT/GeoPackage-blob I/O, the DE-9IM predicate family,
+//! pure-Rust overlay and buffer, SQL aggregates (`ST_Union`, `ST_AsMVT`),
+//! and the helper functions the GeoPackage spatial index triggers require —
 //! so a plain SQLite build can maintain a GeoPackage spatial index
 //! correctly.
 //!

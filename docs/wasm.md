@@ -17,18 +17,21 @@ Measured on the release build (`wasm-pack build --target web --release`,
 
 | artifact | size |
 |---|---|
-| `kenro_wasm_bg.wasm` | 485 KB |
-| gzipped (wire size) | 203 KB |
+| `kenro_wasm_bg.wasm` | 946 KB |
+| gzipped (wire size) | 353 KB |
 
-For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
-(~6.3 MB wire) — kenro is roughly **30× smaller**, at the cost of the
-GEOS/GDAL feature classes kenro deliberately excludes.
+(The step up from v0.2's 485 KB bought the whole overlay/buffer engine —
+i_overlay's mesh — plus the predicate family, processing functions and the
+MVT encoder.) For comparison, DuckDB-WASM's spatial extension alone is
+~23.5 MB (~6.3 MB wire) — kenro is still roughly **18× smaller**, at the
+cost of the GEOS/GDAL feature classes kenro doesn't cover.
 
 ## Host support matrix
 
 | | [@sqlite.org/sqlite-wasm] (primary) | [wa-sqlite] | [sql.js] |
 |---|---|---|---|
-| All 37 functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| All ~80 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
 | GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ✅ | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
 | Arity overloads (`ST_GeomFromText/1,/2`, …) | ✅ | ✅ | ✅ via a registry shim (sql.js keys UDFs by name only; the adapter works around it — sql.js version pinned) |
@@ -37,7 +40,7 @@ GEOS/GDAL feature classes kenro deliberately excludes.
 
 All three hosts run the same CI suite in Node: every registered function
 through SQL at least once, stub and NULL-strictness behavior, plus the full
-golden-vector set (270 vectors from PostGIS / the H3 reference library)
+golden-vector set (700+ vectors from PostGIS / the H3 reference library)
 replayed against the raw wasm exports.
 
 ## Usage
@@ -57,7 +60,7 @@ import { registerKenro } from "kenro-wasm/sqlite-wasm";
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
 const db = new sqlite3.oo1.DB(":memory:");
-registerKenro(db, kenroWasm);
+registerKenro(db, kenroWasm, sqlite3); // sqlite3 namespace needed for aggregates
 
 db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
 ```
@@ -84,7 +87,7 @@ sqlite3.capi.sqlite3_deserialize(
   db.pointer, "main", p, bytes.length, bytes.length,
   sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE,
 );
-registerKenro(db, kenroWasm);
+registerKenro(db, kenroWasm, sqlite3);
 ```
 
 ## Semantics

@@ -7,11 +7,13 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 kenro provides the 20% of SpatiaLite everyone actually uses, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON, and GeoPackage blobs as first-class citizens
-- **Predicates** — DE-9IM `ST_Intersects` / `ST_Contains` / `ST_Within`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
-- **GeoPackage R-tree support** — the exact function set the GeoPackage spec's R-tree maintenance triggers require
+- **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
+- **Overlay & buffer** — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` in pure Rust, with the differences vs GEOS quantified by golden tests
+- **GeoPackage support** — the exact function set the spec's R-tree (F.3) and geometry-type (F.4) maintenance triggers require
 - **CRS transform** — pure-Rust [proj4rs] with first-class support for the Japanese national systems (JGD2000/JGD2011, plane rectangular I–XIX) and [measured accuracy](docs/accuracy.md)
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
-- **Accessors** — area, length, centroid, envelope, validity, simplification, …
+- **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
+- **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -107,7 +109,7 @@ Renamed copies load too (e.g. `libkenro.so`): the binary exports
 
 Browser SQLite builds can't load native extensions, but they all accept
 JS-level user-defined functions — so kenro's SQLite-free core compiles to a
-**~485 KB wasm (~200 KB wire)** module with one adapter per host:
+**~950 KB wasm (~350 KB wire)** module with one adapter per host:
 
 ```js
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
@@ -117,7 +119,7 @@ import { registerKenro } from "kenro-wasm/sqlite-wasm";
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
 const db = new sqlite3.oo1.DB(":memory:");
-registerKenro(db, kenroWasm);
+registerKenro(db, kenroWasm, sqlite3);
 
 db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
 ```
@@ -155,15 +157,51 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_SRID(geom)` | INT | ✅ | ❌ | 0 = unknown. DuckDB's `GEOMETRY` carries no SRID at all — CRS bookkeeping is manual there |
 | `ST_SetSRID(geom, srid)` | geometry | ✅ | ❌ | Relabel only, no reprojection |
 | `ST_Transform(geom, to_srid)` | geometry | ✅ 4 overloads, full PROJ | ⚠️ `(geom, source_crs, target_crs [, always_xy])` | kenro: PostGIS-exact 2-arg form, source = embedded SRID, curated EPSG table (see [Supported CRS](#supported-crs), [accuracy](docs/accuracy.md)). DuckDB must be told the source CRS on every call |
-| **Predicates & measures** | | | | |
+| **Constructors** | | | | |
+| `ST_MakePoint(x, y)` | geometry | ✅ | ✅ | 2D only |
+| `ST_Point(x, y [, srid])` | geometry | ✅ | ⚠️ no srid arg | The srid form is PostGIS 3.2+ |
+| `ST_MakeEnvelope(xmin, ymin, xmax, ymax [, srid])` | geometry | ✅ | ⚠️ no srid arg | Degenerate extents still return a POLYGON, like PostGIS |
+| **Predicates** | | | | |
 | `ST_Intersects(a, b)` | 0/1 | ✅ | ✅ | DE-9IM. kenro errors on GeometryCollection operands (PostGIS's `ST_Intersects` accepts them; its `ST_Contains`/`ST_Within` also error) |
 | `ST_Contains(a, b)` | 0/1 | ✅ | ✅ | Boundary semantics golden-tested against PostGIS |
 | `ST_Within(a, b)` | 0/1 | ✅ | ✅ | `ST_Within(a,b) = ST_Contains(b,a)`, property-tested |
+| `ST_Disjoint(a, b)` | 0/1 | ✅ | ✅ | Empty operands → true (golden-arbitrated PostGIS behavior) |
+| `ST_Touches(a, b)` / `ST_Crosses(a, b)` / `ST_Overlaps(a, b)` | 0/1 | ✅ | ✅ | |
+| `ST_Equals(a, b)` | 0/1 | ✅ | ✅ | Topological equality; both-empty → true |
+| `ST_Covers(a, b)` / `ST_CoveredBy(a, b)` | 0/1 | ✅ | ✅ | The boundary-tolerant contains/within variants |
+| `ST_Relate(a, b)` | TEXT | ✅ | ❌ | The 9-character DE-9IM matrix |
+| `ST_Relate(a, b, pattern)` | 0/1 | ✅ | ❌ | Pattern matching with `*`/`T`/`F`/`0`/`1`/`2` |
+| **Measures** | | | | |
 | `ST_Distance(a, b)` | REAL | ✅ | ✅ | 2D cartesian; NULL for empty inputs |
 | `ST_DWithin(a, b, d)` | 0/1 | ✅ | ✅ | `distance <= d`; negative tolerance errors (matches PostGIS) |
-| **GeoPackage R-tree** | | | | |
+| `ST_ClosestPoint(a, b)` | geometry | ✅ any × any | ❌ (`ST_ShortestLine` instead) | kenro: second operand must be a POINT (geo API limit) — anything else errors |
+| `ST_LineInterpolatePoint(line, fraction)` | geometry | ✅ | ✅ | Fraction outside [0, 1] errors, like PostGIS |
+| `ST_LineLocatePoint(line, point)` | REAL | ✅ | ✅ | |
+| `ST_HausdorffDistance(a, b)` | REAL | ✅ | ❌ | kenro computes vertex-to-vertex distance (geo API), GEOS vertex-to-segment — equal on shared golden vectors, can differ on long sparse segments |
+| `ST_FrechetDistance(a, b)` | REAL | ✅ + densify arg | ❌ | kenro: LINESTRING × LINESTRING, 2-arg form only |
+| `ST_Azimuth(a, b)` | REAL | ✅ | ✅ | Radians clockwise from north; coincident points → NULL |
+| **Overlay & buffer** (pure Rust — see [semantics](#semantics-postgis-is-the-reference)) | | | | |
+| `ST_Intersection(a, b)` | geometry | ✅ | ✅ | Areal results only: polygons that merely touch → empty, where GEOS returns the shared LINESTRING. line × line errors (needs noding) |
+| `ST_Difference(a, b)` | geometry | ✅ | ✅ | Same decision matrix; point operands are filtered exactly |
+| `ST_SymDifference(a, b)` | geometry | ✅ | ❌ | areal × areal and puntal × puntal; mixed dimensions error |
+| `ST_Union(a, b)` | geometry | ✅ | ✅ | Scalar form; line unions error (noding) |
+| `ST_Union(geom)` **aggregate** | geometry | ✅ | ⚠️ named `ST_Union_Agg` | Dissolve in `GROUP BY`; NULL rows skipped, zero rows → NULL (PostGIS aggregate semantics) |
+| `ST_Buffer(geom, d [, opts])` | geometry | ✅ | ⚠️ 3rd arg differs | PostGIS-style options TEXT (`quad_segs= endcap= join= mitre_limit=`) or INTEGER quad_segs; `side=` unsupported. Negative distance erodes polygons. Golden-tested within 2% area of GEOS |
+| **Processing & affine** | | | | |
+| `ST_ConvexHull(geom)` | geometry | ✅ | ✅ | Degenerate hulls collapse to POINT/LINESTRING like PostGIS |
+| `ST_PointOnSurface(geom)` | geometry | ✅ | ✅ | Guaranteed interior; exact coordinates may differ from GEOS (documented in vectors) |
+| `ST_Simplify(geom, tol)` | geometry | ✅ + `preserveCollapsed` arg | ✅ 2-arg; also `ST_SimplifyPreserveTopology` | Ramer-Douglas-Peucker, collapse allowed (= PostGIS 2-arg form) |
+| `ST_SimplifyVW(geom, tol)` | geometry | ✅ | ❌ | Visvalingam-Whyatt; tolerance is an area |
+| `ST_ChaikinSmoothing(geom [, iterations])` | geometry | ✅ | ❌ | PostGIS variant (endpoints preserved on open lines); iterations capped at 5 |
+| `ST_RemoveRepeatedPoints(geom)` | geometry | ✅ + tolerance arg | ✅ | kenro: exact duplicates only (no tolerance form) |
+| `ST_OrientedEnvelope(geom)` | geometry | ✅ | ⚠️ named `ST_MinimumRotatedRectangle` | Minimum rotated rectangle; equal-area alternates possible (rotation-normalized comparison in goldens) |
+| `ST_Rotate(geom, radians [, x0, y0])` | geometry | ✅ | ✅ | About the origin (or the given point) — PostGIS semantics, **not** geo's centroid default |
+| `ST_Translate(geom, dx, dy)` | geometry | ✅ | ✅ | |
+| `ST_Scale(geom, xf, yf)` | geometry | ✅ | ✅ | About the origin, like PostGIS |
+| **GeoPackage triggers** | | | | |
 | `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | kenro uses the GeoPackage spec's trigger names (Annex F.3) — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin` |
 | `ST_IsEmpty(geom)` | 0/1 | ✅ | ✅ | gpkg R-tree contract; NULL on NULL |
+| `GPKG_IsAssignable(expected, actual)` | 0/1 | ❌ | ❌ | kenro-only: the geometry-type-trigger helper (Annex F.4); accepts both `'POINT'` and `'ST_Point'` spellings so the spec DDL works with kenro's `ST_GeometryType` |
 | **H3 cells** (`h3` feature) | | | | |
 | `h3_latlng_to_cell(geom, res)` | INT | via [h3-pg] ext | via community `h3` ext | Same name in all three ecosystems; POINT in lon/lat only |
 | `h3_cell_to_parent(cell, res)` | INT | via h3-pg | via `h3` ext | For coarser `GROUP BY` |
@@ -171,30 +209,37 @@ geometry-accepting function also auto-detects raw WKB input, so
 | **Accessors** | | | | |
 | `ST_Area(geom)` | REAL | ✅ | ✅ | Planar; 0 for non-areal or empty |
 | `ST_Length(geom)` | REAL | ✅ | ✅ | Linear geometries only — polygons return 0 in all three |
+| `ST_Perimeter(geom)` | REAL | ✅ | ✅ | Ring lengths; 0 for non-areal |
 | `ST_Centroid(geom)` | geometry | ✅ | ✅ | Empty input → `POINT EMPTY` |
 | `ST_Envelope(geom)` | geometry | ✅ | ✅ | Degenerates to POINT/LINESTRING exactly like PostGIS. DuckDB also has scalar `ST_Extent` → `BOX_2D` |
 | `ST_X(geom)` / `ST_Y(geom)` | REAL | ✅ | ✅ | POINT only, error otherwise (as in PostGIS); `POINT EMPTY` → NULL |
+| `ST_NPoints(geom)` | INT | ✅ | ✅ | All vertices of any type; empty → 0 |
 | `ST_NumPoints(geom)` | INT / NULL | ✅ | ⚠️ synonym of `ST_NPoints` | LINESTRING-only, NULL for other types (PostGIS as implemented; its docs lag). **Same name, different answer in DuckDB** (counts all vertices of any type) — kenro follows PostGIS |
+| `ST_GeometryType(geom)` | TEXT | ✅ | ⚠️ returns `POINT` | kenro returns the PostGIS spelling `ST_Point`; DuckDB returns bare `POINT` |
+| `ST_NumGeometries(geom)` | INT | ✅ | ✅ | Single geometry → 1; empty → 0 |
+| `ST_GeometryN(geom, n)` | geometry / NULL | ✅ | ❌ | 1-based; out of range → NULL; GeometryCollection supported |
+| `ST_StartPoint(geom)` / `ST_EndPoint(geom)` | geometry / NULL | ✅ | ✅ | PostGIS 3.2 semantics: POINT → itself, MULTILINESTRING works, areal → NULL |
+| `ST_PointN(line, n)` | geometry / NULL | ✅ | ✅ | 1-based with negative indexing from the end |
+| `ST_Reverse(geom)` | geometry | ✅ | ✅ | Member order of multi geometries preserved |
 | `ST_IsValid(geom)` | 0/1 | ✅ GEOS | ✅ GEOS | georust validation: everything incl. ring self-intersection and hole placement, except the split-interior case (documented gap) |
-| `ST_Simplify(geom, tol)` | geometry | ✅ + `preserveCollapsed` arg | ✅ 2-arg; also `ST_SimplifyPreserveTopology` | Ramer-Douglas-Peucker, collapse allowed (= PostGIS 2-arg form) |
+| **Vector tiles (MVT)** | | | | |
+| `ST_AsMVTGeom(geom, bounds [, extent [, buffer [, clip]]])` | geometry / NULL | ✅ | ✅ | World → integer tile coordinates (Y down); clipped-away input → NULL. `bounds` is any geometry (its envelope is used). ±1 pixel vs PostGIS at tile edges (kenro clips before grid snapping, PostGIS after) |
+| `ST_AsMVT(geom [, name [, extent [, props_json]]])` **aggregate** | BLOB | ⚠️ record-based signature | ⚠️ | **Deliberate signature divergence**: SQLite has no record type, so properties come from `json_object(...)` instead of row columns. A PostGIS-style call fails loudly at the type level. Layer name/extent must be constant per group |
 | **Stubs — planned** (call = helpful error) | | | | |
-| `ST_NPoints` | stub | ✅ | ✅ | Counts all vertices; stubbed separately from `ST_NumPoints` to keep the semantics split visible |
-| `ST_Perimeter` | stub | ✅ | ✅ | |
-| `ST_AsMVT` / `ST_AsMVTGeom` | stub | ✅ (aggregate) | ✅ | geozero has an MVT writer, but PostGIS's `ST_AsMVT` is an aggregate — kenro needs aggregate-function support first |
-| **Stubs — deliberately excluded** (GEOS-class) | | | | |
-| `ST_Buffer` / `ST_Union` / `ST_Intersection` / `ST_Difference` | stub | ✅ | ✅ | Computational geometry needs GEOS's muscle; kenro's error message points you to SpatiaLite / DuckDB spatial |
-| `ST_SymDifference` | stub | ✅ | ❌ | Not in DuckDB spatial either |
+| `ST_MakeValid` | stub | ✅ | ✅ | geo's polygon repair is triangulation-based and structurally different from GEOS — wiring it up would produce confusingly different geometry |
 
 All implemented functions are **deterministic and pure** (no I/O, no clock,
-no randomness) and NULL-strict (NULL in → NULL out). Malformed input raises
+no randomness) and NULL-strict (NULL in → NULL out; aggregates skip NULL
+rows instead, following PostGIS aggregate semantics). Malformed input raises
 an explicit error prefixed `kenro:` — never a silent NULL.
 
 Calling a stub raises a helpful error instead of SQLite's
 `no such function`:
 
 ```
-kenro: ST_Buffer is not implemented in kenro. kenro deliberately excludes
-GEOS-class operations; use SpatiaLite or DuckDB spatial for this.
+kenro: ST_MakeValid is not implemented in kenro. geo has no GEOS-equivalent
+MakeValid (its polygon repair is triangulation-based and structurally
+different); validate with ST_IsValid and repair in PostGIS for now.
 ```
 
 Also out of scope: raster, network analysis, full PROJ grid transforms, and
@@ -204,11 +249,12 @@ any claim of full SpatiaLite/PostGIS compatibility.
 
 Function names, signatures, and semantics follow PostGIS (SQL/MM `ST_`
 prefix). Results are validated against PostGIS-generated golden vectors
-committed in this repo (`tests/golden/*.jsonl` — 270+ vectors across
-predicates, transforms, GeoJSON, and accessors; H3 vectors come from the
-reference C library). Where kenro deviates, it does so **loudly and
-documentedly** — never a silently different result. The cross-cutting
-divergences:
+committed in this repo (`tests/golden/*.jsonl` — 700+ vectors across nine
+suites: predicates, transforms, GeoJSON, accessors, processing, overlay,
+buffer, and MVT; H3 vectors come from the reference C library, MVT tiles
+are cross-decoded by two independent decoders). Where kenro deviates, it
+does so **loudly and documentedly** — never a silently different result.
+The cross-cutting divergences:
 
 - **`POINT EMPTY`** cannot be constructed from WKT/GeoJSON (the underlying
   geometry model cannot represent it) — reading one from a GeoPackage/WKB
@@ -225,6 +271,22 @@ divergences:
 - **Bare WKB blobs** are accepted anywhere a geometry is expected
   (auto-detection; PostGIS would require a cast).
 
+And for the overlay family specifically (pure Rust via geo's BooleanOps on
+[i_overlay], which — like geo itself — does not aim for bit-level GEOS
+compatibility):
+
+- **Areal results only**: two polygons that merely touch along an edge
+  intersect to an *empty polygon* in kenro, where GEOS returns the shared
+  `LINESTRING`. Point operands are filtered exactly (no divergence).
+- **Unsupported combinations error instead of guessing**: line × line
+  overlays (which need noding) and mixed-dimension combinations (which
+  produce GeometryCollections in PostGIS) raise a `kenro:` error naming the
+  operand classes — never a wrong-looking answer.
+- **Vertex chains differ**: i_overlay snaps to an internal integer grid
+  (~1e-8 relative), so overlay results agree with GEOS by
+  symmetric-difference area (golden bound 1e-6 ratio), not vertex-by-vertex;
+  `ST_Buffer` agrees within 2% area.
+
 Divergent golden vectors carry a `kenro_expected` + `note` field in the
 vector files; those files are the source of truth for this list and the
 table above.
@@ -240,10 +302,11 @@ Structural differences that matter more than any single function:
   KB–MB scale, no C toolchain, deterministic. PostGIS is a server-side
   PostgreSQL extension. DuckDB spatial bundles GEOS + PROJ + GDAL (its
   WASM build is ~23.5 MB uncompressed, ~6.3 MB over the wire).
-- **Division of labor** — heavyweight analytics, overlays and format
-  conversion belong to DuckDB spatial or PostGIS; predicates, R-tree
-  maintenance and CRS transforms *inside your app's SQLite file* are
-  kenro's seat. They compose rather than compete.
+- **Division of labor** — heavyweight analytics, exotic GEOS operations and
+  format conversion belong to DuckDB spatial or PostGIS; predicates, R-tree
+  maintenance, CRS transforms, everyday overlays/buffers and MVT generation
+  *inside your app's SQLite file* are kenro's seat. They compose rather
+  than compete.
 
 ## Supported CRS
 
@@ -285,7 +348,8 @@ enables `kenro::register`.
 2. ✅ `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
 3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
-5. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
+5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
+6. v0.x releases on crates.io (+ npm for kenro-wasm, GitHub Pages for the demo)
 
 ## License
 
@@ -294,3 +358,4 @@ MIT OR Apache-2.0, at your option.
 [georust/geo]: https://github.com/georust/geo
 [proj4rs]: https://github.com/3liz/proj4rs
 [h3-pg]: https://github.com/zachasme/h3-pg
+[i_overlay]: https://github.com/iShape-Rust/iOverlay
