@@ -10,8 +10,14 @@ keywords = ["sqlite", "geo", "gis", "spatialite", "geopackage"]
 categories = ["database", "science::geo"]
 
 [features]
-default = []
+default = ["transform", "h3", "geojson"]
 rusqlite = ["dep:rusqlite"]
+transform = ["dep:proj4rs"]
+h3 = ["dep:h3o"]
+geojson = ["dep:geojson"]
+# Escape hatch: the full crs-definitions EPSG database (megabytes of tables,
+# u16 codes only) as a fallback for codes missing from kenro's curated table.
+crs-full = ["transform", "proj4rs/crs-definitions"]
 
 [dependencies]
 geo = "0.33"
@@ -25,12 +31,25 @@ thiserror = "2"
 rusqlite = { version = "0.40", optional = true, default-features = false, features = [
     "functions",
 ] }
+proj4rs = { version = "0.1.10", optional = true, default-features = false, features = [
+    "geo-types",
+] }
+h3o = { version = "0.10", optional = true }
+geojson = { version = "0.24", optional = true, default-features = false, features = [
+    "geo-types",
+] }
 
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["functions", "bundled"] }
 proptest = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+geo = "0.33"
+geo-types = "0.7"
+
+[[example]]
+name = "accuracy_report"
+required-features = ["transform"]
 
 [[test]]
 name = "golden_predicates"
@@ -42,4 +61,20 @@ required-features = ["rusqlite"]
 
 [[test]]
 name = "register_smoke"
+required-features = ["rusqlite"]
+
+[[test]]
+name = "golden_transform"
+required-features = ["rusqlite", "transform"]
+
+[[test]]
+name = "golden_h3"
+required-features = ["rusqlite", "h3"]
+
+[[test]]
+name = "golden_geojson"
+required-features = ["rusqlite", "geojson"]
+
+[[test]]
+name = "golden_accessors"
 required-features = ["rusqlite"]

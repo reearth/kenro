@@ -14,10 +14,11 @@ pub enum Error {
     #[error("kenro: invalid WKT: {0}")]
     InvalidWkt(String),
 
-    #[error(
-        "kenro: {func}: mixed SRIDs {a} and {b}; reproject first (ST_Transform arrives in kenro 0.2)"
-    )]
+    #[error("kenro: {func}: mixed SRIDs {a} and {b}; reproject with ST_Transform first")]
     MixedSrid { func: &'static str, a: i32, b: i32 },
+
+    #[error("kenro: invalid GeoJSON: {0}")]
+    InvalidGeoJson(String),
 
     #[error("kenro: {func}: {reason}")]
     Unsupported { func: &'static str, reason: String },

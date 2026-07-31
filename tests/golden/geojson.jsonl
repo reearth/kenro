@@ -1,0 +1,22 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/geojson.sql"}
+{"id":"gj_crs_3857:asgeojson","a":"POINT(1 2)","arg":null,"srid":3857,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:3857\"}},\"coordinates\":[1,2]}"}
+{"id":"gj_empty_line:asgeojson","a":"LINESTRING EMPTY","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"LineString\",\"coordinates\":[]}"}
+{"id":"gj_gc:asgeojson","a":"GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"GeometryCollection\",\"geometries\":[{\"type\":\"Point\",\"coordinates\":[1,2]},{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}]}"}
+{"id":"gj_line:asgeojson","a":"LINESTRING(0 0,1 1)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}"}
+{"id":"gj_mline:asgeojson","a":"MULTILINESTRING((0 0,1 1),(2 2,3 3))","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"MultiLineString\",\"coordinates\":[[[0,0],[1,1]],[[2,2],[3,3]]]}"}
+{"id":"gj_mpoly:asgeojson","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"MultiPolygon\",\"coordinates\":[[[[0,0],[1,0],[1,1],[0,1],[0,0]]]]}"}
+{"id":"gj_mpt:asgeojson","a":"MULTIPOINT(1 2,3 4)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"MultiPoint\",\"coordinates\":[[1,2],[3,4]]}"}
+{"id":"gj_poly_hole:asgeojson","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[4,0],[4,4],[0,4],[0,0]],[[1,1],[2,1],[2,2],[1,2],[1,1]]]}"}
+{"id":"gj_pt:asgeojson","a":"POINT(1 2)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[1,2]}"}
+{"id":"gj_pt_digits0:asgeojson","a":"POINT(139.7454 35.65)","arg":0,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[140,36]}"}
+{"id":"gj_pt_digits3:asgeojson","a":"POINT(139.745433012 35.6585805)","arg":3,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[139.745,35.659]}"}
+{"id":"gj_pt_frac:asgeojson","a":"POINT(139.745433012 35.6585805)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[139.745433012,35.6585805]}"}
+{"id":"gj_pt_int:asgeojson","a":"POINT(139 35)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[139,35]}"}
+{"id":"gj_pt_small:asgeojson","a":"POINT(0.000001 -0.000001)","arg":null,"srid":null,"fn":"asgeojson","expected":"{\"type\":\"Point\",\"coordinates\":[0.000001,-0.000001]}"}
+{"id":"fg_gc:fromgeojson","a":"{\"type\":\"GeometryCollection\",\"geometries\":[{\"type\":\"Point\",\"coordinates\":[1,2]}]}","fn":"fromgeojson","expected":"GEOMETRYCOLLECTION(POINT(1 2))","expected_srid":4326}
+{"id":"fg_line:fromgeojson","a":"{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}","fn":"fromgeojson","expected":"LINESTRING(0 0,1 1)","expected_srid":4326}
+{"id":"fg_mpoly:fromgeojson","a":"{\"type\":\"MultiPolygon\",\"coordinates\":[[[[0,0],[1,0],[1,1],[0,1],[0,0]]]]}","fn":"fromgeojson","expected":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))","expected_srid":4326}
+{"id":"fg_poly:fromgeojson","a":"{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[4,0],[4,4],[0,4],[0,0]]]}","fn":"fromgeojson","expected":"POLYGON((0 0,4 0,4 4,0 4,0 0))","expected_srid":4326}
+{"id":"fg_pt:fromgeojson","a":"{\"type\":\"Point\",\"coordinates\":[139.7,35.7]}","fn":"fromgeojson","expected":"POINT(139.7 35.7)","expected_srid":4326}
+{"id":"fg_3d:fromgeojson","a":"{\"type\":\"Point\",\"coordinates\":[1,2,3]}","fn":"fromgeojson","expected":"POINT Z (1 2 3)","kenro_expected":{"error": true},"note":"PostGIS keeps Z; kenro 0.1 rejects 3D rather than silently dropping it"}
+{"id":"fg_feature:fromgeojson","a":"{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[1,2]},\"properties\":{}}","fn":"fromgeojson","expected":{"error": true},"note":"PostGIS raises on Feature input; kenro raises too"}

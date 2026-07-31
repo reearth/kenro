@@ -1,0 +1,17 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/transform.sql"}
+{"id":"jgd2000_to_wgs84:transform","a":"POINT(139.745433 35.658581)","src_srid":4612,"to_srid":4326,"fn":"transform","expected":"POINT(139.745433 35.658581)"}
+{"id":"jgd2011_to_wgs84:transform","a":"POINT(139.745433 35.658581)","src_srid":6668,"to_srid":4326,"fn":"transform","expected":"POINT(139.745433 35.658581)"}
+{"id":"line_zone9:transform","a":"LINESTRING(139.7 35.6,139.8 35.7)","src_srid":4326,"to_srid":6677,"fn":"transform","expected":"LINESTRING(-12081.03577514161 -44369.49850428259,-3016.4963315810587 -33283.02626418439)"}
+{"id":"mercator_inverse:transform","a":"POINT(15556200 4257415)","src_srid":3857,"to_srid":4326,"fn":"transform","expected":"POINT(139.74372222820097 35.68537229367021)"}
+{"id":"naha_zone15:transform","a":"POINT(127.679245 26.212401)","src_srid":4326,"to_srid":6683,"fn":"transform","expected":"POINT(17911.432113026458 23541.84869590933)"}
+{"id":"osaka_zone6:transform","a":"POINT(135.502165 34.693738)","src_srid":4326,"to_srid":6674,"fn":"transform","expected":"POINT(-45610.76829310982 -144798.51254478688)"}
+{"id":"polygon_3857:transform","a":"POLYGON((139.7 35.6,139.8 35.6,139.8 35.7,139.7 35.6))","src_srid":4326,"to_srid":3857,"fn":"transform","expected":"POLYGON((15551332.863820316 4245720.660441586,15562464.812899645 4245720.660441586,15562464.812899645 4259419.96554792,15551332.863820316 4245720.660441586))"}
+{"id":"sapporo_zone12:transform","a":"POINT(141.354376 43.062096)","src_srid":4326,"to_srid":6680,"fn":"transform","expected":"POINT(-72949.37330225535 -103804.29865002114)"}
+{"id":"tokyo_jgd2000_zone9:transform","a":"POINT(139.745433 35.658581)","src_srid":4612,"to_srid":2451,"fn":"transform","expected":"POINT(-7958.643508300144 -37875.08494919652)"}
+{"id":"tokyo_tower_3857:transform","a":"POINT(139.745433 35.658581)","src_srid":4326,"to_srid":3857,"fn":"transform","expected":"POINT(15556390.442245528 4253743.76954561)"}
+{"id":"tokyo_tower_utm54:transform","a":"POINT(139.745433 35.658581)","src_srid":4326,"to_srid":32654,"fn":"transform","expected":"POINT(386440.56308509345 3946806.0096163624)"}
+{"id":"tokyo_tower_zone9:transform","a":"POINT(139.745433 35.658581)","src_srid":4326,"to_srid":6677,"fn":"transform","expected":"POINT(-7958.643508300144 -37875.08494919652)"}
+{"id":"wgs84_to_jgd2011:transform","a":"POINT(139.745433 35.658581)","src_srid":4326,"to_srid":6668,"fn":"transform","expected":"POINT(139.745433 35.658581)"}
+{"id":"zone9_inverse:transform","a":"POINT(-7000 -35000)","src_srid":6677,"to_srid":4326,"fn":"transform","expected":"POINT(139.7559958666358 35.68450348643748)"}
+{"id":"srid0:transform","a":"POINT(1 2)","src_srid":0,"to_srid":4326,"fn":"transform","expected":{"error": true},"note":"PostGIS raises \"Input geometry has unknown (0) SRID\"; kenro raises too"}
+{"id":"unknown_epsg:transform","a":"POINT(1 2)","src_srid":4326,"to_srid":27700,"fn":"transform","expected":{"error": true},"note":"kenro-only: EPSG:27700 is outside the curated CRS table (PostGIS supports it); documented limitation"}

@@ -61,12 +61,38 @@ fn wkb_to_geo(bytes: &[u8]) -> Result<Geometry<f64>> {
             )));
         }
     };
+    // POINT EMPTY arrives as a point with NaN coordinates (the GeoPackage
+    // spec's own convention); geozero's geo-types writer refuses it, so
+    // build it directly.
+    if let Some(p) = parse_nan_point(bytes, ty) {
+        return Ok(p);
+    }
     let result = if ty & 0xE000_0000 != 0 {
         Ewkb(bytes).to_geo()
     } else {
         Wkb(bytes).to_geo()
     };
     result.map_err(|e| Error::InvalidWkb(e.to_string()))
+}
+
+fn parse_nan_point(bytes: &[u8], ty: u32) -> Option<Geometry<f64>> {
+    if (ty & 0x0FFF_FFFF) % 1000 != 1 {
+        return None; // not a point
+    }
+    let le = bytes[0] == 1;
+    let offset = if ty & 0x2000_0000 != 0 { 9 } else { 5 }; // skip EWKB SRID
+    let x_raw: [u8; 8] = bytes.get(offset..offset + 8)?.try_into().ok()?;
+    let y_raw: [u8; 8] = bytes.get(offset + 8..offset + 16)?.try_into().ok()?;
+    let (x, y) = if le {
+        (f64::from_le_bytes(x_raw), f64::from_le_bytes(y_raw))
+    } else {
+        (f64::from_be_bytes(x_raw), f64::from_be_bytes(y_raw))
+    };
+    if x.is_nan() && y.is_nan() {
+        Some(Geometry::Point(geo_types::Point::new(f64::NAN, f64::NAN)))
+    } else {
+        None
+    }
 }
 
 /// Decode a full GPB blob, returning both the parsed header and the geometry.
@@ -114,6 +140,17 @@ pub fn decode_wkt(wkt: &str, srid: i32) -> Result<Geom> {
 /// Encode as ISO WKB, little-endian (PostGIS `ST_AsBinary` default).
 pub fn encode_wkb(geom: &Geom, func: &'static str) -> Result<Vec<u8>> {
     reject_zm(geom, func)?;
+    // POINT EMPTY: geozero's writer refuses it; hand-write the NaN-coordinate
+    // form (the GeoPackage spec's own representation).
+    if let Geometry::Point(p) = &geom.geometry
+        && p.x().is_nan()
+        && p.y().is_nan()
+    {
+        let mut wkb = vec![0x01, 0x01, 0x00, 0x00, 0x00];
+        wkb.extend_from_slice(&f64::NAN.to_le_bytes());
+        wkb.extend_from_slice(&f64::NAN.to_le_bytes());
+        return Ok(wkb);
+    }
     geom.geometry
         .to_wkb(CoordDimensions::xy())
         .map_err(Error::Geozero)

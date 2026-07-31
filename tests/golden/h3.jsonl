@@ -1,0 +1,31 @@
+{"_generated_by":"python h3 4.5.0 / h3 C library 4.5.0","_script":"scripts/golden/h3_generate.py"}
+{"id":"tokyo_r0:latlng_to_cell","a":"POINT(139.745433 35.658581)","arg":0,"fn":"latlng_to_cell","expected":577305177233555455}
+{"id":"tokyo_r7:latlng_to_cell","a":"POINT(139.745433 35.658581)","arg":7,"fn":"latlng_to_cell","expected":608819013782339583}
+{"id":"tokyo_r9:latlng_to_cell","a":"POINT(139.745433 35.658581)","arg":9,"fn":"latlng_to_cell","expected":617826213094752255}
+{"id":"tokyo_r15:latlng_to_cell","a":"POINT(139.745433 35.658581)","arg":15,"fn":"latlng_to_cell","expected":644847810858829546}
+{"id":"sapporo_r0:latlng_to_cell","a":"POINT(141.354376 43.062096)","arg":0,"fn":"latlng_to_cell","expected":577305177233555455}
+{"id":"sapporo_r7:latlng_to_cell","a":"POINT(141.354376 43.062096)","arg":7,"fn":"latlng_to_cell","expected":608797068965707775}
+{"id":"sapporo_r9:latlng_to_cell","a":"POINT(141.354376 43.062096)","arg":9,"fn":"latlng_to_cell","expected":617804268212846591}
+{"id":"sapporo_r15:latlng_to_cell","a":"POINT(141.354376 43.062096)","arg":15,"fn":"latlng_to_cell","expected":644825865976872978}
+{"id":"naha_r0:latlng_to_cell","a":"POINT(127.679245 26.212401)","arg":0,"fn":"latlng_to_cell","expected":577797758442799103}
+{"id":"naha_r7:latlng_to_cell","a":"POINT(127.679245 26.212401)","arg":7,"fn":"latlng_to_cell","expected":609290437731024895}
+{"id":"naha_r9:latlng_to_cell","a":"POINT(127.679245 26.212401)","arg":9,"fn":"latlng_to_cell","expected":618297636975804415}
+{"id":"naha_r15:latlng_to_cell","a":"POINT(127.679245 26.212401)","arg":15,"fn":"latlng_to_cell","expected":645319234739808612}
+{"id":"greenwich_r0:latlng_to_cell","a":"POINT(-0.0014 51.4779)","arg":0,"fn":"latlng_to_cell","expected":576918149140578303}
+{"id":"greenwich_r7:latlng_to_cell","a":"POINT(-0.0014 51.4779)","arg":7,"fn":"latlng_to_cell","expected":608430896025960447}
+{"id":"greenwich_r9:latlng_to_cell","a":"POINT(-0.0014 51.4779)","arg":9,"fn":"latlng_to_cell","expected":617438095264448511}
+{"id":"greenwich_r15:latlng_to_cell","a":"POINT(-0.0014 51.4779)","arg":15,"fn":"latlng_to_cell","expected":644459693028625234}
+{"id":"null_island_r0:latlng_to_cell","a":"POINT(0.0 0.0)","arg":0,"fn":"latlng_to_cell","expected":578536630256664575}
+{"id":"null_island_r7:latlng_to_cell","a":"POINT(0.0 0.0)","arg":7,"fn":"latlng_to_cell","expected":610049622659825663}
+{"id":"null_island_r9:latlng_to_cell","a":"POINT(0.0 0.0)","arg":9,"fn":"latlng_to_cell","expected":619056821840379903}
+{"id":"null_island_r15:latlng_to_cell","a":"POINT(0.0 0.0)","arg":15,"fn":"latlng_to_cell","expected":646078419604526808}
+{"id":"sydney_r0:latlng_to_cell","a":"POINT(151.2093 -33.8688)","arg":0,"fn":"latlng_to_cell","expected":579838452023951359}
+{"id":"sydney_r7:latlng_to_cell","a":"POINT(151.2093 -33.8688)","arg":7,"fn":"latlng_to_cell","expected":611329441561313279}
+{"id":"sydney_r9:latlng_to_cell","a":"POINT(151.2093 -33.8688)","arg":9,"fn":"latlng_to_cell","expected":620336640811597823}
+{"id":"sydney_r15:latlng_to_cell","a":"POINT(151.2093 -33.8688)","arg":15,"fn":"latlng_to_cell","expected":647358238575743144}
+{"id":"tokyo_parent_r0:cell_to_parent","cell":617826213094752255,"arg":0,"fn":"cell_to_parent","expected":577305177233555455}
+{"id":"tokyo_parent_r5:cell_to_parent","cell":617826213094752255,"arg":5,"fn":"cell_to_parent","expected":599811815181910015}
+{"id":"tokyo_parent_r8:cell_to_parent","cell":617826213094752255,"arg":8,"fn":"cell_to_parent","expected":613322613468430335}
+{"id":"tokyo_parent_r9:cell_to_parent","cell":617826213094752255,"arg":9,"fn":"cell_to_parent","expected":617826213094752255}
+{"id":"tokyo_to_string:cell_to_string","cell":617826213094752255,"fn":"cell_to_string","expected":"892f5aadc6fffff"}
+{"id":"tokyo_from_string:string_to_cell","a":"892f5aadc6fffff","fn":"string_to_cell","expected":617826213094752255}

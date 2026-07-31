@@ -127,6 +127,36 @@ proptest! {
         prop_assert_eq!(predicates::st_dwithin(&a, &b, 0.0).unwrap(), d == 0.0);
     }
 
+    #[cfg(feature = "transform")]
+    #[test]
+    fn transform_roundtrip_within_tolerance(
+        lon in 138.6..140.9f64,
+        lat in 34.6..37.4f64,
+    ) {
+        // 4326 → zone IX → 4326 must come back within ~1e-9 degrees.
+        let src = io::st_geom_from_text(&format!("POINT({lon:?} {lat:?})"), Some(4326)).unwrap();
+        let projected = kenro::functions::transform::st_transform(&src, 6677).unwrap();
+        let back = kenro::functions::transform::st_transform(&projected, 4326).unwrap();
+        let g = geom::decode_auto(&back).unwrap();
+        let geo_types::Geometry::Point(p) = g.geometry else { unreachable!() };
+        prop_assert!((p.x() - lon).abs() < 1e-9, "{} vs {lon}", p.x());
+        prop_assert!((p.y() - lat).abs() < 1e-9, "{} vs {lat}", p.y());
+    }
+
+    #[cfg(feature = "h3")]
+    #[test]
+    fn h3_cells_are_valid_positive_i64(
+        lon in -179.9..179.9f64,
+        lat in -89.9..89.9f64,
+        res in 0..=15i64,
+    ) {
+        let blob = io::st_geom_from_text(&format!("POINT({lon:?} {lat:?})"), Some(4326)).unwrap();
+        let cell = kenro::functions::h3::h3_latlng_to_cell(&blob, res).unwrap();
+        prop_assert!(cell > 0, "bit 63 must be clear: {cell}");
+        let s = kenro::functions::h3::h3_cell_to_string(cell).unwrap();
+        prop_assert_eq!(kenro::functions::h3::h3_string_to_cell(&s).unwrap(), cell);
+    }
+
     #[test]
     fn envelope_invariants_and_fast_path_agreement(wkt in geom_wkt()) {
         let canonical = io::st_geom_from_text(&wkt, None).unwrap();

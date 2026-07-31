@@ -25,7 +25,11 @@ jobs:
         run: cargo build --no-default-features
       - name: Core must not depend on SQLite
         run: '! cargo tree --no-default-features -e normal | grep -q rusqlite'
+      - name: Build with features off (stub fallbacks)
+        run: cargo build --no-default-features --features rusqlite
       - name: Test (core only)
         run: cargo test --no-default-features
       - name: Test (all features)
         run: cargo test --all-features
+      - name: Transform accuracy regression gate
+        run: cargo run --example accuracy_report -- --check

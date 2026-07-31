@@ -1,4 +1,4 @@
-{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/generate.sql"}
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/predicates.sql"}
 {"id":"empty_poly_pt:contains","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"contains","expected":false}
 {"id":"empty_poly_pt:distance","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"distance","expected":null}
 {"id":"empty_poly_pt:intersects","a":"POLYGON EMPTY","b":"POINT(1 1)","fn":"intersects","expected":false}

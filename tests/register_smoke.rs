@@ -33,6 +33,23 @@ fn every_implemented_function_is_callable() {
         "SELECT ST_MinY(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
         "SELECT ST_MaxY(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
         "SELECT ST_IsEmpty(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
+        "SELECT ST_SRID(ST_SetSRID(ST_GeomFromText('POINT(1 2)'), 4326))",
+        "SELECT ST_AsText(ST_Transform(ST_GeomFromText('POINT(139.7 35.7)', 4326), 6677))",
+        "SELECT h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9)",
+        "SELECT h3_cell_to_parent(h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9), 5)",
+        "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9)))",
+        "SELECT ST_AsGeoJSON(ST_GeomFromText('POINT(1 2)'))",
+        "SELECT ST_AsGeoJSON(ST_GeomFromText('POINT(1 2)'), 3)",
+        "SELECT ST_AsText(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[1,2]}'))",
+        "SELECT ST_Area(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+        "SELECT ST_Length(ST_GeomFromText('LINESTRING(0 0,3 4)'))",
+        "SELECT ST_AsText(ST_Centroid(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')))",
+        "SELECT ST_AsText(ST_Envelope(ST_GeomFromText('LINESTRING(0 0,3 4)')))",
+        "SELECT ST_X(ST_GeomFromText('POINT(3 4)'))",
+        "SELECT ST_Y(ST_GeomFromText('POINT(3 4)'))",
+        "SELECT ST_NumPoints(ST_GeomFromText('LINESTRING(0 0,1 1)'))",
+        "SELECT ST_IsValid(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+        "SELECT ST_AsText(ST_Simplify(ST_GeomFromText('LINESTRING(0 0,1 0.001,2 0)'), 0.1))",
     ];
     for sql in cases {
         assert!(
@@ -94,6 +111,26 @@ fn null_in_null_out_for_every_function() {
         "SELECT ST_MinY(NULL)",
         "SELECT ST_MaxY(NULL)",
         "SELECT ST_IsEmpty(NULL)",
+        "SELECT ST_SetSRID(NULL, 4326)",
+        "SELECT ST_SetSRID(ST_GeomFromText('POINT(1 2)'), NULL)",
+        "SELECT ST_SRID(NULL)",
+        "SELECT ST_Transform(NULL, 4326)",
+        "SELECT ST_Transform(ST_GeomFromText('POINT(1 2)', 4326), NULL)",
+        "SELECT h3_latlng_to_cell(NULL, 9)",
+        "SELECT h3_cell_to_parent(NULL, 5)",
+        "SELECT h3_cell_to_string(NULL)",
+        "SELECT h3_string_to_cell(NULL)",
+        "SELECT ST_AsGeoJSON(NULL)",
+        "SELECT ST_GeomFromGeoJSON(NULL)",
+        "SELECT ST_Area(NULL)",
+        "SELECT ST_Length(NULL)",
+        "SELECT ST_Centroid(NULL)",
+        "SELECT ST_Envelope(NULL)",
+        "SELECT ST_X(NULL)",
+        "SELECT ST_Y(NULL)",
+        "SELECT ST_NumPoints(NULL)",
+        "SELECT ST_IsValid(NULL)",
+        "SELECT ST_Simplify(NULL, 0.1)",
     ];
     for sql in cases {
         assert!(
@@ -117,15 +154,15 @@ fn stubs_error_with_helpful_hints() {
 
     let err = query_value(
         &conn,
-        "SELECT ST_Transform(ST_GeomFromText('POINT(0 0)'), 4326)",
+        "SELECT ST_NPoints(ST_GeomFromText('LINESTRING(0 0,1 1)'))",
     )
     .unwrap_err()
     .to_string();
-    assert!(err.contains("Planned for kenro 0.2"), "{err}");
+    assert!(err.contains("ST_NumPoints"), "{err}");
 
     // Stubs are loud for any arity, including NULL args.
-    assert!(query_value(&conn, "SELECT ST_Area(NULL)").is_err());
-    assert!(query_value(&conn, "SELECT ST_Centroid()").is_err());
+    assert!(query_value(&conn, "SELECT ST_Perimeter(NULL)").is_err());
+    assert!(query_value(&conn, "SELECT ST_Union()").is_err());
 }
 
 #[test]

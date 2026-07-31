@@ -1,0 +1,38 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/accessors.sql"}
+{"id":"area_empty:area","a":"POLYGON EMPTY","fn":"area","arg":null,"expected":0}
+{"id":"area_hole:area","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,3 1,3 3,1 3,1 1))","fn":"area","arg":null,"expected":12}
+{"id":"area_line:area","a":"LINESTRING(0 0,5 5)","fn":"area","arg":null,"expected":0}
+{"id":"area_mpoly:area","a":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)),((2 2,4 2,4 4,2 4,2 2)))","fn":"area","arg":null,"expected":5}
+{"id":"area_point:area","a":"POINT(1 2)","fn":"area","arg":null,"expected":0}
+{"id":"area_square:area","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"area","arg":null,"expected":16}
+{"id":"centroid_empty:centroid","a":"LINESTRING EMPTY","fn":"centroid","arg":null,"expected":"POINT EMPTY"}
+{"id":"centroid_line:centroid","a":"LINESTRING(0 0,4 0)","fn":"centroid","arg":null,"expected":"POINT(2 0)"}
+{"id":"centroid_mpt:centroid","a":"MULTIPOINT(0 0,1 0,1 1)","fn":"centroid","arg":null,"expected":"POINT(0.666666666666667 0.333333333333333)"}
+{"id":"centroid_square:centroid","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"centroid","arg":null,"expected":"POINT(2 2)"}
+{"id":"centroid_tri:centroid","a":"POLYGON((0 0,4 0,0 3,0 0))","fn":"centroid","arg":null,"expected":"POINT(1.333333333333333 1)"}
+{"id":"envelope_diag:envelope","a":"LINESTRING(1 2,5 8)","fn":"envelope","arg":null,"expected":"POLYGON((1 2,1 8,5 8,5 2,1 2))"}
+{"id":"envelope_empty:envelope","a":"LINESTRING EMPTY","fn":"envelope","arg":null,"expected":"LINESTRING EMPTY"}
+{"id":"envelope_hline:envelope","a":"LINESTRING(1 2,5 2)","fn":"envelope","arg":null,"expected":"LINESTRING(1 2,5 2)"}
+{"id":"envelope_point:envelope","a":"POINT(3 4)","fn":"envelope","arg":null,"expected":"POINT(3 4)"}
+{"id":"envelope_poly:envelope","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"envelope","arg":null,"expected":"POLYGON((0 0,0 4,4 4,4 0,0 0))"}
+{"id":"isvalid_bowtie:isvalid","a":"POLYGON((0 0,4 4,4 0,0 4,0 0))","fn":"isvalid","arg":null,"expected":false}
+{"id":"isvalid_hole_out:isvalid","a":"POLYGON((0 0,4 0,4 4,0 4,0 0),(5 5,6 5,6 6,5 6,5 5))","fn":"isvalid","arg":null,"expected":false}
+{"id":"isvalid_line:isvalid","a":"LINESTRING(0 0,1 1)","fn":"isvalid","arg":null,"expected":true}
+{"id":"isvalid_square:isvalid","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"isvalid","arg":null,"expected":true}
+{"id":"length_345:length","a":"LINESTRING(0 0,3 4)","fn":"length","arg":null,"expected":5}
+{"id":"length_gc:length","a":"GEOMETRYCOLLECTION(LINESTRING(0 0,3 4),POINT(1 1))","fn":"length","arg":null,"expected":5}
+{"id":"length_mline:length","a":"MULTILINESTRING((0 0,3 4),(0 0,6 8))","fn":"length","arg":null,"expected":15}
+{"id":"length_point:length","a":"POINT(1 2)","fn":"length","arg":null,"expected":0}
+{"id":"length_polygon:length","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","fn":"length","arg":null,"expected":0}
+{"id":"numpoints_line:numpoints","a":"LINESTRING(0 0,1 1,2 2)","fn":"numpoints","arg":null,"expected":3}
+{"id":"numpoints_mline:numpoints","a":"MULTILINESTRING((0 0,1 1))","fn":"numpoints","arg":null,"expected":null}
+{"id":"numpoints_point:numpoints","a":"POINT(0 0)","fn":"numpoints","arg":null,"expected":null}
+{"id":"numpoints_poly:numpoints","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"numpoints","arg":null,"expected":null}
+{"id":"simplify_keep:simplify","a":"LINESTRING(0 0,1 5,2 0)","fn":"simplify","arg":0.1,"expected":"LINESTRING(0 0,1 5,2 0)"}
+{"id":"simplify_point:simplify","a":"POINT(1 2)","fn":"simplify","arg":10,"expected":"POINT(1 2)"}
+{"id":"simplify_poly:simplify","a":"POLYGON((0 0,2 0.01,4 0,4 4,0 4,0 0))","fn":"simplify","arg":0.1,"expected":"POLYGON((0 0,4 0,4 4,0 4,0 0))"}
+{"id":"simplify_zigzag:simplify","a":"LINESTRING(0 0,1 0.01,2 0,3 0.01,4 0)","fn":"simplify","arg":0.1,"expected":"LINESTRING(0 0,4 0)"}
+{"id":"x_point:x","a":"POINT(3.5 -4.25)","fn":"x","arg":null,"expected":3.5}
+{"id":"y_point:y","a":"POINT(3.5 -4.25)","fn":"y","arg":null,"expected":-4.25}
+{"id":"x_line:x","a":"LINESTRING(0 0,1 1)","fn":"x","expected":{"error": true},"note":"PostGIS: Argument to ST_X() must have type point; kenro raises too"}
+{"id":"y_poly:y","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","fn":"y","expected":{"error": true},"note":"PostGIS: Argument to ST_Y() must have type point; kenro raises too"}

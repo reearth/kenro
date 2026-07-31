@@ -6,9 +6,12 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 
 kenro provides the 20% of SpatiaLite everyone actually uses, with zero C dependencies and one-call registration:
 
-- **WKB / WKT / GeoPackage-blob I/O** — `ST_GeomFromText`, `ST_GeomFromWKB`, `ST_GeomFromGPB`, `ST_AsText`, `ST_AsBinary`, `ST_AsGPB`
+- **WKB / WKT / GeoJSON / GeoPackage-blob I/O** — `ST_GeomFromText`, `ST_GeomFromWKB`, `ST_GeomFromGPB`, `ST_GeomFromGeoJSON`, `ST_AsText`, `ST_AsBinary`, `ST_AsGPB`, `ST_AsGeoJSON`
 - **Predicates** — `ST_Intersects`, `ST_Contains`, `ST_Within`, `ST_Distance`, `ST_DWithin` (DE-9IM via [georust/geo])
 - **GeoPackage R-tree support** — `ST_MinX`, `ST_MaxX`, `ST_MinY`, `ST_MaxY`, `ST_IsEmpty`: the exact function set the GeoPackage spec's R-tree maintenance triggers require
+- **CRS transform** — `ST_Transform` / `ST_SetSRID` / `ST_SRID` via pure-Rust [proj4rs], with first-class support for the Japanese national systems (JGD2000/JGD2011, plane rectangular I–XIX) and [measured accuracy](docs/accuracy.md)
+- **H3 cells** — `h3_latlng_to_cell` & friends (h3-pg naming) for mesh aggregation in `GROUP BY`
+- **Accessors** — `ST_Area`, `ST_Length`, `ST_Centroid`, `ST_Envelope`, `ST_X`, `ST_Y`, `ST_NumPoints`, `ST_IsValid`, `ST_Simplify`
 
 That last set is the headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -53,6 +56,17 @@ Inserts, updates and deletes through SQL keep the spatial index in sync via the 
 | `ST_DWithin(a, b, d)` | 0/1 | `distance <= d` |
 | `ST_MinX/ST_MaxX/ST_MinY/ST_MaxY(geom)` | REAL | GeoPackage R-tree contract; NULL for empty |
 | `ST_IsEmpty(geom)` | 0/1 | GeoPackage R-tree contract |
+| `ST_Transform(geom, to_srid)` | BLOB | Source CRS = the geometry's SRID (PostGIS-exact 2-arg form); see [Supported CRS](#supported-crs) |
+| `ST_SetSRID(geom, srid)` / `ST_SRID(geom)` | BLOB / INT | Relabel (no reprojection) / read; 0 = unknown |
+| `ST_AsGeoJSON(geom [, maxdecimaldigits])` | TEXT | Default 9 digits; byte-identical to PostGIS output (golden-tested) |
+| `ST_GeomFromGeoJSON(text)` | BLOB | SRID 4326 per RFC 7946 (PostGIS ≥ 3.0 behavior) |
+| `h3_latlng_to_cell(geom, res)` | INT | H3 cell of a lon/lat POINT ([h3-pg] naming); pairs with `h3_cell_to_parent(cell, res)`, `h3_cell_to_string(cell)`, `h3_string_to_cell(text)` |
+| `ST_Area` / `ST_Length(geom)` | REAL | Planar; polygons have length 0 (as in PostGIS) |
+| `ST_Centroid` / `ST_Envelope(geom)` | BLOB | Envelope degenerates to POINT/LINESTRING like PostGIS |
+| `ST_X` / `ST_Y(geom)` | REAL | POINT only (error otherwise, as in PostGIS) |
+| `ST_NumPoints(geom)` | INT | LINESTRING only, NULL otherwise (PostGIS semantics — distinct from `ST_NPoints`) |
+| `ST_IsValid(geom)` | 0/1 | georust validation (see diff table) |
+| `ST_Simplify(geom, tol)` | BLOB | Ramer-Douglas-Peucker |
 
 "Geometry" values are GeoPackage blobs (they carry the SRID, and a value in a gpkg column is already valid storage). Every geometry-accepting function also auto-detects raw WKB input, so `ST_Within(p.geom, …)` works directly on a gpkg column.
 
@@ -68,8 +82,36 @@ GEOS-class operations; use SpatiaLite or DuckDB spatial for this.
 ```
 
 - **Never**: `ST_Buffer`, `ST_Union`, `ST_Intersection`, `ST_Difference`, `ST_SymDifference` — GEOS-class computational geometry. Use SpatiaLite or DuckDB spatial; kenro stays small.
-- **Planned (0.2)**: `ST_Transform` (proj4rs), `ST_AsGeoJSON` / `ST_GeomFromGeoJSON`, accessors (`ST_Area`, `ST_Length`, `ST_Centroid`, `ST_Envelope`, `ST_SRID`, `ST_X`, `ST_Y`, `ST_NumPoints`, `ST_IsValid`, `ST_Simplify`).
+- **Planned**: `ST_NPoints`, `ST_Perimeter`.
 - Also out of scope: raster, network analysis, full PROJ grid transforms, and any claim of full SpatiaLite/PostGIS compatibility.
+
+## Supported CRS
+
+`ST_Transform` uses a curated EPSG table (proj4rs carries no EPSG database):
+
+| Codes | System |
+|---|---|
+| 4326 | WGS84 geographic |
+| 3857 | Web Mercator |
+| 4612 / 6668 | JGD2000 / JGD2011 geographic |
+| 2443–2461 | JGD2000 plane rectangular zones I–XIX |
+| 6669–6687 | JGD2011 plane rectangular zones I–XIX |
+| 32651–32656 | WGS84 UTM zones 51N–56N |
+
+Anything else raises an error naming the code. The `crs-full` cargo feature
+adds the full `crs-definitions` registry as a fallback (megabytes of tables,
+EPSG codes ≤ 65535 only). Accuracy against PROJ is measured and documented
+in [docs/accuracy.md](docs/accuracy.md) — TL;DR: nanometer-level for
+projection math, 0.1 mm-level for the JGD Helmert pairs, but **no datum
+grids**: real-world JGD2000↔JGD2011 displacement is not modeled; use full
+PROJ for survey-grade work.
+
+## Cargo features
+
+Everything is on by default: `transform` (proj4rs), `h3` (h3o), `geojson`.
+Building with a feature off keeps the corresponding SQL functions registered
+as stubs that explain which feature is missing. `rusqlite` (off by default)
+enables `kenro::register`.
 
 ## PostGIS is the reference
 
@@ -78,10 +120,12 @@ Function names, signatures, and semantics follow PostGIS (SQL/MM `ST_` prefix). 
 | Case | PostGIS | kenro |
 |---|---|---|
 | `ST_GeomFromText('POINT EMPTY')` | empty point | error (the underlying geometry model cannot represent it) |
-| 3D/M geometries | supported | accepted as *input* to predicates and R-tree functions (2D result, same as PostGIS); output/constructor functions raise an error |
+| 3D/M geometries | supported | accepted as *input* to predicates and R-tree functions (2D result, same as PostGIS); output/constructor functions raise an error — incl. `ST_GeomFromGeoJSON` with 3D positions |
 | `GeometryCollection` in predicates | `ST_Intersects` works; `ST_Contains`/`ST_Within` error | error for all predicates |
 | Geometry with SRID vs geometry with unknown SRID (0) | error | proceeds (needed for `… AND ST_Within(gpkg_col, ST_GeomFromText(…))`) — mixed *known* SRIDs still error |
 | bare WKB blob passed to a predicate | needs a cast | accepted (auto-detection) |
+| `ST_Transform` to an EPSG outside the curated table | works (full PROJ database) | error naming the code (see [Supported CRS](#supported-crs)) |
+| `ST_IsValid` interior-connectivity check | full GEOS validation | georust validation — the split-interior case is not detected (everything else, incl. ring self-intersection and hole placement, is) |
 
 Divergent golden vectors carry a `kenro_expected` + `note` field in `predicates.jsonl`; that file is the source of truth for this table.
 
@@ -89,12 +133,12 @@ Divergent golden vectors carry a `kenro_expected` + `note` field in `predicates.
 
 - SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`).
 - Loading kenro **and** SpatiaLite into the same connection: both register `ST_` names and SQLite keeps the last registration. Don't mix them (a registration-filter feature flag can be added if needed).
-- `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject first (`ST_Transform` arrives in 0.2).
+- `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject first (e.g. `ST_Transform(geom, 6677)` for the Tokyo area).
 
 ## Roadmap
 
 1. ✅ Core: GeoPackage blobs, WKB/WKT, predicates, R-tree functions, rusqlite registration, PostGIS golden tests
-2. `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy measured and documented), H3 cell IDs, GeoJSON
+2. ✅ `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
 3. `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. `kenro-wasm`: sql.js / wa-sqlite builds, browser demo
 5. v0.x releases on crates.io
@@ -104,3 +148,5 @@ Divergent golden vectors carry a `kenro_expected` + `note` field in `predicates.
 MIT OR Apache-2.0, at your option.
 
 [georust/geo]: https://github.com/georust/geo
+[proj4rs]: https://github.com/3liz/proj4rs
+[h3-pg]: https://github.com/zachasme/h3-pg

@@ -124,20 +124,196 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
             .map_err(sql_err)
     })?;
 
+    // SRID management (byte-level, feature-independent).
+    conn.create_scalar_function("ST_SetSRID", 2, FLAGS, |ctx| {
+        let (Some(b), Some(srid)) = (
+            blob_or_null(ctx, 0, "ST_SetSRID")?,
+            int_or_null(ctx, 1, "ST_SetSRID")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_set_srid(b, srid))
+    })?;
+    conn.create_scalar_function("ST_SRID", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_SRID")? else {
+            return Ok(None);
+        };
+        io::st_srid(b)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+
+    register_transform(conn)?;
+    register_h3(conn)?;
+    register_geojson(conn)?;
+    register_accessors(conn)?;
+
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
     for stub in stubs::STUBS {
-        let (name, hint) = (stub.name, stub.hint);
-        conn.create_scalar_function(
-            name,
-            -1,
-            FLAGS,
-            move |_ctx| -> rusqlite::Result<Option<Value>> {
-                Err(sql_err(Error::Unimplemented { func: name, hint }))
-            },
-        )?;
+        register_stub(conn, stub)?;
     }
 
+    Ok(())
+}
+
+#[cfg(feature = "transform")]
+fn register_transform(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::transform;
+    conn.create_scalar_function("ST_Transform", 2, FLAGS, |ctx| {
+        let (Some(b), Some(srid)) = (
+            blob_or_null(ctx, 0, "ST_Transform")?,
+            int_or_null(ctx, 1, "ST_Transform")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(transform::st_transform(b, srid))
+    })
+}
+
+#[cfg(not(feature = "transform"))]
+fn register_transform(conn: &Connection) -> rusqlite::Result<()> {
+    register_stubs(conn, stubs::TRANSFORM_OFF)
+}
+
+#[cfg(feature = "h3")]
+fn register_h3(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::h3;
+    conn.create_scalar_function("h3_latlng_to_cell", 2, FLAGS, |ctx| {
+        let (Some(b), Some(res)) = (
+            blob_or_null(ctx, 0, "h3_latlng_to_cell")?,
+            i64_or_null(ctx, 1, "h3_latlng_to_cell")?,
+        ) else {
+            return Ok(None);
+        };
+        h3::h3_latlng_to_cell(b, res)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("h3_cell_to_parent", 2, FLAGS, |ctx| {
+        let (Some(cell), Some(res)) = (
+            i64_or_null(ctx, 0, "h3_cell_to_parent")?,
+            i64_or_null(ctx, 1, "h3_cell_to_parent")?,
+        ) else {
+            return Ok(None);
+        };
+        h3::h3_cell_to_parent(cell, res)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("h3_cell_to_string", 1, FLAGS, |ctx| {
+        let Some(cell) = i64_or_null(ctx, 0, "h3_cell_to_string")? else {
+            return Ok(None);
+        };
+        h3::h3_cell_to_string(cell)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("h3_string_to_cell", 1, FLAGS, |ctx| {
+        let Some(s) = text_or_null(ctx, 0, "h3_string_to_cell")? else {
+            return Ok(None);
+        };
+        h3::h3_string_to_cell(s)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    Ok(())
+}
+
+#[cfg(not(feature = "h3"))]
+fn register_h3(conn: &Connection) -> rusqlite::Result<()> {
+    register_stubs(conn, stubs::H3_OFF)
+}
+
+#[cfg(feature = "geojson")]
+fn register_geojson(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::geojson;
+    conn.create_scalar_function("ST_AsGeoJSON", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_AsGeoJSON")? else {
+            return Ok(None);
+        };
+        geojson::st_as_geojson(b, None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsGeoJSON", 2, FLAGS, |ctx| {
+        let (Some(b), Some(digits)) = (
+            blob_or_null(ctx, 0, "ST_AsGeoJSON")?,
+            i64_or_null(ctx, 1, "ST_AsGeoJSON")?,
+        ) else {
+            return Ok(None);
+        };
+        geojson::st_as_geojson(b, Some(digits))
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeomFromGeoJSON", 1, FLAGS, |ctx| {
+        let Some(s) = text_or_null(ctx, 0, "ST_GeomFromGeoJSON")? else {
+            return Ok(None);
+        };
+        blob(geojson::st_geom_from_geojson(s))
+    })?;
+    Ok(())
+}
+
+#[cfg(not(feature = "geojson"))]
+fn register_geojson(conn: &Connection) -> rusqlite::Result<()> {
+    register_stubs(conn, stubs::GEOJSON_OFF)
+}
+
+fn register_accessors(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::accessors;
+    register_geom_to_real(conn, "ST_Area", accessors::st_area)?;
+    register_geom_to_real(conn, "ST_Length", accessors::st_length)?;
+    register_geom_to_blob(conn, "ST_Centroid", accessors::st_centroid)?;
+    register_geom_to_blob(conn, "ST_Envelope", accessors::st_envelope)?;
+    register_rtree_minmax(conn, "ST_X", accessors::st_x)?;
+    register_rtree_minmax(conn, "ST_Y", accessors::st_y)?;
+    conn.create_scalar_function("ST_NumPoints", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_NumPoints")? else {
+            return Ok(None);
+        };
+        accessors::st_num_points(b)
+            .map(|v| v.map(Value::Integer))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_IsValid", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_IsValid")? else {
+            return Ok(None);
+        };
+        accessors::st_is_valid(b)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_Simplify", 2, FLAGS, |ctx| {
+        let (Some(b), Some(tol)) = (
+            blob_or_null(ctx, 0, "ST_Simplify")?,
+            real_or_null(ctx, 1, "ST_Simplify")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(accessors::st_simplify(b, tol))
+    })?;
+    Ok(())
+}
+
+fn register_stub(conn: &Connection, stub: &'static stubs::Stub) -> rusqlite::Result<()> {
+    let (name, hint) = (stub.name, stub.hint);
+    conn.create_scalar_function(
+        name,
+        -1,
+        FLAGS,
+        move |_ctx| -> rusqlite::Result<Option<Value>> {
+            Err(sql_err(Error::Unimplemented { func: name, hint }))
+        },
+    )
+}
+
+#[allow(dead_code)]
+fn register_stubs(conn: &Connection, list: &'static [stubs::Stub]) -> rusqlite::Result<()> {
+    for stub in list {
+        register_stub(conn, stub)?;
+    }
     Ok(())
 }
 
@@ -153,6 +329,32 @@ fn register_predicate(
         f(a, b)
             .map(|v| Some(Value::Integer(v as i64)))
             .map_err(sql_err)
+    })
+}
+
+fn register_geom_to_real(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8]) -> crate::error::Result<f64>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, name)? else {
+            return Ok(None);
+        };
+        f(b).map(|v| Some(Value::Real(v))).map_err(sql_err)
+    })
+}
+
+fn register_geom_to_blob(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8]) -> crate::error::Result<Vec<u8>>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, name)? else {
+            return Ok(None);
+        };
+        blob(f(b))
     })
 }
 
@@ -210,6 +412,18 @@ fn text_or_null<'a>(
         other => Err(sql_err(Error::Unsupported {
             func,
             reason: format!("expected TEXT, got {}", other.data_type()),
+        })),
+    }
+}
+
+#[allow(dead_code)]
+fn i64_or_null(ctx: &Context<'_>, i: usize, func: &'static str) -> rusqlite::Result<Option<i64>> {
+    match ctx.get_raw(i) {
+        ValueRef::Null => Ok(None),
+        ValueRef::Integer(v) => Ok(Some(v)),
+        other => Err(sql_err(Error::Unsupported {
+            func,
+            reason: format!("expected an INTEGER, got {}", other.data_type()),
         })),
     }
 }

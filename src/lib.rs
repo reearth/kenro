@@ -32,6 +32,8 @@
 //! All functions are pure (no I/O, no clock, no randomness): identical input
 //! always produces identical output.
 
+#[cfg(feature = "transform")]
+pub mod crs;
 pub mod error;
 pub mod functions;
 pub mod geom;

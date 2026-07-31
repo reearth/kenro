@@ -57,6 +57,33 @@ pub fn st_as_gpb(bytes: &[u8]) -> Result<Vec<u8>> {
     geom::encode_storage_gpb(&geom, "ST_AsGPB")
 }
 
+/// `ST_SetSRID(geom, srid)` — relabel only, coordinates unchanged. Operates
+/// at the byte level so 3D payloads survive losslessly.
+pub fn st_set_srid(bytes: &[u8], srid: i32) -> Result<Vec<u8>> {
+    if gpb::is_gpb(bytes) {
+        let header = GpbHeader::parse(bytes)?;
+        Ok(gpb::write_gpb(
+            &bytes[header.wkb_offset..],
+            srid,
+            None,
+            header.empty,
+        ))
+    } else {
+        let geom = geom::decode_wkb(bytes, None)?; // validates the WKB
+        Ok(gpb::write_gpb(
+            bytes,
+            srid,
+            None,
+            geom::is_empty(&geom.geometry),
+        ))
+    }
+}
+
+/// `ST_SRID(geom)` — 0 means unknown, as in PostGIS/GeoPackage.
+pub fn st_srid(bytes: &[u8]) -> Result<i32> {
+    Ok(geom::decode_auto(bytes)?.srid)
+}
+
 /// Re-exported for binding layers that want header-only access.
 pub use crate::gpb::is_gpb;
 
