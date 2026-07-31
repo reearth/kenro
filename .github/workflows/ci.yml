@@ -29,6 +29,8 @@ jobs:
         run: cargo build --no-default-features --features rusqlite
       - name: Test (core only)
         run: cargo test --no-default-features
+      - name: Test (default features)
+        run: cargo test
       - name: Test (all features)
         run: cargo test --all-features
       - name: Transform accuracy regression gate
@@ -91,8 +93,8 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
-      - name: Build (wasm-pack, release)
-        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+      - name: Build (wasm-pack, release, full)
+        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
       - name: Size gate
         run: node crates/kenro-wasm/js/test/size-gate.mjs
       - name: Golden vectors + host smokes (Node)

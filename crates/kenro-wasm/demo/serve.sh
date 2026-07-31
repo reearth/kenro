@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Assemble the demo into demo/dist (same layout the Pages workflow deploys)
 # and serve it locally. Prerequisite:
-#   wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+#   wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -13,7 +13,7 @@ per host in `js/src/`.
 ## Build
 
 ```sh
-wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
 ```
 
 ## Use
@@ -39,7 +39,7 @@ module): [docs/wasm.md](../../docs/wasm.md).
 `demo/` is a static drag-a-GeoPackage-and-query page:
 
 ```sh
-wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
 crates/kenro-wasm/demo/serve.sh   # serves http://localhost:8000
 ```
 

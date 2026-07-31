@@ -48,7 +48,7 @@ replayed against the raw wasm exports.
 Build (or take the npm package once published):
 
 ```sh
-wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg
+wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
 ```
 
 ```js
