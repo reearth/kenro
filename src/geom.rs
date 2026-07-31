@@ -61,6 +61,12 @@ fn wkb_to_geo(bytes: &[u8]) -> Result<Geometry<f64>> {
             )));
         }
     };
+    // Hostile-input guard: element counts inside WKB must be backed by
+    // actual bytes BEFORE geozero decodes (its readers pre-allocate from
+    // the counts — a random 4-byte count can demand gigabytes and abort
+    // the process, which is not an Err).
+    validate_wkb(bytes)?;
+
     // POINT EMPTY arrives as a point with NaN coordinates (the GeoPackage
     // spec's own convention); geozero's geo-types writer refuses it, so
     // build it directly.
@@ -73,6 +79,103 @@ fn wkb_to_geo(bytes: &[u8]) -> Result<Geometry<f64>> {
         Wkb(bytes).to_geo()
     };
     result.map_err(|e| Error::InvalidWkb(e.to_string()))
+}
+
+/// Structural WKB validation: walks the geometry tree checking that every
+/// element count is backed by enough remaining bytes, so downstream
+/// decoding can never allocate more than the input's size. Handles ISO and
+/// EWKB type codes (Z/M dims change the coordinate size; an EWKB SRID adds
+/// 4 bytes).
+fn validate_wkb(bytes: &[u8]) -> Result<()> {
+    fn fail(msg: &str) -> Error {
+        Error::InvalidWkb(msg.into())
+    }
+    fn walk(b: &[u8], pos: &mut usize, depth: u8) -> Result<()> {
+        if depth > 32 {
+            return Err(fail("geometry nesting too deep"));
+        }
+        let need = |pos: usize, n: usize| {
+            if pos.checked_add(n).is_none_or(|end| end > b.len()) {
+                Err(fail(
+                    "truncated WKB (element count exceeds available bytes)",
+                ))
+            } else {
+                Ok(())
+            }
+        };
+        need(*pos, 5)?;
+        let le = match b[*pos] {
+            0 => false,
+            1 => true,
+            _ => return Err(fail("invalid byte-order marker")),
+        };
+        let read_u32 = |b: &[u8], at: usize| {
+            let raw: [u8; 4] = b[at..at + 4].try_into().expect("bounds checked");
+            if le {
+                u32::from_le_bytes(raw)
+            } else {
+                u32::from_be_bytes(raw)
+            }
+        };
+        let ty = read_u32(b, *pos + 1);
+        *pos += 5;
+        if ty & 0x2000_0000 != 0 {
+            need(*pos, 4)?;
+            *pos += 4; // EWKB SRID
+        }
+        let iso_dim_code = (ty & 0x0000_FFFF) / 1000;
+        let mut dims = 2 + usize::from(ty & 0x8000_0000 != 0) + usize::from(ty & 0x4000_0000 != 0);
+        dims = dims.max(match iso_dim_code {
+            1 | 2 => 3,
+            3 => 4,
+            _ => 2,
+        });
+        let coord_size = 8 * dims;
+        let base = (ty & 0x0000_FFFF) % 1000;
+        match base {
+            1 => {
+                need(*pos, coord_size)?;
+                *pos += coord_size;
+            }
+            2 => {
+                need(*pos, 4)?;
+                let n = read_u32(b, *pos) as usize;
+                *pos += 4;
+                let total = n
+                    .checked_mul(coord_size)
+                    .ok_or_else(|| fail("count overflow"))?;
+                need(*pos, total)?;
+                *pos += total;
+            }
+            3 => {
+                need(*pos, 4)?;
+                let rings = read_u32(b, *pos) as usize;
+                *pos += 4;
+                for _ in 0..rings {
+                    need(*pos, 4)?;
+                    let n = read_u32(b, *pos) as usize;
+                    *pos += 4;
+                    let total = n
+                        .checked_mul(coord_size)
+                        .ok_or_else(|| fail("count overflow"))?;
+                    need(*pos, total)?;
+                    *pos += total;
+                }
+            }
+            4..=7 => {
+                need(*pos, 4)?;
+                let n = read_u32(b, *pos) as usize;
+                *pos += 4;
+                for _ in 0..n {
+                    walk(b, pos, depth + 1)?;
+                }
+            }
+            _ => return Err(fail("unknown WKB geometry type")),
+        }
+        Ok(())
+    }
+    let mut pos = 0;
+    walk(bytes, &mut pos, 0)
 }
 
 fn parse_nan_point(bytes: &[u8], ty: u32) -> Option<Geometry<f64>> {
@@ -408,6 +511,23 @@ mod tests {
             assert!(decode_wkt(wkt, 0).is_err(), "{wkt}");
         }
         assert!(decode_wkt("POINT(1 2)", 0).is_ok());
+    }
+
+    #[test]
+    fn hostile_wkb_counts_error_instead_of_allocating() {
+        // MultiPoint claiming ~2^31 members in a 9-byte buffer: must be an
+        // Err, never an allocation attempt (this aborted CI once).
+        let mut wkb = vec![0x01, 0x04, 0x00, 0x00, 0x00];
+        wkb.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        assert!(decode_wkb(&wkb, None).is_err());
+        // LineString with a huge vertex count.
+        let mut wkb = vec![0x01, 0x02, 0x00, 0x00, 0x00];
+        wkb.extend_from_slice(&0xFFFF_FFF0u32.to_le_bytes());
+        assert!(decode_wkb(&wkb, None).is_err());
+        // Polygon with a huge ring count.
+        let mut wkb = vec![0x01, 0x03, 0x00, 0x00, 0x00];
+        wkb.extend_from_slice(&0x00FF_FFFFu32.to_le_bytes());
+        assert!(decode_wkb(&wkb, None).is_err());
     }
 
     #[test]
