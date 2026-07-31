@@ -51,6 +51,40 @@ pub const H3_OFF: &[Stub] = &[
     },
 ];
 
+pub const OVERLAY_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_Intersection",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_Difference",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_SymDifference",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_Union",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_Buffer",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+];
+
+pub const MVT_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_AsMVTGeom",
+        hint: "kenro was built without the `mvt` cargo feature.",
+    },
+    Stub {
+        name: "ST_AsMVT",
+        hint: "kenro was built without the `mvt` cargo feature.",
+    },
+];
+
 pub const GEOJSON_OFF: &[Stub] = &[
     Stub {
         name: "ST_AsGeoJSON",

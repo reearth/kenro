@@ -31,11 +31,18 @@ keywords = ["sqlite", "geo", "gis", "spatialite", "geopackage"]
 categories = ["database", "science::geo"]
 
 [features]
-default = ["transform", "h3", "geojson"]
+default = ["transform", "h3", "geojson", "overlay", "mvt"]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
 h3 = ["dep:h3o"]
 geojson = ["dep:geojson"]
+# Overlay engine: ST_Intersection/Difference/SymDifference/Union/Buffer and
+# the ST_Union aggregate (pulls i_overlay's mesh — the largest single
+# contributor to wasm size).
+overlay = []
+# Vector tiles: ST_AsMVTGeom + the ST_AsMVT aggregate (clipping needs the
+# overlay engine).
+mvt = ["overlay"]
 # Escape hatch: the full crs-definitions EPSG database (megabytes of tables,
 # u16 codes only) as a fallback for codes missing from kenro's curated table.
 crs-full = ["transform", "proj4rs/crs-definitions"]
@@ -87,7 +94,7 @@ required-features = ["rusqlite"]
 
 [[test]]
 name = "register_smoke"
-required-features = ["rusqlite"]
+required-features = ["rusqlite", "overlay", "mvt", "transform", "h3", "geojson"]
 
 [[test]]
 name = "golden_transform"
@@ -111,12 +118,16 @@ required-features = ["rusqlite"]
 
 [[test]]
 name = "golden_bool_ops"
-required-features = ["rusqlite"]
+required-features = ["rusqlite", "overlay"]
 
 [[test]]
 name = "golden_buffer"
-required-features = ["rusqlite"]
+required-features = ["rusqlite", "overlay"]
 
 [[test]]
 name = "golden_mvt"
-required-features = ["rusqlite"]
+required-features = ["rusqlite", "mvt"]
+
+[[test]]
+name = "proptests"
+required-features = ["overlay", "mvt"]

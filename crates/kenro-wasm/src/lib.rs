@@ -261,31 +261,37 @@ pub fn h3_string_to_cell(s: &str) -> R<i64> {
 
 // ---- Overlay ----
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stIntersection)]
 pub fn st_intersection(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_intersection(a, b).map_err(err)
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stDifference)]
 pub fn st_difference(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_difference(a, b).map_err(err)
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stSymDifference)]
 pub fn st_sym_difference(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_sym_difference(a, b).map_err(err)
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stUnion)]
 pub fn st_union(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_union(a, b).map_err(err)
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stBuffer)]
 pub fn st_buffer(geom: &[u8], distance: f64) -> R<Vec<u8>> {
     kenro::functions::overlay::st_buffer(geom, distance, None).map_err(err)
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stBufferOpts)]
 pub fn st_buffer_opts(geom: &[u8], distance: f64, options: &str) -> R<Vec<u8>> {
     kenro::functions::overlay::st_buffer(geom, distance, Some(options)).map_err(err)
@@ -474,16 +480,19 @@ pub fn st_simplify(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
 
 // ---- MVT ----
 
+#[cfg(feature = "mvt")]
 #[wasm_bindgen(js_name = stAsMvtGeom)]
 pub fn st_as_mvt_geom(geom: &[u8], bounds: &[u8]) -> R<Option<Vec<u8>>> {
     kenro::functions::mvt::st_as_mvt_geom(geom, bounds, None, None, None).map_err(err)
 }
 
+#[cfg(feature = "mvt")]
 #[wasm_bindgen(js_name = stAsMvtGeomExtent)]
 pub fn st_as_mvt_geom_extent(geom: &[u8], bounds: &[u8], extent: i32) -> R<Option<Vec<u8>>> {
     kenro::functions::mvt::st_as_mvt_geom(geom, bounds, Some(extent), None, None).map_err(err)
 }
 
+#[cfg(feature = "mvt")]
 #[wasm_bindgen(js_name = stAsMvtGeomBuffer)]
 pub fn st_as_mvt_geom_buffer(
     geom: &[u8],
@@ -495,6 +504,7 @@ pub fn st_as_mvt_geom_buffer(
         .map_err(err)
 }
 
+#[cfg(feature = "mvt")]
 #[wasm_bindgen(js_name = stAsMvtGeomClip)]
 pub fn st_as_mvt_geom_clip(
     geom: &[u8],
@@ -510,11 +520,13 @@ pub fn st_as_mvt_geom_clip(
 // ---- Aggregates (accumulator classes; JS adapters drive step/finish) ----
 
 /// Accumulator for the `ST_Union(geom)` aggregate.
+#[cfg(feature = "overlay")]
 #[wasm_bindgen]
 pub struct UnionAgg {
     inner: Option<kenro::functions::overlay::UnionAggregate>,
 }
 
+#[cfg(feature = "overlay")]
 #[wasm_bindgen]
 impl UnionAgg {
     #[wasm_bindgen(constructor)]
@@ -546,11 +558,13 @@ impl UnionAgg {
 /// Accumulator for the `ST_AsMVT(geom [, name [, extent [, props_json]]])`
 /// aggregate. Trailing arguments the SQL call omits arrive as `undefined`
 /// (→ `None`), so one class serves all four arities.
+#[cfg(feature = "mvt")]
 #[wasm_bindgen]
 pub struct MvtAgg {
     inner: Option<kenro::functions::mvt::MvtAggregate>,
 }
 
+#[cfg(feature = "mvt")]
 #[wasm_bindgen]
 impl MvtAgg {
     #[wasm_bindgen(constructor)]

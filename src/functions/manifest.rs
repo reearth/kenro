@@ -227,47 +227,59 @@ pub const FUNCTIONS: &[FnEntry] = &[
         "stIntersection",
         [Blob, Blob],
         Blob,
-        None
+        Some("overlay")
     ),
-    entry!("ST_Difference", "stDifference", [Blob, Blob], Blob, None),
+    entry!(
+        "ST_Difference",
+        "stDifference",
+        [Blob, Blob],
+        Blob,
+        Some("overlay")
+    ),
     entry!(
         "ST_SymDifference",
         "stSymDifference",
         [Blob, Blob],
         Blob,
-        None
+        Some("overlay")
     ),
-    entry!("ST_Union", "stUnion", [Blob, Blob], Blob, None),
-    entry!("ST_Buffer", "stBuffer", [Blob, Real], Blob, None),
+    entry!("ST_Union", "stUnion", [Blob, Blob], Blob, Some("overlay")),
+    entry!("ST_Buffer", "stBuffer", [Blob, Real], Blob, Some("overlay")),
     entry!(
         "ST_Buffer",
         "stBufferOpts",
         [Blob, Real, TextOrInt],
         Blob,
-        None
+        Some("overlay")
     ),
     // MVT.
-    entry!("ST_AsMVTGeom", "stAsMvtGeom", [Blob, Blob], OptBlob, None),
+    entry!(
+        "ST_AsMVTGeom",
+        "stAsMvtGeom",
+        [Blob, Blob],
+        OptBlob,
+        Some("mvt")
+    ),
     entry!(
         "ST_AsMVTGeom",
         "stAsMvtGeomExtent",
         [Blob, Blob, Int],
         OptBlob,
-        None
+        Some("mvt")
     ),
     entry!(
         "ST_AsMVTGeom",
         "stAsMvtGeomBuffer",
         [Blob, Blob, Int, Int],
         OptBlob,
-        None
+        Some("mvt")
     ),
     entry!(
         "ST_AsMVTGeom",
         "stAsMvtGeomClip",
         [Blob, Blob, Int, Int, Int],
         OptBlob,
-        None
+        Some("mvt")
     ),
     // Processing.
     entry!("ST_ConvexHull", "stConvexHull", [Blob], Blob, None),
@@ -355,7 +367,7 @@ pub const AGGREGATES: &[AggEntry] = &[
         sql_name: "ST_Union",
         ctor_export: "UnionAgg",
         args: &[Kind::Blob],
-        feature: None,
+        feature: Some("overlay"),
     },
     // ST_AsMVT's signature deliberately diverges from PostGIS (SQLite has no
     // record type): (geom [, name [, extent [, props_json]]]).
@@ -363,25 +375,25 @@ pub const AGGREGATES: &[AggEntry] = &[
         sql_name: "ST_AsMVT",
         ctor_export: "MvtAgg",
         args: &[Kind::Blob],
-        feature: None,
+        feature: Some("mvt"),
     },
     AggEntry {
         sql_name: "ST_AsMVT",
         ctor_export: "MvtAgg",
         args: &[Kind::Blob, Kind::Text],
-        feature: None,
+        feature: Some("mvt"),
     },
     AggEntry {
         sql_name: "ST_AsMVT",
         ctor_export: "MvtAgg",
         args: &[Kind::Blob, Kind::Text, Kind::Int],
-        feature: None,
+        feature: Some("mvt"),
     },
     AggEntry {
         sql_name: "ST_AsMVT",
         ctor_export: "MvtAgg",
         args: &[Kind::Blob, Kind::Text, Kind::Int, Kind::Text],
-        feature: None,
+        feature: Some("mvt"),
     },
 ];
 
@@ -392,6 +404,8 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("transform") => cfg!(feature = "transform"),
         Some("h3") => cfg!(feature = "h3"),
         Some("geojson") => cfg!(feature = "geojson"),
+        Some("overlay") => cfg!(feature = "overlay"),
+        Some("mvt") => cfg!(feature = "mvt"),
         Some(_) => false,
     })
 }
@@ -402,6 +416,13 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
 pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_MakeValid", &[1]),
     // Feature-off fallbacks.
+    ("ST_Intersection", &[2]),
+    ("ST_Difference", &[2]),
+    ("ST_SymDifference", &[2]),
+    ("ST_Union", &[1, 2]),
+    ("ST_Buffer", &[2, 3]),
+    ("ST_AsMVTGeom", &[2, 3, 4, 5]),
+    ("ST_AsMVT", &[1, 2, 3, 4]),
     ("ST_Transform", &[2]),
     ("ST_AsGeoJSON", &[1, 2]),
     ("ST_GeomFromGeoJSON", &[1]),
@@ -428,6 +449,8 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("transform") => cfg!(feature = "transform"),
         Some("h3") => cfg!(feature = "h3"),
         Some("geojson") => cfg!(feature = "geojson"),
+        Some("overlay") => cfg!(feature = "overlay"),
+        Some("mvt") => cfg!(feature = "mvt"),
         Some(_) => false,
     })
 }
@@ -444,6 +467,12 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "geojson") {
         stubs.extend(super::stubs::GEOJSON_OFF.iter());
+    }
+    if !cfg!(feature = "overlay") {
+        stubs.extend(super::stubs::OVERLAY_OFF.iter());
+    }
+    if !cfg!(feature = "mvt") {
+        stubs.extend(super::stubs::MVT_OFF.iter());
     }
     stubs
 }

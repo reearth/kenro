@@ -210,6 +210,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     // Overlay.
+    #[cfg(feature = "overlay")]
     {
         use crate::functions::overlay;
         register_geom2_to_blob(conn, "ST_Intersection", overlay::st_intersection)?;
@@ -267,6 +268,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     // MVT.
+    #[cfg(feature = "mvt")]
     {
         use crate::functions::mvt as fmvt;
         // ST_AsMVTGeom /2../5: trailing Int args are optional.
@@ -473,6 +475,10 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     for stub in stubs::STUBS {
         register_stub(conn, stub)?;
     }
+    #[cfg(not(feature = "overlay"))]
+    register_stubs(conn, stubs::OVERLAY_OFF)?;
+    #[cfg(not(feature = "mvt"))]
+    register_stubs(conn, stubs::MVT_OFF)?;
 
     Ok(())
 }
