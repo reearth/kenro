@@ -50,6 +50,18 @@ jobs:
         uses: taiki-e/setup-cross-toolchain-action@v1
         with:
           target: ${{ matrix.target }}
+      - name: Stub libsqlite3 for the cross linker (linux aarch64)
+        # libsqlite3-sys emits `-lsqlite3` even in loadable_extension mode,
+        # but no symbols are actually used (everything routes through
+        # sqlite3_api_routines) and `--as-needed` drops the DT_NEEDED entry.
+        # The cross sysroot has no aarch64 libsqlite3, so satisfy the flag
+        # with an empty stub; the assert step below proves the artifact has
+        # no runtime dependency on it.
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          mkdir -p /tmp/stublib
+          echo 'void kenro_stub(void) {}' | aarch64-linux-gnu-gcc -shared -o /tmp/stublib/libsqlite3.so -x c -
+          echo "RUSTFLAGS=${RUSTFLAGS:+$RUSTFLAGS }-L /tmp/stublib" >> "$GITHUB_ENV"
 
       - name: Build (single target)
         if: matrix.name != 'macos-universal'
@@ -70,6 +82,12 @@ jobs:
             target/x86_64-apple-darwin/release/${{ matrix.lib }} \
             target/aarch64-apple-darwin/release/${{ matrix.lib }}
           lipo -info dist/${{ matrix.lib }}
+
+      - name: Assert no libsqlite3 runtime dependency (linux)
+        if: contains(matrix.name, 'linux')
+        run: |
+          readelf -d dist/${{ matrix.lib }}
+          ! readelf -d dist/${{ matrix.lib }} | grep -q 'NEEDED.*sqlite3'
 
       - name: Smoke-load through Python (native builds)
         if: matrix.name == 'x86_64-unknown-linux-gnu'
