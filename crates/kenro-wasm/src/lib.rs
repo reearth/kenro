@@ -259,6 +259,28 @@ pub fn h3_string_to_cell(s: &str) -> R<i64> {
     kenro::functions::h3::h3_string_to_cell(s).map_err(err)
 }
 
+// ---- Overlay ----
+
+#[wasm_bindgen(js_name = stIntersection)]
+pub fn st_intersection(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_intersection(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stDifference)]
+pub fn st_difference(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_difference(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSymDifference)]
+pub fn st_sym_difference(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_sym_difference(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stUnion)]
+pub fn st_union(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_union(a, b).map_err(err)
+}
+
 // ---- Processing + affine ----
 
 #[wasm_bindgen(js_name = stConvexHull)]
@@ -530,6 +552,10 @@ mod tests {
             "h3CellToParent",
             "h3CellToString",
             "h3StringToCell",
+            "stIntersection",
+            "stDifference",
+            "stSymDifference",
+            "stUnion",
             "stConvexHull",
             "stPointOnSurface",
             "stSimplifyVw",

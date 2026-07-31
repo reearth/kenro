@@ -208,6 +208,39 @@ test("processing vectors", () => {
   }
 });
 
+test("bool_ops vectors", () => {
+  for (const v of loadVectors("bool_ops")) {
+    // Areal similarity needs polygon xor — validated in the Rust harness
+    // over the identical core; the wasm pass covers the exact/geometric
+    // modes and errors.
+    if (v.mode === "areal") continue;
+    const run = () => {
+      const a = geom(v.a);
+      const b = geom(v.b);
+      switch (v.fn) {
+        case "intersection":
+          return wasm.stAsText(wasm.stIntersection(a, b));
+        case "difference":
+          return wasm.stAsText(wasm.stDifference(a, b));
+        case "symdifference":
+          return wasm.stAsText(wasm.stSymDifference(a, b));
+        case "union":
+          return wasm.stAsText(wasm.stUnion(a, b));
+        default:
+          throw new Error(`unknown fn ${v.fn}`);
+      }
+    };
+    if (runExpectingError(v, run)) continue;
+    const got = run();
+    const want = effective(v);
+    if (v.mode === "geometric") {
+      assert.ok(geomApproxEqual(got, want), `${v.id}: ${got} vs ${want}`);
+    } else {
+      assert.equal(got, want, v.id);
+    }
+  }
+});
+
 test("accessors vectors", () => {
   const geometric = new Set(["centroid", "envelope", "simplify"]);
   const optText = (blob) => (blob === undefined ? undefined : wasm.stAsText(blob));

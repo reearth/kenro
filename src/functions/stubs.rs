@@ -15,9 +15,6 @@ pub struct Stub {
     pub hint: &'static str,
 }
 
-const GEOS_HINT: &str =
-    "kenro deliberately excludes GEOS-class operations; use SpatiaLite or DuckDB spatial for this.";
-
 pub const STUBS: &[Stub] = &[
     // Planned ("not yet").
     Stub {
@@ -37,26 +34,9 @@ pub const STUBS: &[Stub] = &[
         hint: "MVT tile generation is not implemented in kenro yet; generate tiles with \
                PostGIS or tippecanoe for now.",
     },
-    // Deliberately out of scope ("never").
     Stub {
         name: "ST_Buffer",
-        hint: GEOS_HINT,
-    },
-    Stub {
-        name: "ST_Union",
-        hint: GEOS_HINT,
-    },
-    Stub {
-        name: "ST_Intersection",
-        hint: GEOS_HINT,
-    },
-    Stub {
-        name: "ST_Difference",
-        hint: GEOS_HINT,
-    },
-    Stub {
-        name: "ST_SymDifference",
-        hint: GEOS_HINT,
+        hint: "Planned for the next release (geo's pure-Rust Buffer).",
     },
 ];
 

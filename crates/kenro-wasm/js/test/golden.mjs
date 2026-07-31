@@ -293,6 +293,22 @@ export const SMOKE_SQL = {
     sql: "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.767 35.681)', 4326), 9)))",
     check: (v) => typeof v === "bigint" || Number(v) > 0,
   },
+  "ST_Intersection/2": {
+    sql: "SELECT ST_Area(ST_Intersection(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
+    check: (v) => Math.abs(Number(v) - 25) < 1e-9,
+  },
+  "ST_Difference/2": {
+    sql: "SELECT ST_Area(ST_Difference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
+    check: (v) => Math.abs(Number(v) - 75) < 1e-9,
+  },
+  "ST_SymDifference/2": {
+    sql: "SELECT ST_Area(ST_SymDifference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
+    check: (v) => Math.abs(Number(v) - 150) < 1e-9,
+  },
+  "ST_Union/2": {
+    sql: "SELECT ST_Area(ST_Union(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
+    check: (v) => Math.abs(Number(v) - 175) < 1e-9,
+  },
   "ST_ConvexHull/1": {
     sql: "SELECT ST_AsText(ST_ConvexHull(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4,2 2)')))",
     check: (v) => typeof v === "string" && v.startsWith("POLYGON"),

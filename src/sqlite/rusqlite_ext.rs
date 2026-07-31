@@ -209,6 +209,15 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         })?;
     }
 
+    // Overlay.
+    {
+        use crate::functions::overlay;
+        register_geom2_to_blob(conn, "ST_Intersection", overlay::st_intersection)?;
+        register_geom2_to_blob(conn, "ST_Difference", overlay::st_difference)?;
+        register_geom2_to_blob(conn, "ST_SymDifference", overlay::st_sym_difference)?;
+        register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
+    }
+
     // Processing + affine.
     {
         use crate::functions::{affine, processing};
@@ -647,6 +656,19 @@ fn register_geom_to_blob(
             return Ok(None);
         };
         blob(f(b))
+    })
+}
+
+fn register_geom2_to_blob(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8], &[u8]) -> crate::error::Result<Vec<u8>>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+        let (Some(a), Some(b)) = (blob_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?) else {
+            return Ok(None);
+        };
+        blob(f(a, b))
     })
 }
 

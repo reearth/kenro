@@ -107,3 +107,7 @@ required-features = ["rusqlite"]
 [[test]]
 name = "golden_processing"
 required-features = ["rusqlite"]
+
+[[test]]
+name = "golden_bool_ops"
+required-features = ["rusqlite"]

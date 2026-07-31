@@ -218,6 +218,23 @@ pub const FUNCTIONS: &[FnEntry] = &[
         None
     ),
     entry!("ST_Azimuth", "stAzimuth", [Blob, Blob], OptReal, None),
+    // Overlay.
+    entry!(
+        "ST_Intersection",
+        "stIntersection",
+        [Blob, Blob],
+        Blob,
+        None
+    ),
+    entry!("ST_Difference", "stDifference", [Blob, Blob], Blob, None),
+    entry!(
+        "ST_SymDifference",
+        "stSymDifference",
+        [Blob, Blob],
+        Blob,
+        None
+    ),
+    entry!("ST_Union", "stUnion", [Blob, Blob], Blob, None),
     // Processing.
     entry!("ST_ConvexHull", "stConvexHull", [Blob], Blob, None),
     entry!("ST_PointOnSurface", "stPointOnSurface", [Blob], Blob, None),
@@ -293,10 +310,6 @@ pub const FUNCTIONS: &[FnEntry] = &[
 /// in `DEFAULT_STUB_ARITIES`.
 pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Buffer", &[2, 3]),
-    ("ST_Union", &[1, 2]),
-    ("ST_Intersection", &[2]),
-    ("ST_Difference", &[2]),
-    ("ST_SymDifference", &[2]),
     ("ST_MakeValid", &[1]),
     ("ST_AsMVT", &[1, 2, 3, 4]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
