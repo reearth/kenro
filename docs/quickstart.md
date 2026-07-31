@@ -266,7 +266,7 @@ Two patterns that do work:
   store GeoPackage blobs in D1 columns, `SELECT` them out, then call
   `stAsText` / `stIntersects` / `stTransform` … on the values in JS. The
   wasm module is well inside Worker size limits (standard tier
-  589 KB / 240 KB gzip, minimal 412 KB / 167 KB).
+  617 KB / 251 KB gzip, minimal 412 KB / 167 KB).
 - **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite]
   over bytes fetched from R2/KV (read-only analytics on a shipped
   `.gpkg`/`.sqlite`), and `registerKenro` as usual — the same adapters

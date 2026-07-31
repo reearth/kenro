@@ -12,7 +12,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **GeoPackage support** — the exact function set the spec's R-tree (F.3) and geometry-type (F.4) maintenance triggers require
 - **CRS transform** — pure-Rust [proj4rs]: WGS84, Web Mercator and every UTM zone built in, the full EPSG registry behind a feature flag, with [measured accuracy](docs/accuracy.md)
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
-- **Vector tiles** (`full` feature) — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
+- **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
@@ -174,15 +174,18 @@ PROJ for survey-grade work.
 
 ## Cargo features
 
-The **default (lite)** set — `transform` (proj4rs), `h3` (h3o), `geojson` —
-covers most use cases: I/O, the whole predicate family, GeoPackage
-triggers, measures/processing/affine, CRS transform, H3, GeoJSON.
+The **default (standard)** set — `transform` (proj4rs), `h3` (h3o),
+`geojson`, `mvt` — covers most use cases: I/O, the whole predicate family,
+GeoPackage triggers, measures/processing/affine, CRS transform, H3,
+GeoJSON, and MVT vector tiles (tile clipping uses dedicated rectangle
+algorithms, so MVT costs almost nothing).
 
-**`full`** adds the two features excluded from the default for size:
+**`full`** adds the one feature excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
-`ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest single contributor to
-binary size) and `mvt` (`ST_AsMVTGeom` + `ST_AsMVT`). In wasm terms:
-lite 589 KB (240 KB gzip) vs full 946 KB (353 KB gzip).
+`ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest
+single contributor to binary size). In wasm terms: standard 617 KB
+(251 KB gzip) vs full 946 KB (353 KB gzip); `--no-default-features`
+gives a 412 KB (167 KB gzip) minimal build.
 
 Building with any feature off keeps the corresponding SQL functions
 registered as stubs that explain which feature is missing. `rusqlite` (off

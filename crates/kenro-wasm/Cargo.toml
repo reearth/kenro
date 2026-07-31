@@ -13,8 +13,8 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 # Lite by default (browser size); `full` adds overlay/buffer/MVT.
-default = ["transform", "h3", "geojson"]
-full = ["transform", "h3", "geojson", "overlay", "mvt"]
+default = ["transform", "h3", "geojson", "mvt"]
+full = ["transform", "h3", "geojson", "mvt", "overlay"]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]

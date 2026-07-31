@@ -8,17 +8,183 @@
 //! `props_json` is a JSON object (build it with `json_object(...)`). A
 //! PostGIS-style call fails loudly at the type level — never silently.
 
-use geo::BooleanOps;
-use geo_types::{Coord, Geometry, LineString, MultiPolygon, Point, Polygon, Rect};
+use geo_types::{Coord, Geometry, LineString, MultiLineString, MultiPolygon, Point, Polygon, Rect};
 
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 use crate::mvt;
 
-use super::overlay::{
+use super::classify::{
     Class, classify, ensure_finite, normalize_lines, normalize_points, normalize_polygons,
     points_of, to_multi_line, to_multi_polygon,
 };
+
+// ---- axis-aligned rectangle clipping ----
+//
+// The clip window is always an axis-aligned rectangle, so the general
+// overlay engine (i_overlay, the `overlay` feature) is deliberately NOT
+// used here: Liang–Barsky handles segments and Sutherland–Hodgman handles
+// rings, both exact for rectangular windows. One behavioral difference vs
+// a boolean intersection: a concave polygon crossing the window several
+// times stays a single ring connected by zero-width edges along the
+// window boundary instead of splitting into parts — identical when
+// rendered, and the golden vectors bound the coordinate difference vs
+// PostGIS at ±1 tile pixel.
+
+/// Liang–Barsky: the sub-segment of `a→b` inside `rect`, if any.
+fn clip_segment(
+    a: Coord<f64>,
+    b: Coord<f64>,
+    rect: &Rect<f64>,
+) -> Option<(Coord<f64>, Coord<f64>)> {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let mut t0 = 0.0f64;
+    let mut t1 = 1.0f64;
+    for (p, q) in [
+        (-dx, a.x - rect.min().x),
+        (dx, rect.max().x - a.x),
+        (-dy, a.y - rect.min().y),
+        (dy, rect.max().y - a.y),
+    ] {
+        if p == 0.0 {
+            if q < 0.0 {
+                return None; // parallel and outside
+            }
+        } else {
+            let t = q / p;
+            if p < 0.0 {
+                t0 = t0.max(t);
+            } else {
+                t1 = t1.min(t);
+            }
+            if t0 > t1 {
+                return None;
+            }
+        }
+    }
+    let at = |t: f64| Coord {
+        x: a.x + t * dx,
+        y: a.y + t * dy,
+    };
+    Some((at(t0), at(t1)))
+}
+
+/// Clip every member polyline, splitting where it leaves the window and
+/// merging consecutive in-window segments back into polylines.
+fn clip_lines(lines: &MultiLineString<f64>, rect: &Rect<f64>) -> MultiLineString<f64> {
+    let mut out: Vec<LineString<f64>> = Vec::new();
+    for line in &lines.0 {
+        let mut current: Vec<Coord<f64>> = Vec::new();
+        for w in line.0.windows(2) {
+            match clip_segment(w[0], w[1], rect) {
+                Some((p, q)) if p != q => {
+                    if current.last() != Some(&p) {
+                        if current.len() >= 2 {
+                            out.push(LineString::new(std::mem::take(&mut current)));
+                        } else {
+                            current.clear();
+                        }
+                        current.push(p);
+                    }
+                    current.push(q);
+                }
+                _ => {
+                    if current.len() >= 2 {
+                        out.push(LineString::new(std::mem::take(&mut current)));
+                    } else {
+                        current.clear();
+                    }
+                }
+            }
+        }
+        if current.len() >= 2 {
+            out.push(LineString::new(current));
+        }
+    }
+    MultiLineString(out)
+}
+
+/// Sutherland–Hodgman: clip a closed ring against one half-plane.
+fn clip_ring_edge(
+    ring: &[Coord<f64>],
+    inside: impl Fn(&Coord<f64>) -> bool,
+    intersect: impl Fn(&Coord<f64>, &Coord<f64>) -> Coord<f64>,
+) -> Vec<Coord<f64>> {
+    let mut out = Vec::with_capacity(ring.len() + 4);
+    for i in 0..ring.len() {
+        let (cur, next) = (&ring[i], &ring[(i + 1) % ring.len()]);
+        match (inside(cur), inside(next)) {
+            (true, true) => out.push(*next),
+            (true, false) => out.push(intersect(cur, next)),
+            (false, true) => {
+                out.push(intersect(cur, next));
+                out.push(*next);
+            }
+            (false, false) => {}
+        }
+    }
+    out
+}
+
+/// Sutherland–Hodgman a ring (closed or open input) against `rect`;
+/// returns a closed ring, or `None` when nothing remains.
+fn clip_ring(ring: &LineString<f64>, rect: &Rect<f64>) -> Option<LineString<f64>> {
+    let mut pts: Vec<Coord<f64>> = ring.0.clone();
+    if pts.len() > 1 && pts.first() == pts.last() {
+        pts.pop();
+    }
+    let (min, max) = (rect.min(), rect.max());
+    let lerp_x = |x0: f64| {
+        move |a: &Coord<f64>, b: &Coord<f64>| {
+            let t = (x0 - a.x) / (b.x - a.x);
+            Coord {
+                x: x0,
+                y: a.y + t * (b.y - a.y),
+            }
+        }
+    };
+    let lerp_y = |y0: f64| {
+        move |a: &Coord<f64>, b: &Coord<f64>| {
+            let t = (y0 - a.y) / (b.y - a.y);
+            Coord {
+                x: a.x + t * (b.x - a.x),
+                y: y0,
+            }
+        }
+    };
+    pts = clip_ring_edge(&pts, |c| c.x >= min.x, lerp_x(min.x));
+    if pts.is_empty() {
+        return None;
+    }
+    pts = clip_ring_edge(&pts, |c| c.x <= max.x, lerp_x(max.x));
+    if pts.is_empty() {
+        return None;
+    }
+    pts = clip_ring_edge(&pts, |c| c.y >= min.y, lerp_y(min.y));
+    if pts.is_empty() {
+        return None;
+    }
+    pts = clip_ring_edge(&pts, |c| c.y <= max.y, lerp_y(max.y));
+    pts.dedup();
+    if pts.len() < 3 {
+        return None;
+    }
+    let first = pts[0];
+    pts.push(first);
+    Some(LineString::new(pts))
+}
+
+/// Clip a polygon against `rect`: exterior and holes ring-by-ring (holes of
+/// a valid polygon stay inside the clipped exterior by construction).
+fn clip_polygon(p: &Polygon<f64>, rect: &Rect<f64>) -> Option<Polygon<f64>> {
+    let exterior = clip_ring(p.exterior(), rect)?;
+    let interiors = p
+        .interiors()
+        .iter()
+        .filter_map(|r| clip_ring(r, rect))
+        .collect();
+    Some(Polygon::new(exterior, interiors))
+}
 
 // ---- degenerate cleanup on tile-space (integer) coordinates ----
 
@@ -184,17 +350,20 @@ pub fn st_as_mvt_geom(
                 normalize_points(inside)
             }
             Class::Lineal => {
-                let clip_poly = MultiPolygon(vec![rect.to_polygon()]);
-                let clipped = clip_poly.clip(&to_multi_line(&geometry), false);
-                let result = normalize_lines(clipped);
+                let result = normalize_lines(clip_lines(&to_multi_line(&geometry), &rect));
                 if geom::is_empty(&result) {
                     return Ok(None);
                 }
                 result
             }
             Class::Areal => {
-                let clip_poly = MultiPolygon(vec![rect.to_polygon()]);
-                let clipped = clip_poly.intersection(&to_multi_polygon(&geometry));
+                let clipped = MultiPolygon(
+                    to_multi_polygon(&geometry)
+                        .0
+                        .iter()
+                        .filter_map(|p| clip_polygon(p, &rect))
+                        .collect(),
+                );
                 let result = normalize_polygons(clipped);
                 if geom::is_empty(&result) {
                     return Ok(None);

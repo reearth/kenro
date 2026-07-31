@@ -5,6 +5,7 @@
 
 pub mod accessors;
 pub mod affine;
+pub(crate) mod classify;
 #[cfg(feature = "geojson")]
 pub mod geojson;
 #[cfg(feature = "h3")]

@@ -34,8 +34,8 @@ categories = ["database", "science::geo"]
 # The default set covers most use cases (I/O, predicates, GeoPackage
 # triggers, measures/processing, transform, H3, GeoJSON) while keeping the
 # build small; `full` adds the overlay engine and MVT on top.
-default = ["transform", "h3", "geojson"]
-full = ["transform", "h3", "geojson", "overlay", "mvt"]
+default = ["transform", "h3", "geojson", "mvt"]
+full = ["transform", "h3", "geojson", "mvt", "overlay"]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
 h3 = ["dep:h3o"]
@@ -44,9 +44,10 @@ geojson = ["dep:geojson"]
 # the ST_Union aggregate (pulls i_overlay's mesh — the largest single
 # contributor to wasm size).
 overlay = []
-# Vector tiles: ST_AsMVTGeom + the ST_AsMVT aggregate (clipping needs the
-# overlay engine).
-mvt = ["overlay"]
+# Vector tiles: ST_AsMVTGeom + the ST_AsMVT aggregate. Clipping is done by
+# dedicated axis-aligned-rectangle algorithms, so this does NOT pull the
+# overlay engine and is cheap enough to sit in the default set.
+mvt = []
 # Escape hatch: the full crs-definitions EPSG database (megabytes of tables,
 # u16 codes only) as a fallback for codes missing from kenro's curated table.
 crs-full = ["transform", "proj4rs/crs-definitions"]

@@ -5,9 +5,10 @@ DuckDB Spatial for comparison (columns verified against PostGIS 3.5 and a
 live DuckDB 1.4.0 + spatial session, July 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
-Functions marked with the `overlay` / `mvt` cargo features are present in
-`full` builds; in default (lite) builds they register as stubs that name
-the missing feature (see [Cargo features](../README.md#cargo-features)).
+Functions marked with the `overlay` feature need a `full` build (default
+builds register them as stubs naming the feature); everything else,
+including MVT, is in the default set (see
+[Cargo features](../README.md#cargo-features)).
 
 "Geometry" values in and out of kenro functions are GeoPackage blobs — they
 carry the SRID, and a value in a gpkg column is already valid storage. Every
