@@ -181,3 +181,71 @@ jobs:
         with:
           files: assets/*
           generate_release_notes: true
+
+  # Registry publishing runs only on tags, through approval-gated
+  # environments, with OIDC trusted publishing — no long-lived tokens in
+  # this repository. One-time registry-side setup (web UI):
+  #   crates.io → kenro → Settings → Trusted Publishing → GitHub:
+  #     repository reearth/kenro, workflow release.yml, environment crates-io
+  #   npmjs.com → kenro-wasm → Settings → Trusted Publisher → GitHub Actions:
+  #     organization/user reearth, repository kenro, workflow release.yml,
+  #     environment npm
+  publish-crate:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Tag must match the crate version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(cargo metadata --no-deps --format-version 1 | python3 -c "import json,sys; print([p['version'] for p in json.load(sys.stdin)['packages'] if p['name']=='kenro'][0])")
+          test "$tag" = "$version" || { echo "tag v$tag != Cargo.toml $version"; exit 1; }
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish -p kenro
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  publish-npm:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: npm >= 11.5.1 (trusted publishing needs it)
+        run: npm install -g npm@latest && npm --version
+      - name: Tag must match the package version
+        working-directory: crates/kenro-wasm/js
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(node -p "require('./package.json').version")
+          test "$tag" = "$version" || { echo "tag v$tag != package.json $version"; exit 1; }
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - name: Build (full tier)
+        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
+      - name: Publish (OIDC, provenance)
+        working-directory: crates/kenro-wasm/js
+        run: npm publish --access public
