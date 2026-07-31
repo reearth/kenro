@@ -1,8 +1,9 @@
 # kenro
 
-**Spatial SQL for SQLite in the browser** — PostGIS-style `ST_` functions
-registered as JS-level UDFs on any wasm SQLite host: the official
-[@sqlite.org/sqlite-wasm] build, [sql.js], and [wa-sqlite].
+**SpatiaLite-style spatial SQL for SQLite in the browser** —
+PostGIS-compatible `ST_` functions registered as JS-level UDFs on any wasm
+SQLite host: the official [@sqlite.org/sqlite-wasm] build, [sql.js], and
+[wa-sqlite].
 
 kenro is a full spatial SQL engine in pure Rust (~80 functions: the DE-9IM
 predicate family, overlay/repair/buffer, CRS transform, H3, GeoJSON, MVT

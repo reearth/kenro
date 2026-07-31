@@ -1,7 +1,8 @@
 //! # kenro (間縄)
 //!
-//! Spatial functions for SQLite in pure Rust — works with rusqlite, as a
-//! loadable extension, and in WASM.
+//! SpatiaLite-style spatial SQL for SQLite in pure Rust — PostGIS-compatible
+//! `ST_` functions that work with rusqlite, as a loadable extension, and in
+//! WASM.
 //!
 //! kenro is a full spatial SQL engine for SQLite in pure Rust, with zero C
 //! dependencies: WKB/WKT/GeoPackage-blob I/O, the DE-9IM predicate family,

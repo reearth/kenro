@@ -1,7 +1,7 @@
 {
   "name": "kenro",
   "version": "0.1.0",
-  "description": "Spatial SQL for SQLite in the browser — PostGIS-style ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build (pure-Rust core compiled to wasm)",
+  "description": "SpatiaLite-style spatial SQL for SQLite in the browser — PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
   "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",

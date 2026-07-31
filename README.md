@@ -1,12 +1,12 @@
 # kenro（間縄）
 
-**Spatial functions for SQLite in pure Rust** — works with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
+**SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
-If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, or *GeoPackage in pure Rust*: this is that crate.
+If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, or *GeoPackage in pure Rust*: this is that crate.
 
 **kenro is a full spatial SQL engine for SQLite**: the PostGIS function surface — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~80 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
-- **Geometry I/O** — WKT, WKB, GeoJSON, and GeoPackage blobs as first-class citizens
+- **Geometry I/O** — WKT, WKB, GeoJSON and GeoPackage blobs in and out, MVT vector tiles out — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
 - **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree (F.3) and geometry-type (F.4) maintenance triggers require
