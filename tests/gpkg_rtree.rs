@@ -263,7 +263,7 @@ fn geometry_type_and_srs_id_triggers() {
     // Wrong SRID aborts.
     let err = conn
         .execute(
-            "INSERT INTO parks (geom) VALUES (ST_AsGPB(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 6677)))",
+            "INSERT INTO parks (geom) VALUES (ST_AsGPB(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 32654)))",
             [],
         )
         .unwrap_err()

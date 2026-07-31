@@ -53,7 +53,7 @@ function sampleDatabase() {
   $("sql").value =
     "SELECT name,\n" +
     "       ST_AsText(ST_Centroid(geom)) AS centroid,\n" +
-    "       round(ST_Area(ST_Transform(ST_GeomFromGPB(geom), 6677))) AS area_m2,\n" +
+    "       round(ST_Area(ST_Transform(ST_GeomFromGPB(geom), 32654))) AS area_m2,\n" +
     "       h3_cell_to_string(h3_latlng_to_cell(ST_Centroid(geom), 9)) AS h3\n" +
     "FROM parks";
   setStatus("Sample database loaded — drop a .gpkg to replace it.");

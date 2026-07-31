@@ -158,8 +158,8 @@ mod tests {
         let wkb = st_as_binary(&st_geom_from_text("POINT(1 2)", Some(4326)).unwrap()).unwrap();
         let h = GpbHeader::parse(&st_geom_from_wkb(&wkb, None).unwrap()).unwrap();
         assert_eq!(h.srid, 0); // ISO WKB carries no srid
-        let h = GpbHeader::parse(&st_geom_from_wkb(&wkb, Some(6668)).unwrap()).unwrap();
-        assert_eq!(h.srid, 6668);
+        let h = GpbHeader::parse(&st_geom_from_wkb(&wkb, Some(3857)).unwrap()).unwrap();
+        assert_eq!(h.srid, 3857);
     }
 
     #[test]

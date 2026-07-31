@@ -15,16 +15,14 @@ use geo_types::{Geometry, Point};
 /// `--check` mode fails if a measured max exceeds these.
 const THRESHOLDS_M: &[(&str, f64)] = &[
     ("4326->3857", 1e-7),
-    ("4326->6677", 1e-6),
-    ("4326->6677_wide", 1e-6),
-    ("2451->4326", 1e-3),
-    ("4612->4326", 1e-3),
-    ("6668->4326", 1e-7),
-    ("4612->6668", 1e-7),
+    ("4326->32633", 1e-6),
+    ("4326->32633_wide", 1e-6),
+    ("4326->32756", 1e-6),
+    ("32633->4326", 1e-6),
 ];
 
 fn geographic(srid: i32) -> bool {
-    matches!(srid, 4326 | 4612 | 6668)
+    matches!(srid, 4326)
 }
 
 struct Stats {

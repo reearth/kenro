@@ -57,14 +57,14 @@ fn every_module_works_through_the_loaded_extension() {
     // transform.
     let srid: i64 = query(
         &conn,
-        "SELECT ST_SRID(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 6677))",
+        "SELECT ST_SRID(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 32654))",
     );
-    assert_eq!(srid, 6677);
+    assert_eq!(srid, 32654);
     let x: f64 = query(
         &conn,
-        "SELECT ST_X(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 6677))",
+        "SELECT ST_X(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 32654))",
     );
-    assert!((-10_000.0..0.0).contains(&x), "easting {x}");
+    assert!((380_000.0..400_000.0).contains(&x), "easting {x}");
 
     // h3.
     let cell: String = query(

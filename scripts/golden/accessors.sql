@@ -138,8 +138,8 @@ SELECT row_to_json(t)::text FROM (
          to_jsonb(ST_AsText(ST_Point(-3.25, 4.0))) AS expected
 ) t;
 SELECT row_to_json(t)::text FROM (
-  SELECT 'point3:point_srid' AS id, ARRAY[1.0, 2.0] AS args, 6677 AS srid, 'point_srid' AS "fn",
-         to_jsonb(ST_SRID(ST_Point(1.0, 2.0, 6677))) AS expected
+  SELECT 'point3:point_srid' AS id, ARRAY[1.0, 2.0] AS args, 3857 AS srid, 'point_srid' AS "fn",
+         to_jsonb(ST_SRID(ST_Point(1.0, 2.0, 3857))) AS expected
 ) t;
 SELECT row_to_json(t)::text FROM (
   SELECT 'envelope4:makeenvelope' AS id, ARRAY[0.0, 0.0, 2.0, 3.0] AS args, 'makeenvelope' AS "fn",

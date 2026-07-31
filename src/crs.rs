@@ -1,18 +1,18 @@
-//! Coordinate reference systems: a curated EPSG → proj4-string table and the
-//! proj4rs-backed geometry transform.
+//! Coordinate reference systems: a built-in EPSG → proj4-string table and
+//! the proj4rs-backed geometry transform.
 //!
-//! proj4rs carries no EPSG database of its own; kenro embeds the codes its
-//! audience actually uses (global basics + the Japanese national systems)
-//! instead of linking the megabytes-large full registry. The `crs-full`
-//! cargo feature adds the full `crs-definitions` table as a fallback for
-//! anything else (u16 codes only).
+//! proj4rs carries no EPSG database of its own. kenro stays neutral about
+//! regions: the built-in table contains only globally-defined,
+//! algorithmically-derivable systems — WGS84 geographic, Web Mercator, and
+//! every WGS84 UTM zone (north and south). National and regional systems
+//! are all served the same way: the `crs-full` cargo feature adds the full
+//! `crs-definitions` registry as a fallback (u16 codes only).
 //!
-//! Accuracy caveat (measured and documented in docs/accuracy.md): WGS84,
-//! JGD2000 and JGD2011 are all GRS80/WGS84-class with zero or absent Helmert
-//! shifts here, so datum transforms among them are identity at this level —
-//! the real-world JGD2000↔JGD2011 displacement requires datum grids that
-//! neither proj4rs nor a gridless PROJ applies. Survey-grade work needs
-//! full PROJ.
+//! Accuracy caveat (measured and documented in docs/accuracy.md): this is
+//! gridless projection math. Datum-grid transformations (national datum
+//! modernizations, earthquake displacement models, …) are applied by
+//! neither kenro nor a gridless PROJ — survey-grade work needs full PROJ
+//! with the official grids.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -24,43 +24,7 @@ use proj4rs::Proj;
 
 use crate::error::{Error, Result};
 
-/// (lat_0, lon_0) of the Japanese plane rectangular zones I–XIX, in zone
-/// order. Shared by JGD2000 (EPSG 2443–2461) and JGD2011 (EPSG 6669–6687).
-const JGD_PLANE_ZONES: [(&str, &str); 19] = [
-    ("33", "129.5"),             // I
-    ("33", "131"),               // II
-    ("36", "132.1666666666667"), // III
-    ("33", "133.5"),             // IV
-    ("36", "134.3333333333333"), // V
-    ("36", "136"),               // VI
-    ("36", "137.1666666666667"), // VII
-    ("36", "138.5"),             // VIII
-    ("36", "139.8333333333333"), // IX
-    ("40", "140.8333333333333"), // X
-    ("44", "140.25"),            // XI
-    ("44", "142.25"),            // XII
-    ("44", "144.25"),            // XIII
-    ("26", "142"),               // XIV
-    ("26", "127.5"),             // XV
-    ("26", "124"),               // XVI
-    ("26", "131"),               // XVII
-    ("20", "136"),               // XVIII
-    ("26", "154"),               // XIX
-];
-
-fn jgd_plane(zone_index: i32, towgs84: bool) -> String {
-    let (lat_0, lon_0) = JGD_PLANE_ZONES[zone_index as usize];
-    let datum = if towgs84 {
-        " +towgs84=0,0,0,0,0,0,0"
-    } else {
-        ""
-    };
-    format!(
-        "+proj=tmerc +lat_0={lat_0} +lon_0={lon_0} +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80{datum} +units=m +no_defs"
-    )
-}
-
-/// The curated proj4 definition for an EPSG code, if kenro knows it.
+/// The built-in proj4 definition for an EPSG code, if kenro knows it.
 pub fn proj4_def(epsg: i32) -> Option<String> {
     match epsg {
         // WGS84 geographic.
@@ -70,19 +34,16 @@ pub fn proj4_def(epsg: i32) -> Option<String> {
             "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs"
                 .into(),
         ),
-        // JGD2000 geographic.
-        4612 => Some("+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs".into()),
-        // JGD2011 geographic (EPSG defines no Helmert to WGS84; pass-through).
-        6668 => Some("+proj=longlat +ellps=GRS80 +no_defs".into()),
-        // WGS84 UTM zones 51N–56N (Japan).
-        32651..=32656 => Some(format!(
+        // WGS84 UTM, northern hemisphere (zones 1N–60N).
+        32601..=32660 => Some(format!(
             "+proj=utm +zone={} +datum=WGS84 +units=m +no_defs",
             epsg - 32600
         )),
-        // JGD2000 plane rectangular I–XIX.
-        2443..=2461 => Some(jgd_plane(epsg - 2443, true)),
-        // JGD2011 plane rectangular I–XIX.
-        6669..=6687 => Some(jgd_plane(epsg - 6669, false)),
+        // WGS84 UTM, southern hemisphere (zones 1S–60S).
+        32701..=32760 => Some(format!(
+            "+proj=utm +zone={} +south +datum=WGS84 +units=m +no_defs",
+            epsg - 32700
+        )),
         _ => None,
     }
 }
@@ -95,9 +56,10 @@ fn unknown_epsg(func: &'static str, epsg: i32) -> Error {
     Error::Unsupported {
         func,
         reason: format!(
-            "EPSG:{epsg} is not in kenro's built-in CRS table (WGS84, WebMercator, \
-             UTM 51N-56N, JGD2000/JGD2011 geographic and plane rectangular I-XIX); \
-             see the README \"Supported CRS\" section"
+            "EPSG:{epsg} is not in kenro's built-in CRS table (WGS84 4326, WebMercator \
+             3857, WGS84 UTM 32601-32660 north / 32701-32760 south); enable the \
+             `crs-full` cargo feature for the full EPSG registry — see the README \
+             \"Supported CRS\" section"
         ),
     }
 }
@@ -161,6 +123,7 @@ mod tests {
     use geo_types::{Geometry, Point};
 
     const TOKYO_TOWER: (f64, f64) = (139.745433, 35.658581);
+    const SYDNEY_OPERA: (f64, f64) = (151.215, -33.8568);
 
     fn transform_point(x: f64, y: f64, from: i32, to: i32) -> (f64, f64) {
         let mut g: Geometry<f64> = Geometry::Point(Point::new(x, y));
@@ -173,13 +136,12 @@ mod tests {
 
     #[test]
     fn every_curated_code_parses() {
-        let codes: Vec<i32> = [4326, 3857, 4612, 6668]
+        let codes: Vec<i32> = [4326, 3857]
             .into_iter()
-            .chain(32651..=32656)
-            .chain(2443..=2461)
-            .chain(6669..=6687)
+            .chain(32601..=32660)
+            .chain(32701..=32760)
             .collect();
-        assert_eq!(codes.len(), 48);
+        assert_eq!(codes.len(), 122);
         for code in codes {
             let def = proj4_def(code).unwrap_or_else(|| panic!("EPSG:{code} missing"));
             Proj::from_proj_string(&def).unwrap_or_else(|e| panic!("EPSG:{code}: {e}"));
@@ -201,33 +163,27 @@ mod tests {
     }
 
     #[test]
-    fn plane_rectangular_zone_ix_plausibility_and_roundtrip() {
-        // Tokyo Tower is SW of the zone IX origin (36N 139.8333E): both
-        // easting and northing must be negative and km-scale.
-        let (x, y) = transform_point(TOKYO_TOWER.0, TOKYO_TOWER.1, 4326, 6677);
-        assert!((-9000.0..-7000.0).contains(&x), "easting {x}");
-        assert!((-39000.0..-37000.0).contains(&y), "northing {y}");
-        let (lon, lat) = transform_point(x, y, 6677, 4326);
+    fn utm_north_plausibility_and_roundtrip() {
+        // Tokyo is in UTM zone 54N; easting ~380 km (west of the 141°E
+        // central meridian), northing ~3.94 Mm.
+        let (x, y) = transform_point(TOKYO_TOWER.0, TOKYO_TOWER.1, 4326, 32654);
+        assert!((300_000.0..500_000.0).contains(&x), "easting {x}");
+        assert!((3_800_000.0..4_050_000.0).contains(&y), "northing {y}");
+        let (lon, lat) = transform_point(x, y, 32654, 4326);
         assert!((lon - TOKYO_TOWER.0).abs() < 1e-9, "{lon}");
         assert!((lat - TOKYO_TOWER.1).abs() < 1e-9, "{lat}");
     }
 
     #[test]
-    fn jgd_datum_pairs_are_identity_at_this_level() {
-        for pair in [(4326, 6668), (4612, 6668), (4326, 4612)] {
-            let (x, y) = transform_point(TOKYO_TOWER.0, TOKYO_TOWER.1, pair.0, pair.1);
-            assert!((x - TOKYO_TOWER.0).abs() < 1e-9, "{pair:?}: {x}");
-            assert!((y - TOKYO_TOWER.1).abs() < 1e-9, "{pair:?}: {y}");
-        }
-    }
-
-    #[test]
-    fn utm_54n_plausibility() {
-        // Tokyo is in UTM zone 54N; easting ~380km (west of the 141E central
-        // meridian), northing ~3.94Mm.
-        let (x, y) = transform_point(TOKYO_TOWER.0, TOKYO_TOWER.1, 4326, 32654);
-        assert!((300_000.0..500_000.0).contains(&x), "easting {x}");
-        assert!((3_800_000.0..4_050_000.0).contains(&y), "northing {y}");
+    fn utm_south_has_the_false_northing() {
+        // Sydney is in UTM zone 56S; the 10 Mm false northing keeps
+        // southern-hemisphere northings positive (~6.25 Mm here).
+        let (x, y) = transform_point(SYDNEY_OPERA.0, SYDNEY_OPERA.1, 4326, 32756);
+        assert!((300_000.0..400_000.0).contains(&x), "easting {x}");
+        assert!((6_200_000.0..6_300_000.0).contains(&y), "northing {y}");
+        let (lon, lat) = transform_point(x, y, 32756, 4326);
+        assert!((lon - SYDNEY_OPERA.0).abs() < 1e-9, "{lon}");
+        assert!((lat - SYDNEY_OPERA.1).abs() < 1e-9, "{lat}");
     }
 
     // With crs-full, 27700 (OSGB) resolves from the full registry instead.
@@ -239,5 +195,6 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("EPSG:27700"), "{msg}");
         assert!(msg.contains("Supported CRS"), "{msg}");
+        assert!(msg.contains("crs-full"), "{msg}");
     }
 }

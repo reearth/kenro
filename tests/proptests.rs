@@ -69,7 +69,7 @@ proptest! {
     #[test]
     fn gpb_roundtrip_preserves_geometry_srid_and_flags(
         wkt in geom_wkt(),
-        srid in prop_oneof![Just(0), Just(4326), Just(6668), -1..100_000i32],
+        srid in prop_oneof![Just(0), Just(4326), Just(3857), -1..100_000i32],
     ) {
         let blob = io::st_geom_from_text(&wkt, Some(srid)).unwrap();
         let header = GpbHeader::parse(&blob).unwrap();
@@ -133,9 +133,9 @@ proptest! {
         lon in 138.6..140.9f64,
         lat in 34.6..37.4f64,
     ) {
-        // 4326 → zone IX → 4326 must come back within ~1e-9 degrees.
+        // 4326 → UTM 54N → 4326 must come back within ~1e-9 degrees.
         let src = io::st_geom_from_text(&format!("POINT({lon:?} {lat:?})"), Some(4326)).unwrap();
-        let projected = kenro::functions::transform::st_transform(&src, 6677).unwrap();
+        let projected = kenro::functions::transform::st_transform(&src, 32654).unwrap();
         let back = kenro::functions::transform::st_transform(&projected, 4326).unwrap();
         let g = geom::decode_auto(&back).unwrap();
         let geo_types::Geometry::Point(p) = g.geometry else { unreachable!() };

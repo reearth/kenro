@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 use crate::geom;
 
 /// `h3_latlng_to_cell(geom, resolution)` → cell as INTEGER. POINT only, in
-/// lon/lat coordinates (SRID 4326/4612/6668 or unknown).
+/// lon/lat coordinates (SRID 4326 or unknown).
 pub fn h3_latlng_to_cell(bytes: &[u8], resolution: i64) -> Result<i64> {
     const FUNC: &str = "h3_latlng_to_cell";
     let geom = geom::decode_auto(bytes)?;
@@ -31,11 +31,11 @@ pub fn h3_latlng_to_cell(bytes: &[u8], resolution: i64) -> Result<i64> {
             reason: "geometry is empty".into(),
         });
     }
-    if !matches!(geom.srid, 0 | 4326 | 4612 | 6668) && geom.srid > 0 {
+    if !matches!(geom.srid, 0 | 4326) && geom.srid > 0 {
         return Err(Error::Unsupported {
             func: FUNC,
             reason: format!(
-                "expects lon/lat coordinates (SRID 4326/4612/6668 or unknown), got SRID {}; \
+                "expects lon/lat coordinates (SRID 4326 or unknown), got SRID {}; \
                  run ST_Transform(geom, 4326) first",
                 geom.srid
             ),
@@ -146,7 +146,7 @@ mod tests {
     fn guards() {
         let line = st_geom_from_text("LINESTRING(0 0,1 1)", Some(4326)).unwrap();
         assert!(h3_latlng_to_cell(&line, 9).is_err());
-        let projected = st_geom_from_text("POINT(-7813 -37912)", Some(6677)).unwrap();
+        let projected = st_geom_from_text("POINT(380000 3946000)", Some(32654)).unwrap();
         let err = h3_latlng_to_cell(&projected, 9).unwrap_err().to_string();
         assert!(err.contains("ST_Transform"), "{err}");
         assert!(h3_latlng_to_cell(&tokyo(), 16).is_err());

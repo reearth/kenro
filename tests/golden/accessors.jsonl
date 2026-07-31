@@ -81,7 +81,7 @@
 {"id":"y_point:y","a":"POINT(3.5 -4.25)","fn":"y","arg":null,"expected":-4.25}
 {"id":"makepoint:makepoint","args":[1.5,2.5],"fn":"makepoint","expected":"POINT(1.5 2.5)"}
 {"id":"point2:point","args":[-3.25,4.0],"fn":"point","expected":"POINT(-3.25 4)"}
-{"id":"point3:point_srid","args":[1.0,2.0],"srid":6677,"fn":"point_srid","expected":6677}
+{"id":"point3:point_srid","args":[1.0,2.0],"srid":3857,"fn":"point_srid","expected":3857}
 {"id":"envelope4:makeenvelope","args":[0.0,0.0,2.0,3.0],"fn":"makeenvelope","expected":"POLYGON((0 0,0 3,2 3,2 0,0 0))"}
 {"id":"envelope_degenerate:makeenvelope","args":[1.0,2.0,1.0,2.0],"fn":"makeenvelope","expected":"POLYGON((1 2,1 2,1 2,1 2,1 2))"}
 {"id":"envelope5:makeenvelope_srid","args":[0.0,0.0,2.0,3.0],"srid":4326,"fn":"makeenvelope_srid","expected":4326}

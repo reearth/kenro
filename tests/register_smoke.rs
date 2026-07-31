@@ -34,7 +34,7 @@ fn every_implemented_function_is_callable() {
         "SELECT ST_MaxY(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
         "SELECT ST_IsEmpty(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
         "SELECT ST_SRID(ST_SetSRID(ST_GeomFromText('POINT(1 2)'), 4326))",
-        "SELECT ST_AsText(ST_Transform(ST_GeomFromText('POINT(139.7 35.7)', 4326), 6677))",
+        "SELECT ST_AsText(ST_Transform(ST_GeomFromText('POINT(139.7 35.7)', 4326), 32654))",
         "SELECT h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9)",
         "SELECT h3_cell_to_parent(h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9), 5)",
         "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.7 35.7)', 4326), 9)))",
@@ -207,11 +207,11 @@ fn errors_are_attributable_and_actionable() {
     let err = query_value(
         &conn,
         "SELECT ST_Intersects(ST_GeomFromText('POINT(0 0)', 4326),
-                              ST_GeomFromText('POINT(0 0)', 6668))",
+                              ST_GeomFromText('POINT(0 0)', 3857))",
     )
     .unwrap_err()
     .to_string();
-    assert!(err.contains("mixed SRIDs 4326 and 6668"), "{err}");
+    assert!(err.contains("mixed SRIDs 4326 and 3857"), "{err}");
 }
 
 #[test]

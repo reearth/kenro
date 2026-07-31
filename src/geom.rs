@@ -482,7 +482,7 @@ mod tests {
         ewkb.extend_from_slice(&1.0f64.to_le_bytes());
         ewkb.extend_from_slice(&2.0f64.to_le_bytes());
         assert_eq!(decode_wkb(&ewkb, None).unwrap().srid, 4326);
-        assert_eq!(decode_wkb(&ewkb, Some(6668)).unwrap().srid, 6668);
+        assert_eq!(decode_wkb(&ewkb, Some(3857)).unwrap().srid, 3857);
     }
 
     #[test]

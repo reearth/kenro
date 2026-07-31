@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Regenerates scripts/accuracy/reference.jsonl: a lattice of points over
-# Japan transformed by the reference PostGIS/PROJ. Consumed by
+# Regenerates scripts/accuracy/reference.jsonl: global point lattices
+# transformed by the reference PostGIS/PROJ. Consumed by
 # `cargo run --example accuracy_report`, which produces docs/accuracy.md.
 #
 # NOTE what the reference is: this PostGIS image ships PROJ *without*
-# Japanese datum grids, so the comparison measures proj4rs vs gridless PROJ
-# (projection math + Helmert), not survey-grade truth. See docs/accuracy.md.
+# datum grids, so the comparison measures proj4rs vs gridless PROJ
+# (projection math), not survey-grade truth. See docs/accuracy.md.
 set -euo pipefail
 cd "$(dirname "$0")"
 

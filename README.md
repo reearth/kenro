@@ -10,7 +10,7 @@ kenro provides the 20% of SpatiaLite everyone actually uses, with zero C depende
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
 - **Overlay & buffer** — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree (F.3) and geometry-type (F.4) maintenance triggers require
-- **CRS transform** — pure-Rust [proj4rs] with first-class support for the Japanese national systems (JGD2000/JGD2011, plane rectangular I–XIX) and [measured accuracy](docs/accuracy.md)
+- **CRS transform** — pure-Rust [proj4rs]: WGS84, Web Mercator and every UTM zone built in, the full EPSG registry behind a feature flag, with [measured accuracy](docs/accuracy.md)
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
@@ -310,23 +310,24 @@ Structural differences that matter more than any single function:
 
 ## Supported CRS
 
-`ST_Transform` uses a curated EPSG table (proj4rs carries no EPSG database):
+`ST_Transform` ships a built-in EPSG table (proj4rs carries no EPSG
+database). kenro is region-neutral: the built-in codes are exactly the
+globally-defined, algorithmically-derivable systems —
 
 | Codes | System |
 |---|---|
 | 4326 | WGS84 geographic |
 | 3857 | Web Mercator |
-| 4612 / 6668 | JGD2000 / JGD2011 geographic |
-| 2443–2461 | JGD2000 plane rectangular zones I–XIX |
-| 6669–6687 | JGD2011 plane rectangular zones I–XIX |
-| 32651–32656 | WGS84 UTM zones 51N–56N |
+| 32601–32660 | WGS84 UTM zones 1N–60N |
+| 32701–32760 | WGS84 UTM zones 1S–60S |
 
-Anything else raises an error naming the code. The `crs-full` cargo feature
-adds the full `crs-definitions` registry as a fallback (megabytes of tables,
-EPSG codes ≤ 65535 only). Accuracy against PROJ is measured and documented
-in [docs/accuracy.md](docs/accuracy.md) — TL;DR: nanometer-level for
-projection math, 0.1 mm-level for the JGD Helmert pairs, but **no datum
-grids**: real-world JGD2000↔JGD2011 displacement is not modeled; use full
+Every national and regional system is served the same way: the `crs-full`
+cargo feature adds the full `crs-definitions` registry as a fallback
+(megabytes of tables, EPSG codes ≤ 65535 only); without it, an unknown code
+raises an error naming the code and the feature. Accuracy against PROJ is
+measured and documented in [docs/accuracy.md](docs/accuracy.md) — TL;DR:
+nanometer-level projection math, but **no datum grids**: national datum
+modernizations and earthquake-displacement models are not applied; use full
 PROJ for survey-grade work.
 
 ## Cargo features
@@ -340,12 +341,12 @@ enables `kenro::register`.
 
 - SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`); the loadable-extension path needs SQLite ≥ 3.34 (it fails with a clear version-mismatch message on older hosts).
 - Loading kenro **and** SpatiaLite into the same connection: both register `ST_` names and SQLite keeps the last registration. Don't mix them (a registration-filter feature flag can be added if needed).
-- `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject first (e.g. `ST_Transform(geom, 6677)` for the Tokyo area).
+- `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject to the local UTM zone first (e.g. `ST_Transform(geom, 32654)` around Tokyo, `32633` around Berlin).
 
 ## Roadmap
 
 1. ✅ Core: GeoPackage blobs, WKB/WKT, predicates, R-tree functions, rusqlite registration, PostGIS golden tests
-2. ✅ `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
+2. ✅ `ST_Transform` (proj4rs; accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
 3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
 5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`

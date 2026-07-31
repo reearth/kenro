@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn srid_gate() {
         let a = g_srid("POINT(0 0)", 4326);
-        let b = g_srid("POINT(0 0)", 6668);
+        let b = g_srid("POINT(0 0)", 3857);
         assert!(matches!(
             st_intersects(&a, &b),
             Err(Error::MixedSrid { .. })

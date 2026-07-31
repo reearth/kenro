@@ -13,7 +13,7 @@ use rusqlite::Connection;
 const DEFAULT_TOLERANCE_M: f64 = 0.01;
 
 fn geographic(srid: i32) -> bool {
-    matches!(srid, 4326 | 4612 | 6668)
+    matches!(srid, 4326)
 }
 
 /// Compare two WKT geometries coordinate-wise, with deltas converted to

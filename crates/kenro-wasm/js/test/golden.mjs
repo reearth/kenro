@@ -114,7 +114,7 @@ export function geomSameVertexSet(a, b, relTol = 1e-9) {
   );
 }
 
-const GEOGRAPHIC_SRIDS = new Set([4326, 4612, 6668]);
+const GEOGRAPHIC_SRIDS = new Set([4326]);
 
 /** Transform comparison: per-vertex error in meters (mirror of the Rust harness). */
 export function assertWithinToleranceMeters(id, got, want, toSrid, tolM = 0.01) {
@@ -158,8 +158,8 @@ export const SMOKE_SQL = {
     check: (v) => v === "POINT(1 2)",
   },
   "ST_GeomFromWKB/2": {
-    sql: "SELECT ST_SRID(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('POINT(1 2)')), 6677))",
-    check: (v) => Number(v) === 6677,
+    sql: "SELECT ST_SRID(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromText('POINT(1 2)')), 3857))",
+    check: (v) => Number(v) === 3857,
   },
   "ST_GeomFromGPB/1": {
     sql: "SELECT ST_AsText(ST_GeomFromGPB(ST_AsGPB(ST_GeomFromText('POINT(1 2)'))))",
@@ -262,8 +262,8 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 1,
   },
   "ST_Transform/2": {
-    sql: "SELECT ST_SRID(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 6677))",
-    check: (v) => Number(v) === 6677,
+    sql: "SELECT ST_SRID(ST_Transform(ST_GeomFromText('POINT(139.767 35.681)', 4326), 32654))",
+    check: (v) => Number(v) === 32654,
   },
   "ST_AsGeoJSON/1": {
     sql: "SELECT ST_AsGeoJSON(ST_GeomFromText('POINT(1 2)'))",

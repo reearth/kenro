@@ -34,10 +34,10 @@ mod tests {
     use crate::gpb::GpbHeader;
 
     #[test]
-    fn transform_tokyo_to_zone_ix_and_back() {
+    fn transform_tokyo_to_utm54_and_back() {
         let src = st_geom_from_text("POINT(139.745433 35.658581)", Some(4326)).unwrap();
-        let projected = st_transform(&src, 6677).unwrap();
-        assert_eq!(st_srid(&projected).unwrap(), 6677);
+        let projected = st_transform(&src, 32654).unwrap();
+        assert_eq!(st_srid(&projected).unwrap(), 32654);
         let back = st_transform(&projected, 4326).unwrap();
         let wkt = st_as_text(&back).unwrap();
         assert!(wkt.starts_with("POINT(139.745"), "{wkt}");
@@ -64,7 +64,7 @@ mod tests {
         assert_eq!(st_srid(&labeled).unwrap(), 4326);
         assert_eq!(st_as_text(&labeled).unwrap(), "POINT(139.7 35.7)");
         // And the combination unlocks ST_Transform from bare WKT input.
-        assert!(st_transform(&labeled, 6677).is_ok());
+        assert!(st_transform(&labeled, 32654).is_ok());
     }
 
     #[test]

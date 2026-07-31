@@ -258,9 +258,9 @@ mod tests {
             max_y: 4.5,
         };
         for (envelope, empty) in [(None, false), (Some(env), false), (None, true)] {
-            let blob = write_gpb(&point_wkb(), 6668, envelope, empty);
+            let blob = write_gpb(&point_wkb(), 3857, envelope, empty);
             let h = GpbHeader::parse(&blob).unwrap();
-            assert_eq!(h.srid, 6668);
+            assert_eq!(h.srid, 3857);
             assert_eq!(h.envelope, envelope);
             assert_eq!(h.empty, empty);
             assert_eq!(&blob[h.wkb_offset..], &point_wkb()[..]);
