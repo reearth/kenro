@@ -796,6 +796,7 @@ fn register_geom_to_blob(
     })
 }
 
+#[cfg(feature = "overlay")]
 fn register_geom2_to_blob(
     conn: &Connection,
     name: &'static str,
@@ -882,6 +883,7 @@ fn text_or_null<'a>(
 
 /// `Kind::TextOrInt`: TEXT as-is; INTEGER n normalized to `quad_segs=n`
 /// (ST_Buffer's PostGIS integer overload).
+#[cfg(feature = "overlay")]
 fn text_or_int_or_null(
     ctx: &Context<'_>,
     i: usize,
