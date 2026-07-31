@@ -13,17 +13,19 @@ cannot drift.
 
 Measured on release builds (`wasm-pack build --target web --release`,
 `wasm-opt -Oz`); enforced by a CI size gate (fails above 1.5 MB raw /
-500 KB gzip). The default (lite) build covers everything except
-overlay/buffer/MVT; the `full` feature adds them (i_overlay's mesh is the
-single largest contributor):
+500 KB gzip). Three tiers are built and attached to every GitHub Release
+(`kenro-wasm-minimal.tar.gz` / `kenro-wasm-standard.tar.gz` /
+`kenro-wasm-full.tar.gz`); functions outside a tier register as stubs
+naming the missing feature:
 
-| build | raw | gzipped (wire) |
-|---|---|---|
-| default (lite) | 589 KB | 240 KB |
-| `--features full` | 946 KB | 353 KB |
+| tier | cargo flags | adds | raw | gzipped (wire) |
+|---|---|---|---|---|
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors | 412 KB | 167 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON | 589 KB | 240 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, MVT (i_overlay's mesh is the single largest contributor) | 946 KB | 353 KB |
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
-(~6.3 MB wire) — kenro is **25–40× smaller** depending on the build, at
+(~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at
 the cost of the GEOS/GDAL feature classes kenro doesn't cover.
 
 ## Host support matrix
@@ -54,8 +56,8 @@ wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --f
 ```js
 // Official SQLite WASM (recommended)
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
-import initKenro, * as kenroWasm from "kenro-wasm";
-import { registerKenro } from "kenro-wasm/sqlite-wasm";
+import initKenro, * as kenroWasm from "kenro";
+import { registerKenro } from "kenro/sqlite-wasm";
 
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
@@ -67,11 +69,11 @@ db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
 
 ```js
 // sql.js
-import { registerKenro } from "kenro-wasm/sqljs";
+import { registerKenro } from "kenro/sqljs";
 registerKenro(db, kenroWasm);
 
 // wa-sqlite
-import { registerKenro } from "kenro-wasm/wa-sqlite";
+import { registerKenro } from "kenro/wa-sqlite";
 registerKenro(sqlite3, db, kenroWasm);
 ```
 

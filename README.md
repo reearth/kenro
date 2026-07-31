@@ -4,7 +4,7 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, or *GeoPackage in pure Rust*: this is that crate.
 
-kenro brings the working set of spatial SQL — predicates through overlays to vector tiles, ~80 functions — into SQLite with zero C dependencies and one-call registration:
+**kenro is a full spatial SQL engine for SQLite**: the PostGIS function surface — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~80 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON, and GeoPackage blobs as first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
@@ -75,14 +75,14 @@ per-platform gotchas (macOS system SQLite, D1's no-UDF limitation, …).
 ## Quickstart (browser — kenro-wasm)
 
 Browser SQLite builds can't load native extensions, but they all accept
-JS-level user-defined functions — so kenro's SQLite-free core compiles to a
-**~590 KB wasm (~240 KB wire)** module (946 KB / 353 KB with the `full`
-feature's overlay + MVT) with one adapter per host:
+JS-level user-defined functions — so kenro's SQLite-free core compiles to
+wasm — **412–946 KB (167–353 KB wire) depending on the feature tier**
+([sizes](docs/wasm.md#size)) — with one adapter per host:
 
 ```js
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
-import initKenro, * as kenroWasm from "kenro-wasm";
-import { registerKenro } from "kenro-wasm/sqlite-wasm";
+import initKenro, * as kenroWasm from "kenro";
+import { registerKenro } from "kenro/sqlite-wasm";
 
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
@@ -141,11 +141,12 @@ Structural differences that matter more than any single function:
   KB–MB scale, no C toolchain, deterministic. PostGIS is a server-side
   PostgreSQL extension. DuckDB spatial bundles GEOS + PROJ + GDAL (its
   WASM build is ~23.5 MB uncompressed, ~6.3 MB over the wire).
-- **Division of labor** — heavyweight analytics, exotic GEOS operations and
-  format conversion belong to DuckDB spatial or PostGIS; predicates, R-tree
-  maintenance, CRS transforms, everyday overlays/buffers and MVT generation
-  *inside your app's SQLite file* are kenro's seat. They compose rather
-  than compete.
+- **Division of labor** — kenro covers spatial SQL end-to-end inside your
+  app's SQLite file: predicates, overlay/repair/buffer, R-tree maintenance,
+  CRS transforms, MVT generation, aggregates. Reach for PostGIS or DuckDB
+  spatial when you need what kenro deliberately leaves out — raster,
+  topology/networks, format conversion, GeometryCollection-heavy
+  operations. They compose rather than compete.
 
 ## Supported CRS
 
@@ -201,7 +202,7 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
 6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
 7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
-8. v0.x releases on crates.io (+ npm for kenro-wasm)
+8. v0.x releases on crates.io (+ npm as `kenro`)
 
 ## License
 

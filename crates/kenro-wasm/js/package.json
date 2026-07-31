@@ -1,5 +1,5 @@
 {
-  "name": "kenro-wasm",
+  "name": "kenro",
   "version": "0.1.0",
   "private": true,
   "description": "kenro spatial functions for browser SQLite (sql.js / wa-sqlite / official SQLite WASM)",

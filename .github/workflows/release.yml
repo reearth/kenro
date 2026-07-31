@@ -137,17 +137,24 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
-      - name: Build (full)
-        run: wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --features full
-      - name: Package
+      # Three tiers (sizes in docs/wasm.md); each bundle = pkg + adapters.
+      - name: Build and package all tiers
         run: |
           cp LICENSE-MIT LICENSE-APACHE crates/kenro-wasm/js/
-          tar czf kenro-wasm.tar.gz -C crates/kenro-wasm/js \
-            package.json pkg src LICENSE-MIT LICENSE-APACHE
+          build_tier() {
+            local tier="$1"; shift
+            wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- "$@"
+            tar czf "kenro-wasm-${tier}.tar.gz" -C crates/kenro-wasm/js \
+              package.json pkg src LICENSE-MIT LICENSE-APACHE
+          }
+          build_tier minimal --no-default-features
+          build_tier standard
+          build_tier full --features full
+          ls -la kenro-wasm-*.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: kenro-wasm
-          path: kenro-wasm.tar.gz
+          path: kenro-wasm-*.tar.gz
           if-no-files-found: error
 
   release:

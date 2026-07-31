@@ -3,9 +3,9 @@
 //! Spatial functions for SQLite in pure Rust — works with rusqlite, as a
 //! loadable extension, and in WASM.
 //!
-//! kenro brings the working set of spatial SQL into SQLite with zero C
+//! kenro is a full spatial SQL engine for SQLite in pure Rust, with zero C
 //! dependencies: WKB/WKT/GeoPackage-blob I/O, the DE-9IM predicate family,
-//! pure-Rust overlay and buffer, SQL aggregates (`ST_Union`, `ST_AsMVT`),
+//! pure-Rust overlay/repair/buffer, SQL aggregates (`ST_Union`, `ST_AsMVT`),
 //! and the helper functions the GeoPackage spatial index triggers require —
 //! so a plain SQLite build can maintain a GeoPackage spatial index
 //! correctly.

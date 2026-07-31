@@ -20,8 +20,8 @@ wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --f
 
 ```js
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
-import initKenro, * as kenroWasm from "kenro-wasm";
-import { registerKenro } from "kenro-wasm/sqlite-wasm";
+import initKenro, * as kenroWasm from "kenro";
+import { registerKenro } from "kenro/sqlite-wasm";
 
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
