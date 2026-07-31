@@ -144,9 +144,11 @@ Structural differences that matter more than any single function:
 - **Division of labor** — kenro covers spatial SQL end-to-end inside your
   app's SQLite file: predicates, overlay/repair/buffer, R-tree maintenance,
   CRS transforms, MVT generation, aggregates. Reach for PostGIS or DuckDB
-  spatial when you need what kenro deliberately leaves out — raster,
-  topology/networks, format conversion, GeometryCollection-heavy
-  operations. They compose rather than compete.
+  spatial when you need what kenro
+  [deliberately leaves out](docs/functions.md#deliberately-out-of-scope) —
+  raster, topology/networks, file-format conversion,
+  GeometryCollection-producing operations, datum-grid transforms. They
+  compose rather than compete.
 
 ## Supported CRS
 

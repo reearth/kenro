@@ -115,8 +115,20 @@ GeometryCollection values; for areal dissolve use the ST_Union aggregate,
 otherwise collect rows on the application side.
 ```
 
-Also out of scope: raster, network analysis, full PROJ grid transforms, and
-any claim of full SpatiaLite/PostGIS compatibility.
+## Deliberately out of scope
+
+- **Raster** — kenro is vector-only.
+- **Topology / network analysis** — no `ST_Node`/`ST_Polygonize`, no
+  routing.
+- **File-format conversion** — kenro operates on geometry *values*
+  (WKT/WKB/GeoJSON/GeoPackage blobs), not files; reading shapefiles or
+  writing whole GeoPackages is GDAL/ogr2ogr territory (DuckDB's `ST_Read`).
+- **GeometryCollection-producing operations** — kenro never returns a
+  GeometryCollection; operations that would (mixed-dimension overlays,
+  `ST_Collect`) error loudly instead.
+- **Datum-grid transforms** — `ST_Transform` is gridless projection math
+  ([accuracy](accuracy.md)); survey-grade work needs full PROJ.
+- Any claim of full SpatiaLite/PostGIS compatibility.
 
 ## Semantics: PostGIS is the reference
 
