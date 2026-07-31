@@ -218,6 +218,55 @@ pub const FUNCTIONS: &[FnEntry] = &[
         None
     ),
     entry!("ST_Azimuth", "stAzimuth", [Blob, Blob], OptReal, None),
+    // Processing.
+    entry!("ST_ConvexHull", "stConvexHull", [Blob], Blob, None),
+    entry!("ST_PointOnSurface", "stPointOnSurface", [Blob], Blob, None),
+    entry!("ST_SimplifyVW", "stSimplifyVw", [Blob, Real], Blob, None),
+    entry!(
+        "ST_ChaikinSmoothing",
+        "stChaikinSmoothing",
+        [Blob],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_ChaikinSmoothing",
+        "stChaikinSmoothingN",
+        [Blob, Int],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_RemoveRepeatedPoints",
+        "stRemoveRepeatedPoints",
+        [Blob],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_OrientedEnvelope",
+        "stOrientedEnvelope",
+        [Blob],
+        Blob,
+        None
+    ),
+    // Affine.
+    entry!("ST_Rotate", "stRotate", [Blob, Real], Blob, None),
+    entry!(
+        "ST_Rotate",
+        "stRotateXY",
+        [Blob, Real, Real, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_Translate",
+        "stTranslate",
+        [Blob, Real, Real],
+        Blob,
+        None
+    ),
+    entry!("ST_Scale", "stScale", [Blob, Real, Real], Blob, None),
     // Accessors.
     entry!("ST_Area", "stArea", [Blob], Real, None),
     entry!("ST_NPoints", "stNPoints", [Blob], Int, None),
@@ -248,6 +297,7 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Intersection", &[2]),
     ("ST_Difference", &[2]),
     ("ST_SymDifference", &[2]),
+    ("ST_MakeValid", &[1]),
     ("ST_AsMVT", &[1, 2, 3, 4]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
     // Feature-off fallbacks.

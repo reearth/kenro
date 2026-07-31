@@ -11,6 +11,7 @@ import {
   effective,
   expectsError,
   geomApproxEqual,
+  geomSameVertexSet,
   initWasm,
   loadVectors,
 } from "./golden.mjs";
@@ -141,7 +142,19 @@ test("h3 vectors", () => {
 
 test("processing vectors", () => {
   const optText = (blob) => (blob === undefined ? undefined : wasm.stAsText(blob));
-  const geometric = new Set(["closestpoint", "lineinterpolate"]);
+  const geometric = new Set([
+    "closestpoint",
+    "lineinterpolate",
+    "pointonsurface",
+    "simplifyvw",
+    "chaikin",
+    "removerepeated",
+    "rotate",
+    "rotate4",
+    "translate",
+    "scale",
+  ]);
+  const vertexSet = new Set(["convexhull", "orientedenv"]);
   for (const v of loadVectors("processing")) {
     const run = () => {
       const a = geom(v.a);
@@ -158,6 +171,26 @@ test("processing vectors", () => {
           return wasm.stFrechetDistance(a, geom(v.b));
         case "azimuth":
           return wasm.stAzimuth(a, geom(v.b));
+        case "convexhull":
+          return wasm.stAsText(wasm.stConvexHull(a));
+        case "pointonsurface":
+          return wasm.stAsText(wasm.stPointOnSurface(a));
+        case "simplifyvw":
+          return wasm.stAsText(wasm.stSimplifyVw(a, v.arg));
+        case "chaikin":
+          return wasm.stAsText(wasm.stChaikinSmoothingN(a, v.arg));
+        case "removerepeated":
+          return wasm.stAsText(wasm.stRemoveRepeatedPoints(a));
+        case "orientedenv":
+          return wasm.stAsText(wasm.stOrientedEnvelope(a));
+        case "rotate":
+          return wasm.stAsText(wasm.stRotate(a, v.arg));
+        case "rotate4":
+          return wasm.stAsText(wasm.stRotateXY(a, v.arg, v.args[0], v.args[1]));
+        case "translate":
+          return wasm.stAsText(wasm.stTranslate(a, 10, -2));
+        case "scale":
+          return wasm.stAsText(wasm.stScale(a, 2, 3));
         default:
           throw new Error(`unknown fn ${v.fn}`);
       }
@@ -167,7 +200,9 @@ test("processing vectors", () => {
     const want = effective(v);
     if (want === null) assert.equal(got, undefined, v.id);
     else if (typeof want === "number") assertNumberClose(v.id, got, want);
-    else if (geometric.has(v.fn)) {
+    else if (vertexSet.has(v.fn)) {
+      assert.ok(geomSameVertexSet(got, want), `${v.id}: ${got} vs ${want}`);
+    } else if (geometric.has(v.fn)) {
       assert.ok(geomApproxEqual(got, want), `${v.id}: ${got} vs ${want}`);
     } else assert.equal(got, want, v.id);
   }

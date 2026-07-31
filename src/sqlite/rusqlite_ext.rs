@@ -209,6 +209,87 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         })?;
     }
 
+    // Processing + affine.
+    {
+        use crate::functions::{affine, processing};
+        register_geom_to_blob(conn, "ST_ConvexHull", processing::st_convex_hull)?;
+        register_geom_to_blob(conn, "ST_PointOnSurface", processing::st_point_on_surface)?;
+        register_geom_to_blob(
+            conn,
+            "ST_RemoveRepeatedPoints",
+            processing::st_remove_repeated_points,
+        )?;
+        register_geom_to_blob(
+            conn,
+            "ST_OrientedEnvelope",
+            processing::st_oriented_envelope,
+        )?;
+        conn.create_scalar_function("ST_SimplifyVW", 2, FLAGS, |ctx| {
+            let (Some(b), Some(tol)) = (
+                blob_or_null(ctx, 0, "ST_SimplifyVW")?,
+                real_or_null(ctx, 1, "ST_SimplifyVW")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(processing::st_simplify_vw(b, tol))
+        })?;
+        conn.create_scalar_function("ST_ChaikinSmoothing", 1, FLAGS, |ctx| {
+            let Some(b) = blob_or_null(ctx, 0, "ST_ChaikinSmoothing")? else {
+                return Ok(None);
+            };
+            blob(processing::st_chaikin_smoothing(b, 1))
+        })?;
+        conn.create_scalar_function("ST_ChaikinSmoothing", 2, FLAGS, |ctx| {
+            let (Some(b), Some(n)) = (
+                blob_or_null(ctx, 0, "ST_ChaikinSmoothing")?,
+                i64_or_null(ctx, 1, "ST_ChaikinSmoothing")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(processing::st_chaikin_smoothing(b, n))
+        })?;
+        conn.create_scalar_function("ST_Rotate", 2, FLAGS, |ctx| {
+            let (Some(b), Some(radians)) = (
+                blob_or_null(ctx, 0, "ST_Rotate")?,
+                real_or_null(ctx, 1, "ST_Rotate")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(affine::st_rotate(b, radians))
+        })?;
+        conn.create_scalar_function("ST_Rotate", 4, FLAGS, |ctx| {
+            let (Some(b), Some(radians), Some(x0), Some(y0)) = (
+                blob_or_null(ctx, 0, "ST_Rotate")?,
+                real_or_null(ctx, 1, "ST_Rotate")?,
+                real_or_null(ctx, 2, "ST_Rotate")?,
+                real_or_null(ctx, 3, "ST_Rotate")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(affine::st_rotate_xy(b, radians, x0, y0))
+        })?;
+        conn.create_scalar_function("ST_Translate", 3, FLAGS, |ctx| {
+            let (Some(b), Some(dx), Some(dy)) = (
+                blob_or_null(ctx, 0, "ST_Translate")?,
+                real_or_null(ctx, 1, "ST_Translate")?,
+                real_or_null(ctx, 2, "ST_Translate")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(affine::st_translate(b, dx, dy))
+        })?;
+        conn.create_scalar_function("ST_Scale", 3, FLAGS, |ctx| {
+            let (Some(b), Some(xf), Some(yf)) = (
+                blob_or_null(ctx, 0, "ST_Scale")?,
+                real_or_null(ctx, 1, "ST_Scale")?,
+                real_or_null(ctx, 2, "ST_Scale")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(affine::st_scale(b, xf, yf))
+        })?;
+    }
+
     // R-tree helpers (GeoPackage Annex F.3 contract).
     register_rtree_minmax(conn, "ST_MinX", rtree::st_min_x)?;
     register_rtree_minmax(conn, "ST_MaxX", rtree::st_max_x)?;

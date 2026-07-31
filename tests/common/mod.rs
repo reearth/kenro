@@ -75,6 +75,41 @@ pub fn assert_number(id: &str, got: f64, want: f64) {
     );
 }
 
+/// Rotation/direction-insensitive comparison for convex hulls and oriented
+/// envelopes: same type prefix and the same coordinate multiset. Valid
+/// because a convex ring is determined by its vertex set.
+pub fn geoms_same_vertex_set(a: &str, b: &str, tol: f64) -> bool {
+    if a == b {
+        return true;
+    }
+    let type_of = |s: &str| s.split(['(', ' ']).next().unwrap_or("").to_string();
+    if type_of(a) != type_of(b) {
+        return false;
+    }
+    let coords = |s: &str| {
+        let mut pairs: Vec<(f64, f64)> = Vec::new();
+        let nums: Vec<f64> = s
+            .split(|c: char| !(c.is_ascii_digit() || c == '.' || c == '-' || c == 'e'))
+            .filter(|t| !t.is_empty())
+            .filter_map(|t| t.parse().ok())
+            .collect();
+        for chunk in nums.chunks(2) {
+            if chunk.len() == 2 {
+                pairs.push((chunk[0], chunk[1]));
+            }
+        }
+        pairs.sort_by(|p, q| p.partial_cmp(q).unwrap_or(std::cmp::Ordering::Equal));
+        pairs.dedup_by(|p, q| (p.0 - q.0).abs() <= tol && (p.1 - q.1).abs() <= tol);
+        pairs
+    };
+    let (ca, cb) = (coords(a), coords(b));
+    ca.len() == cb.len()
+        && ca.iter().zip(&cb).all(|(p, q)| {
+            let t = |v: f64| tol * v.abs().max(1.0);
+            (p.0 - q.0).abs() <= t(q.0) && (p.1 - q.1).abs() <= t(q.1)
+        })
+}
+
 /// Geometric comparison of two WKT strings with a per-coordinate tolerance
 /// (scaled by magnitude). Identical strings short-circuit, which also covers
 /// `POINT EMPTY` (unparseable by kenro's WKT reader by design).

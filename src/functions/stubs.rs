@@ -21,6 +21,12 @@ const GEOS_HINT: &str =
 pub const STUBS: &[Stub] = &[
     // Planned ("not yet").
     Stub {
+        name: "ST_MakeValid",
+        hint: "geo has no GEOS-equivalent MakeValid (its polygon repair is \
+               triangulation-based and structurally different); validate with ST_IsValid \
+               and repair in PostGIS for now.",
+    },
+    Stub {
         name: "ST_AsMVT",
         hint: "MVT tile generation is not implemented in kenro yet (in PostGIS this is an \
                aggregate paired with ST_AsMVTGeom); generate tiles with PostGIS or tippecanoe \

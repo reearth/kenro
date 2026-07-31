@@ -259,6 +259,63 @@ pub fn h3_string_to_cell(s: &str) -> R<i64> {
     kenro::functions::h3::h3_string_to_cell(s).map_err(err)
 }
 
+// ---- Processing + affine ----
+
+#[wasm_bindgen(js_name = stConvexHull)]
+pub fn st_convex_hull(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::processing::st_convex_hull(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointOnSurface)]
+pub fn st_point_on_surface(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::processing::st_point_on_surface(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSimplifyVw)]
+pub fn st_simplify_vw(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
+    kenro::functions::processing::st_simplify_vw(geom, tolerance).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stChaikinSmoothing)]
+pub fn st_chaikin_smoothing(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::processing::st_chaikin_smoothing(geom, 1).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stChaikinSmoothingN)]
+pub fn st_chaikin_smoothing_n(geom: &[u8], iterations: i32) -> R<Vec<u8>> {
+    kenro::functions::processing::st_chaikin_smoothing(geom, iterations as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRemoveRepeatedPoints)]
+pub fn st_remove_repeated_points(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::processing::st_remove_repeated_points(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stOrientedEnvelope)]
+pub fn st_oriented_envelope(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::processing::st_oriented_envelope(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRotate)]
+pub fn st_rotate(geom: &[u8], radians: f64) -> R<Vec<u8>> {
+    kenro::functions::affine::st_rotate(geom, radians).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRotateXY)]
+pub fn st_rotate_xy(geom: &[u8], radians: f64, x0: f64, y0: f64) -> R<Vec<u8>> {
+    kenro::functions::affine::st_rotate_xy(geom, radians, x0, y0).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stTranslate)]
+pub fn st_translate(geom: &[u8], dx: f64, dy: f64) -> R<Vec<u8>> {
+    kenro::functions::affine::st_translate(geom, dx, dy).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stScale)]
+pub fn st_scale(geom: &[u8], xfactor: f64, yfactor: f64) -> R<Vec<u8>> {
+    kenro::functions::affine::st_scale(geom, xfactor, yfactor).map_err(err)
+}
+
 // ---- Constructors ----
 
 #[wasm_bindgen(js_name = stMakePoint)]
@@ -473,6 +530,17 @@ mod tests {
             "h3CellToParent",
             "h3CellToString",
             "h3StringToCell",
+            "stConvexHull",
+            "stPointOnSurface",
+            "stSimplifyVw",
+            "stChaikinSmoothing",
+            "stChaikinSmoothingN",
+            "stRemoveRepeatedPoints",
+            "stOrientedEnvelope",
+            "stRotate",
+            "stRotateXY",
+            "stTranslate",
+            "stScale",
             "stClosestPoint",
             "stLineInterpolatePoint",
             "stLineLocatePoint",

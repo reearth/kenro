@@ -83,6 +83,37 @@ export function geomApproxEqual(a, b, relTol = 1e-9) {
   );
 }
 
+/** Vertex-multiset comparison for convex rings (rotation/direction-insensitive). */
+export function geomSameVertexSet(a, b, relTol = 1e-9) {
+  if (a === b) return true;
+  const shape = (s) => {
+    const type = s.split(/[\s(]/, 1)[0];
+    const nums = (s.match(NUMBER_RE) ?? []).map(Number);
+    const pairs = [];
+    for (let i = 0; i + 1 < nums.length; i += 2) pairs.push([nums[i], nums[i + 1]]);
+    pairs.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+    const dedup = [];
+    for (const p of pairs) {
+      const last = dedup[dedup.length - 1];
+      if (!last || Math.abs(last[0] - p[0]) > relTol || Math.abs(last[1] - p[1]) > relTol) {
+        dedup.push(p);
+      }
+    }
+    return { type, dedup };
+  };
+  const ga = shape(a);
+  const gb = shape(b);
+  return (
+    ga.type === gb.type &&
+    ga.dedup.length === gb.dedup.length &&
+    ga.dedup.every((p, i) => {
+      const q = gb.dedup[i];
+      const t = (v) => relTol * Math.max(1, Math.abs(v));
+      return Math.abs(p[0] - q[0]) <= t(q[0]) && Math.abs(p[1] - q[1]) <= t(q[1]);
+    })
+  );
+}
+
 const GEOGRAPHIC_SRIDS = new Set([4326, 4612, 6668]);
 
 /** Transform comparison: per-vertex error in meters (mirror of the Rust harness). */
@@ -261,6 +292,50 @@ export const SMOKE_SQL = {
   "h3_string_to_cell/1": {
     sql: "SELECT h3_string_to_cell(h3_cell_to_string(h3_latlng_to_cell(ST_GeomFromText('POINT(139.767 35.681)', 4326), 9)))",
     check: (v) => typeof v === "bigint" || Number(v) > 0,
+  },
+  "ST_ConvexHull/1": {
+    sql: "SELECT ST_AsText(ST_ConvexHull(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4,2 2)')))",
+    check: (v) => typeof v === "string" && v.startsWith("POLYGON"),
+  },
+  "ST_PointOnSurface/1": {
+    sql: "SELECT ST_AsText(ST_PointOnSurface(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))')))",
+    check: (v) => v === "POINT(2 2)",
+  },
+  "ST_SimplifyVW/2": {
+    sql: "SELECT ST_AsText(ST_SimplifyVW(ST_GeomFromText('LINESTRING(0 0,1 0.01,2 0)'), 1.0))",
+    check: (v) => v === "LINESTRING(0 0,2 0)",
+  },
+  "ST_ChaikinSmoothing/1": {
+    sql: "SELECT ST_NPoints(ST_ChaikinSmoothing(ST_GeomFromText('LINESTRING(0 0,4 4,8 0)')))",
+    check: (v) => Number(v) > 3,
+  },
+  "ST_ChaikinSmoothing/2": {
+    sql: "SELECT ST_NPoints(ST_ChaikinSmoothing(ST_GeomFromText('LINESTRING(0 0,4 4,8 0)'), 2))",
+    check: (v) => Number(v) > 4,
+  },
+  "ST_RemoveRepeatedPoints/1": {
+    sql: "SELECT ST_AsText(ST_RemoveRepeatedPoints(ST_GeomFromText('LINESTRING(0 0,0 0,1 1)')))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_OrientedEnvelope/1": {
+    sql: "SELECT ST_AsText(ST_OrientedEnvelope(ST_GeomFromText('POINT(3 4)')))",
+    check: (v) => v === "POINT(3 4)",
+  },
+  "ST_Rotate/2": {
+    sql: "SELECT ST_X(ST_Rotate(ST_GeomFromText('POINT(4 5)'), 3.14159265358979323846))",
+    check: (v) => Math.abs(Number(v) - -4) < 1e-9,
+  },
+  "ST_Rotate/4": {
+    sql: "SELECT ST_X(ST_Rotate(ST_GeomFromText('POINT(4 5)'), 3.14159265358979323846, 5, 5))",
+    check: (v) => Math.abs(Number(v) - 6) < 1e-9,
+  },
+  "ST_Translate/3": {
+    sql: "SELECT ST_AsText(ST_Translate(ST_GeomFromText('POINT(1 2)'), 10, -2))",
+    check: (v) => v === "POINT(11 0)",
+  },
+  "ST_Scale/3": {
+    sql: "SELECT ST_AsText(ST_Scale(ST_GeomFromText('POINT(2 3)'), 2, 3))",
+    check: (v) => v === "POINT(4 9)",
   },
   "ST_ClosestPoint/2": {
     sql: "SELECT ST_AsText(ST_ClosestPoint(ST_GeomFromText('LINESTRING(0 0,10 0)'), ST_GeomFromText('POINT(5 3)')))",

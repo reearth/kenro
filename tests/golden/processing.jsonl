@@ -3,15 +3,24 @@
 {"id":"azimuth_north:azimuth","a":"POINT(0 0)","b":"POINT(0 5)","fn":"azimuth","arg":null,"expected":0}
 {"id":"azimuth_same:azimuth","a":"POINT(3 4)","b":"POINT(3 4)","fn":"azimuth","arg":null,"expected":null}
 {"id":"azimuth_sw:azimuth","a":"POINT(0 0)","b":"POINT(-1 -1)","fn":"azimuth","arg":null,"expected":3.9269908169872423}
+{"id":"chaikin_1:chaikin","a":"LINESTRING(0 0,4 4,8 0)","b":null,"fn":"chaikin","arg":1,"expected":"LINESTRING(0 0,3 3,5 3,8 0)"}
+{"id":"chaikin_3:chaikin","a":"LINESTRING(0 0,4 4,8 0)","b":null,"fn":"chaikin","arg":3,"expected":"LINESTRING(0 0,1.6875 1.6875,2.5625 2.4375,3.1875 2.8125,3.75 3,4.25 3,4.8125 2.8125,5.4375 2.4375,6.3125 1.6875,8 0)"}
 {"id":"closest_line_pt:closestpoint","a":"LINESTRING(0 0,10 0)","b":"POINT(5 3)","fn":"closestpoint","arg":null,"expected":"POINT(5 0)"}
 {"id":"closest_poly_pt:closestpoint","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","b":"POINT(10 2)","fn":"closestpoint","arg":null,"expected":"POINT(4 2)"}
 {"id":"closest_pt_pt:closestpoint","a":"POINT(1 2)","b":"POINT(9 9)","fn":"closestpoint","arg":null,"expected":"POINT(1 2)"}
+{"id":"dedup_clean:removerepeated","a":"LINESTRING(0 0,1 1)","b":null,"fn":"removerepeated","arg":null,"expected":"LINESTRING(0 0,1 1)"}
+{"id":"dedup_line:removerepeated","a":"LINESTRING(0 0,0 0,1 1,1 1,2 2)","b":null,"fn":"removerepeated","arg":null,"expected":"LINESTRING(0 0,1 1,2 2)"}
 {"id":"frechet_parallel:frechet","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 3,10 3)","fn":"frechet","arg":null,"expected":3}
 {"id":"frechet_reversed:frechet","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(10 3,0 3)","fn":"frechet","arg":null,"expected":10.44030650891055}
 {"id":"frechet_same:frechet","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 0,10 0)","fn":"frechet","arg":null,"expected":0}
 {"id":"hausdorff_parallel:hausdorff","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 3,10 3)","fn":"hausdorff","arg":null,"expected":3}
 {"id":"hausdorff_pt_line:hausdorff","a":"POINT(5 5)","b":"LINESTRING(0 0,10 0)","fn":"hausdorff","arg":null,"expected":7.0710678118654755}
 {"id":"hausdorff_same:hausdorff","a":"LINESTRING(0 0,10 0)","b":"LINESTRING(0 0,10 0)","fn":"hausdorff","arg":null,"expected":0}
+{"id":"hull_collinear:convexhull","a":"MULTIPOINT(0 0,1 1,2 2)","b":null,"fn":"convexhull","arg":null,"expected":"LINESTRING(0 0,2 2)"}
+{"id":"hull_concave:convexhull","a":"POLYGON((0 0,4 0,4 4,2 1,0 4,0 0))","b":null,"fn":"convexhull","arg":null,"expected":"POLYGON((0 0,0 4,4 4,4 0,0 0))"}
+{"id":"hull_gc:convexhull","a":"GEOMETRYCOLLECTION(POINT(0 0),POINT(4 0),POINT(2 5))","b":null,"fn":"convexhull","arg":null,"expected":"POLYGON((0 0,2 5,4 0,0 0))"}
+{"id":"hull_point:convexhull","a":"POINT(1 2)","b":null,"fn":"convexhull","arg":null,"expected":"POINT(1 2)"}
+{"id":"hull_square:convexhull","a":"MULTIPOINT(0 0,4 0,4 4,0 4,2 2)","b":null,"fn":"convexhull","arg":null,"expected":"POLYGON((0 0,0 4,4 4,4 0,0 0))"}
 {"id":"interp_end:lineinterpolate","a":"LINESTRING(0 0,10 0)","b":null,"fn":"lineinterpolate","arg":1,"expected":"POINT(10 0)"}
 {"id":"interp_mid:lineinterpolate","a":"LINESTRING(0 0,10 0)","b":null,"fn":"lineinterpolate","arg":0.5,"expected":"POINT(5 0)"}
 {"id":"interp_multiseg:lineinterpolate","a":"LINESTRING(0 0,4 0,4 4)","b":null,"fn":"lineinterpolate","arg":0.35,"expected":"POINT(2.8 0)"}
@@ -20,5 +29,18 @@
 {"id":"locate_mid:linelocate","a":"LINESTRING(0 0,10 0)","b":"POINT(2.5 4)","fn":"linelocate","arg":null,"expected":0.25}
 {"id":"locate_multiseg:linelocate","a":"LINESTRING(0 0,4 0,4 4)","b":"POINT(4 1)","fn":"linelocate","arg":null,"expected":0.625}
 {"id":"locate_start:linelocate","a":"LINESTRING(0 0,10 0)","b":"POINT(-5 0)","fn":"linelocate","arg":null,"expected":0}
+{"id":"oenv_axis_square:orientedenv","a":"MULTIPOINT(0 0,4 0,4 4,0 4)","b":null,"fn":"orientedenv","arg":null,"expected":"POLYGON((0 0,4 0,4 4,0 4,0 0))"}
+{"id":"oenv_diag_line:orientedenv","a":"LINESTRING(0 0,2 2)","b":null,"fn":"orientedenv","arg":null,"expected":"LINESTRING(0 0,2 2)"}
+{"id":"oenv_point:orientedenv","a":"POINT(3 4)","b":null,"fn":"orientedenv","arg":null,"expected":"POINT(3 4)"}
+{"id":"pos_point:pointonsurface","a":"POINT(7 8)","b":null,"fn":"pointonsurface","arg":null,"expected":"POINT(7 8)"}
+{"id":"pos_square:pointonsurface","a":"POLYGON((0 0,4 0,4 4,0 4,0 0))","b":null,"fn":"pointonsurface","arg":null,"expected":"POINT(2 2)"}
+{"id":"rotate_half_pi:rotate","a":"LINESTRING(1 0,2 0)","b":null,"fn":"rotate","arg":1.5707963267948966,"expected":"LINESTRING(6.123233995736766e-17 1,1.224646799147353e-16 2)"}
+{"id":"rotate_pi:rotate","a":"POINT(4 5)","b":null,"fn":"rotate","arg":3.141592653589793,"expected":"POINT(-4.000000000000001 -4.999999999999999)"}
+{"id":"scale_point:scale","a":"POINT(2 3)","b":null,"fn":"scale","arg":null,"expected":"POINT(4 9)"}
+{"id":"svw_point:simplifyvw","a":"POINT(1 2)","b":null,"fn":"simplifyvw","arg":1,"expected":"POINT(1 2)"}
+{"id":"svw_zigzag_large:simplifyvw","a":"LINESTRING(0 0,1 0.01,2 0,3 0.01,4 0)","b":null,"fn":"simplifyvw","arg":1,"expected":"LINESTRING(0 0,4 0)"}
+{"id":"svw_zigzag_small:simplifyvw","a":"LINESTRING(0 0,1 0.01,2 0,3 0.01,4 0)","b":null,"fn":"simplifyvw","arg":0.001,"expected":"LINESTRING(0 0,1 0.01,2 0,3 0.01,4 0)"}
+{"id":"translate_line:translate","a":"LINESTRING(0 0,1 1)","b":null,"fn":"translate","arg":null,"expected":"LINESTRING(10 -2,11 -1)"}
+{"id":"rotate_about:rotate4","a":"POINT(4 5)","arg":3.14159265358979323846,"args":[5.0,5.0],"fn":"rotate4","expected":"POINT(5.999999999999999 5.000000000000001)"}
 {"id":"interp_oob:lineinterpolate","a":"LINESTRING(0 0,10 0)","arg":1.5,"fn":"lineinterpolate","expected":{"error": true},"note":"PostGIS raises on fraction outside [0,1]; kenro raises too (geo would clamp)"}
 {"id":"frechet_poly:frechet","a":"POLYGON((0 0,1 0,1 1,0 1,0 0))","b":"LINESTRING(0 0,1 1)","fn":"frechet","expected":{"error": true},"note":"kenro restricts ST_FrechetDistance to LINESTRING x LINESTRING"}

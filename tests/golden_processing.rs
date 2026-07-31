@@ -5,16 +5,37 @@
 mod common;
 
 use common::Vector;
-use kenro::functions::{io, measures};
+use kenro::functions::{affine, io, measures, processing};
 use rusqlite::Connection;
 use rusqlite::types::Value;
 
 fn check(id: &str, func: &str, got: &serde_json::Value, want: &serde_json::Value) {
-    let geometric = matches!(func, "closestpoint" | "lineinterpolate");
+    let geometric = matches!(
+        func,
+        "closestpoint"
+            | "lineinterpolate"
+            | "pointonsurface"
+            | "simplifyvw"
+            | "chaikin"
+            | "removerepeated"
+            | "rotate"
+            | "rotate4"
+            | "translate"
+            | "scale"
+    );
+    // Convex rings compare as vertex sets (ring rotation/direction differ
+    // legitimately between implementations).
+    let vertex_set = matches!(func, "convexhull" | "orientedenv");
     match (got, want) {
         (serde_json::Value::Null, serde_json::Value::Null) => {}
         (serde_json::Value::Number(g), serde_json::Value::Number(w)) => {
             common::assert_number(id, g.as_f64().unwrap(), w.as_f64().unwrap())
+        }
+        (serde_json::Value::String(g), serde_json::Value::String(w)) if vertex_set => {
+            assert!(
+                common::geoms_same_vertex_set(g, w, 1e-9),
+                "{id}: got {g}, want {w}"
+            )
         }
         (serde_json::Value::String(g), serde_json::Value::String(w)) if geometric => {
             assert!(
@@ -51,6 +72,23 @@ fn run_pure(v: &Vector) -> Result<serde_json::Value, kenro::Error> {
             Some(az) => serde_json::json!(az),
             None => serde_json::Value::Null,
         },
+        "convexhull" => io::st_as_text(&processing::st_convex_hull(&a)?)?.into(),
+        "pointonsurface" => io::st_as_text(&processing::st_point_on_surface(&a)?)?.into(),
+        "simplifyvw" => io::st_as_text(&processing::st_simplify_vw(&a, v.arg.unwrap())?)?.into(),
+        "chaikin" => io::st_as_text(&processing::st_chaikin_smoothing(
+            &a,
+            v.arg.unwrap() as i64,
+        )?)?
+        .into(),
+        "removerepeated" => io::st_as_text(&processing::st_remove_repeated_points(&a)?)?.into(),
+        "orientedenv" => io::st_as_text(&processing::st_oriented_envelope(&a)?)?.into(),
+        "rotate" => io::st_as_text(&affine::st_rotate(&a, v.arg.unwrap())?)?.into(),
+        "rotate4" => {
+            let args = v.args.clone().unwrap();
+            io::st_as_text(&affine::st_rotate_xy(&a, v.arg.unwrap(), args[0], args[1])?)?.into()
+        }
+        "translate" => io::st_as_text(&affine::st_translate(&a, 10.0, -2.0)?)?.into(),
+        "scale" => io::st_as_text(&affine::st_scale(&a, 2.0, 3.0)?)?.into(),
         other => panic!("{}: unknown fn {other}", v.id),
     })
 }
@@ -84,14 +122,39 @@ fn golden_processing_through_sql() {
             "hausdorff" => "SELECT ST_HausdorffDistance(ST_GeomFromText(?1), ST_GeomFromText(?2))",
             "frechet" => "SELECT ST_FrechetDistance(ST_GeomFromText(?1), ST_GeomFromText(?2))",
             "azimuth" => "SELECT ST_Azimuth(ST_GeomFromText(?1), ST_GeomFromText(?2))",
+            "convexhull" => "SELECT ST_AsText(ST_ConvexHull(ST_GeomFromText(?1)))",
+            "pointonsurface" => "SELECT ST_AsText(ST_PointOnSurface(ST_GeomFromText(?1)))",
+            "simplifyvw" => "SELECT ST_AsText(ST_SimplifyVW(ST_GeomFromText(?1), ?2))",
+            "chaikin" => "SELECT ST_AsText(ST_ChaikinSmoothing(ST_GeomFromText(?1), ?2))",
+            "removerepeated" => "SELECT ST_AsText(ST_RemoveRepeatedPoints(ST_GeomFromText(?1)))",
+            "orientedenv" => "SELECT ST_AsText(ST_OrientedEnvelope(ST_GeomFromText(?1)))",
+            "rotate" => "SELECT ST_AsText(ST_Rotate(ST_GeomFromText(?1), ?2))",
+            "rotate4" => "SELECT ST_AsText(ST_Rotate(ST_GeomFromText(?1), ?2, ?3, ?4))",
+            "translate" => "SELECT ST_AsText(ST_Translate(ST_GeomFromText(?1), 10.0, -2.0))",
+            "scale" => "SELECT ST_AsText(ST_Scale(ST_GeomFromText(?1), 2.0, 3.0))",
             other => panic!("{}: unknown fn {other}", v.id),
         };
         let result: rusqlite::Result<Value> = match v.func.as_str() {
-            "lineinterpolate" => conn.query_row(
+            "lineinterpolate" | "simplifyvw" | "rotate" => conn.query_row(
                 sql,
                 rusqlite::params![v.a.as_ref().unwrap(), v.arg.unwrap()],
                 |r| r.get(0),
             ),
+            "chaikin" => conn.query_row(
+                sql,
+                rusqlite::params![v.a.as_ref().unwrap(), v.arg.unwrap() as i64],
+                |r| r.get(0),
+            ),
+            "rotate4" => {
+                let args = v.args.clone().unwrap();
+                conn.query_row(
+                    sql,
+                    rusqlite::params![v.a.as_ref().unwrap(), v.arg.unwrap(), args[0], args[1]],
+                    |r| r.get(0),
+                )
+            }
+            "convexhull" | "pointonsurface" | "removerepeated" | "orientedenv" | "translate"
+            | "scale" => conn.query_row(sql, [v.a.as_ref().unwrap()], |r| r.get(0)),
             _ => conn.query_row(sql, [v.a.as_ref().unwrap(), v.b.as_ref().unwrap()], |r| {
                 r.get(0)
             }),

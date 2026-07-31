@@ -4,6 +4,7 @@
 //! extension and WASM) are thin value-mapping shims over these.
 
 pub mod accessors;
+pub mod affine;
 #[cfg(feature = "geojson")]
 pub mod geojson;
 #[cfg(feature = "h3")]
@@ -12,6 +13,7 @@ pub mod io;
 pub mod manifest;
 pub mod measures;
 pub mod predicates;
+pub mod processing;
 pub mod rtree;
 pub mod stubs;
 #[cfg(feature = "transform")]
