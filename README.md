@@ -4,7 +4,7 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, or *GeoPackage in pure Rust*: this is that crate.
 
-**kenro is a full spatial SQL engine for SQLite**: the PostGIS function surface — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~80 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~80 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON and GeoPackage blobs in and out, MVT vector tiles out — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
@@ -115,9 +115,12 @@ comparison and documented behavior differences — lives in
 All implemented functions are **deterministic and pure** (no I/O, no clock,
 no randomness) and NULL-strict (NULL in → NULL out; aggregates skip NULL
 rows, following PostGIS aggregate semantics). Malformed input raises an
-explicit error prefixed `kenro:` — never a silent NULL. Functions kenro
-knows about but does not implement register as stubs whose error explains
-what to use instead.
+explicit error prefixed `kenro:` — never a silent NULL. You also never get
+SQLite's bare `no such function`: anything outside the build's feature set
+registers as a stub naming the missing cargo feature (a default build
+stubs the six overlay-family functions; `full` has none), and the one
+deliberate exclusion, `ST_Collect`, errors with a pointer to the
+`ST_Union` aggregate.
 
 ## Semantics: PostGIS is the reference
 

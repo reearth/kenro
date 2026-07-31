@@ -5,7 +5,7 @@ PostGIS-compatible `ST_` functions registered as JS-level UDFs on any wasm
 SQLite host: the official [@sqlite.org/sqlite-wasm] build, [sql.js], and
 [wa-sqlite].
 
-kenro is a full spatial SQL engine in pure Rust (~80 functions: the DE-9IM
+kenro is a spatial SQL engine in pure Rust (~80 functions: the DE-9IM
 predicate family, overlay/repair/buffer, CRS transform, H3, GeoJSON, MVT
 vector tiles, spatial aggregates), golden-tested against PostGIS. This
 package is its wasm build plus one small adapter per host. The bundled
