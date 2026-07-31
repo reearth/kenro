@@ -22,7 +22,7 @@ naming the missing feature:
 |---|---|---|---|---|
 | minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors | 412 KB | 167 KB |
 | standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 617 KB | 251 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor) | 946 KB | 353 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, and `ST_AsMVTGeom` gains PostGIS-grade validity repair (i_overlay's mesh is the single largest contributor) | 946 KB | 353 KB |
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
 (~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at

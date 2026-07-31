@@ -33,6 +33,8 @@ jobs:
         run: cargo test
       - name: Test (all features)
         run: cargo test --all-features
+      - name: Golden MVT on the standard tier (rect-clip path, no overlay)
+        run: cargo test --no-default-features --features rusqlite,mvt --test golden_mvt
       - name: Transform accuracy regression gate
         run: cargo run --example accuracy_report -- --check
 

@@ -216,7 +216,6 @@ pub fn st_union(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
 /// documented split-interior gap).
 pub fn st_make_valid(bytes: &[u8]) -> Result<Vec<u8>> {
     use geo::algorithm::Validation;
-    use geo::orient::{Direction, Orient};
     const FUNC: &str = "ST_MakeValid";
     let g = geom::decode_auto(bytes)?;
     let class = classify(FUNC, &g.geometry)?;
@@ -224,12 +223,17 @@ pub fn st_make_valid(bytes: &[u8]) -> Result<Vec<u8>> {
     if geom::is_empty(&g.geometry) || class != Class::Areal || g.geometry.is_valid() {
         return encode(g.geometry, g.srid, FUNC);
     }
-    // Drop rings the arrangement cannot use (fewer than 3 distinct
-    // vertices), then resolve self-intersections by unioning with nothing.
+    let repaired = repair_multi_polygon(to_multi_polygon(&g.geometry));
+    encode(normalize_polygons(repaired), g.srid, FUNC)
+}
+
+/// The areal repair core (also used by the MVT pipeline in `full` builds):
+/// drop rings the arrangement cannot use (fewer than 3 distinct vertices),
+/// then resolve self-intersections by unioning with nothing.
+pub(crate) fn repair_multi_polygon(mp: MultiPolygon<f64>) -> MultiPolygon<f64> {
+    use geo::orient::{Direction, Orient};
     let cleaned = MultiPolygon(
-        to_multi_polygon(&g.geometry)
-            .0
-            .into_iter()
+        mp.0.into_iter()
             .filter_map(|p| {
                 let keep = |ring: &LineString<f64>| {
                     let mut distinct = ring.0.clone();
@@ -250,10 +254,9 @@ pub fn st_make_valid(bytes: &[u8]) -> Result<Vec<u8>> {
             })
             .collect(),
     );
-    let repaired = cleaned
+    cleaned
         .orient(Direction::Default)
-        .union(&MultiPolygon(vec![]));
-    encode(normalize_polygons(repaired), g.srid, FUNC)
+        .union(&MultiPolygon(vec![]))
 }
 
 /// Accumulator for the 1-arg `ST_Union(geom)` aggregate (dissolve).

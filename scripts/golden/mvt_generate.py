@@ -53,6 +53,11 @@ ASMVTGEOM = [
     # (kenro's WKT reader rejects POINT EMPTY by design, so the empty-input
     # vector uses an empty linestring.)
     ("empty_line", "LINESTRING EMPTY", [100, 0]),
+    # Invalid inputs: PostGIS's ST_AsMVTGeom repairs internally. kenro's
+    # `full` tier reproduces that; the standard tier skips these vectors
+    # (see tests/golden_mvt.rs).
+    ("dirty_bowtie", "POLYGON((10 10,60 60,60 10,10 60,10 10))", [100, 0]),
+    ("dirty_overlap_multi", "MULTIPOLYGON(((10 10,50 10,50 50,10 50,10 10)),((30 30,70 30,70 70,30 70,30 30)))", [100, 0]),
 ]
 
 # (id, layer_name, extent, rows = [(wkt, props|None)])

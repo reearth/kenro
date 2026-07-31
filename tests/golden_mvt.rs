@@ -58,6 +58,12 @@ fn geom_args(v: &Vector) -> (Option<i32>, Option<i32>, Option<i32>) {
     (get(0), get(1), get(2))
 }
 
+/// `dirty_*` vectors need the `full` tier's validity repair; the standard
+/// tier (rect clipping, no repair) skips them by design.
+fn skipped(v: &Vector) -> bool {
+    v.id.starts_with("dirty_") && !cfg!(feature = "overlay")
+}
+
 fn check_asmvtgeom(v: &Vector, got: Option<String>) {
     match (got, v.effective()) {
         (None, Value::Null) => {}
@@ -217,6 +223,9 @@ fn asmvt_rows(v: &Vector) -> Vec<(String, Option<String>)> {
 #[test]
 fn golden_mvt_through_pure_functions() {
     for v in common::load("mvt") {
+        if skipped(&v) {
+            continue;
+        }
         match v.func.as_str() {
             "asmvtgeom" => {
                 let a = io::st_geom_from_text(v.a.as_ref().unwrap(), None).unwrap();
@@ -267,6 +276,9 @@ fn golden_mvt_through_sql() {
     let conn = Connection::open_in_memory().unwrap();
     kenro::register(&conn).unwrap();
     for v in common::load("mvt") {
+        if skipped(&v) {
+            continue;
+        }
         match v.func.as_str() {
             "asmvtgeom" => {
                 let (extent, buffer, clip) = geom_args(&v);

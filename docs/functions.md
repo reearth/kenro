@@ -97,7 +97,7 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_Reverse(geom)` | geometry | ✅ | ✅ | Member order of multi geometries preserved |
 | `ST_IsValid(geom)` | 0/1 | ✅ GEOS | ✅ GEOS | georust validation: everything incl. ring self-intersection and hole placement, except the split-interior case (documented gap) |
 | **Vector tiles (MVT)** | | | | |
-| `ST_AsMVTGeom(geom, bounds [, extent [, buffer [, clip]]])` | geometry / NULL | ✅ | ✅ | World → integer tile coordinates (Y down); clipped-away input → NULL. `bounds` is any geometry (its envelope is used). ±1 pixel vs PostGIS at tile edges (kenro clips before grid snapping, PostGIS after) |
+| `ST_AsMVTGeom(geom, bounds [, extent [, buffer [, clip]]])` | geometry / NULL | ✅ | ✅ | World → integer tile coordinates (Y down); clipped-away input → NULL. `bounds` is any geometry (its envelope is used). ±1 pixel vs PostGIS at tile edges (kenro clips before grid snapping, PostGIS after). **`full` builds add PostGIS-grade validity repair**: invalid input and snap-induced self-intersections are made valid (golden-tested); standard builds clip exactly but pass invalid rings through |
 | `ST_AsMVT(geom [, name [, extent [, props_json]]])` **aggregate** | BLOB | ⚠️ record-based signature | ⚠️ | **Deliberate signature divergence**: SQLite has no record type, so properties come from `json_object(...)` instead of row columns. A PostGIS-style call fails loudly at the type level. Layer name/extent must be constant per group |
 | **Stubs** (call = helpful error) | | | | |
 | `ST_Collect` | stub | ✅ | ✅ | kenro never produces GeometryCollection values; use the `ST_Union` aggregate for areal dissolve, or collect rows on the application side |

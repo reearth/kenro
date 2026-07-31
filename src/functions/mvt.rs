@@ -104,6 +104,7 @@ fn clip_lines(lines: &MultiLineString<f64>, rect: &Rect<f64>) -> MultiLineString
     MultiLineString(out)
 }
 
+#[cfg(not(feature = "overlay"))]
 /// Sutherland–Hodgman: clip a closed ring against one half-plane.
 fn clip_ring_edge(
     ring: &[Coord<f64>],
@@ -126,6 +127,7 @@ fn clip_ring_edge(
     out
 }
 
+#[cfg(not(feature = "overlay"))]
 /// Sutherland–Hodgman a ring (closed or open input) against `rect`;
 /// returns a closed ring, or `None` when nothing remains.
 fn clip_ring(ring: &LineString<f64>, rect: &Rect<f64>) -> Option<LineString<f64>> {
@@ -174,6 +176,7 @@ fn clip_ring(ring: &LineString<f64>, rect: &Rect<f64>) -> Option<LineString<f64>
     Some(LineString::new(pts))
 }
 
+#[cfg(not(feature = "overlay"))]
 /// Clip a polygon against `rect`: exterior and holes ring-by-ring (holes of
 /// a valid polygon stay inside the clipped exterior by construction).
 fn clip_polygon(p: &Polygon<f64>, rect: &Rect<f64>) -> Option<Polygon<f64>> {
@@ -184,6 +187,50 @@ fn clip_polygon(p: &Polygon<f64>, rect: &Rect<f64>) -> Option<Polygon<f64>> {
         .filter_map(|r| clip_ring(r, rect))
         .collect();
     Some(Polygon::new(exterior, interiors))
+}
+
+/// Areal clip, standard tier: ring-by-ring Sutherland–Hodgman (exact for
+/// the rectangular window; self-intersecting input stays self-intersecting,
+/// as documented).
+#[cfg(not(feature = "overlay"))]
+fn clip_areal(g: &Geometry<f64>, rect: &Rect<f64>) -> MultiPolygon<f64> {
+    MultiPolygon(
+        to_multi_polygon(g)
+            .0
+            .iter()
+            .filter_map(|p| clip_polygon(p, rect))
+            .collect(),
+    )
+}
+
+/// Areal clip, `full` tier: PostGIS-grade — invalid input is repaired first
+/// (ST_AsMVTGeom in PostGIS runs make-valid internally), then a boolean
+/// intersection clips AND splits window-crossing concave polygons into
+/// proper parts instead of bridged rings.
+#[cfg(feature = "overlay")]
+fn clip_areal(g: &Geometry<f64>, rect: &Rect<f64>) -> MultiPolygon<f64> {
+    use geo::BooleanOps;
+    use geo::algorithm::Validation;
+    let mut mp = to_multi_polygon(g);
+    if !mp.is_valid() {
+        mp = super::overlay::repair_multi_polygon(mp);
+    }
+    mp.intersection(&MultiPolygon(vec![rect.to_polygon()]))
+}
+
+/// Post-snap repair, `full` tier only: rounding onto the integer grid can
+/// make even valid input self-intersect (the classic MVT failure mode);
+/// PostGIS re-validates after gridding and so does kenro when the overlay
+/// engine is present. One pass: repair, re-round, drop re-degenerated
+/// rings.
+#[cfg(feature = "overlay")]
+fn snap_repair(mp: MultiPolygon<f64>) -> MultiPolygon<f64> {
+    use geo::algorithm::Validation;
+    if mp.is_valid() {
+        return mp;
+    }
+    let repaired = super::overlay::repair_multi_polygon(mp);
+    MultiPolygon(repaired.0.iter().filter_map(clean_polygon).collect())
 }
 
 // ---- degenerate cleanup on tile-space (integer) coordinates ----
@@ -260,6 +307,11 @@ fn clean_tile_geometry(g: &Geometry<f64>) -> Option<Geometry<f64>> {
                 .iter()
                 .filter_map(clean_polygon)
                 .collect();
+            if polys.is_empty() {
+                return None;
+            }
+            #[cfg(feature = "overlay")]
+            let polys = snap_repair(MultiPolygon(polys)).0;
             if polys.is_empty() {
                 return None;
             }
@@ -357,14 +409,7 @@ pub fn st_as_mvt_geom(
                 result
             }
             Class::Areal => {
-                let clipped = MultiPolygon(
-                    to_multi_polygon(&geometry)
-                        .0
-                        .iter()
-                        .filter_map(|p| clip_polygon(p, &rect))
-                        .collect(),
-                );
-                let result = normalize_polygons(clipped);
+                let result = normalize_polygons(clip_areal(&geometry, &rect));
                 if geom::is_empty(&result) {
                     return Ok(None);
                 }
@@ -598,6 +643,23 @@ mod tests {
         )
         .unwrap();
         assert!(out.is_none());
+    }
+
+    #[cfg(feature = "overlay")]
+    #[test]
+    fn full_tier_repairs_invalid_input_like_postgis() {
+        use crate::functions::accessors::st_is_valid;
+        let out = st_as_mvt_geom(
+            &gpb("POLYGON((10 10,60 60,60 10,10 60,10 10))"),
+            &gpb("POLYGON((0 0,100 0,100 100,0 100,0 0))"),
+            Some(100),
+            Some(0),
+            None,
+        )
+        .unwrap()
+        .unwrap();
+        assert!(st_is_valid(&out).unwrap());
+        assert!(as_wkt(&out).starts_with("MULTIPOLYGON"), "{}", as_wkt(&out));
     }
 
     #[test]

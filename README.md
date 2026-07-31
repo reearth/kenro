@@ -183,7 +183,9 @@ algorithms, so MVT costs almost nothing).
 **`full`** adds the one feature excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
 `ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest
-single contributor to binary size). In wasm terms: standard 617 KB
+single contributor to binary size). With overlay present, `ST_AsMVTGeom`
+also upgrades to PostGIS-grade validity repair (invalid input and
+snap-induced self-intersections are made valid before tiling). In wasm terms: standard 617 KB
 (251 KB gzip) vs full 946 KB (353 KB gzip); `--no-default-features`
 gives a 412 KB (167 KB gzip) minimal build.
 
