@@ -245,6 +245,7 @@ pub const FUNCTIONS: &[FnEntry] = &[
     ),
     entry!("ST_Union", "stUnion", [Blob, Blob], Blob, Some("overlay")),
     entry!("ST_Buffer", "stBuffer", [Blob, Real], Blob, Some("overlay")),
+    entry!("ST_MakeValid", "stMakeValid", [Blob], Blob, Some("overlay")),
     entry!(
         "ST_Buffer",
         "stBufferOpts",
@@ -414,8 +415,8 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
 /// (`n_args = -1`) functions. Names not listed here register at every arity
 /// in `DEFAULT_STUB_ARITIES`.
 pub const STUB_ARITIES: &[(&str, &[i32])] = &[
-    ("ST_MakeValid", &[1]),
     // Feature-off fallbacks.
+    ("ST_MakeValid", &[1]),
     ("ST_Intersection", &[2]),
     ("ST_Difference", &[2]),
     ("ST_SymDifference", &[2]),

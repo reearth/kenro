@@ -84,7 +84,7 @@ fn every_module_works_through_the_loaded_extension() {
     // Stub error message.
     let err = conn
         .query_row(
-            "SELECT ST_MakeValid(ST_GeomFromText('POINT(0 0)'))",
+            "SELECT ST_Collect(ST_GeomFromText('POINT(0 0)'))",
             [],
             |r| r.get::<_, i64>(0),
         )

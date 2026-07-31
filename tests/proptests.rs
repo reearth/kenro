@@ -173,6 +173,22 @@ proptest! {
     }
 
     #[test]
+    fn make_valid_output_is_valid(
+        pts in prop::collection::vec((-100.0..100.0f64, -100.0..100.0f64), 3..9),
+    ) {
+        use kenro::functions::accessors;
+        // Random rings are self-intersecting more often than not — exactly
+        // the input MakeValid exists for. Output must always validate.
+        let mut ring: Vec<String> = pts.iter().map(|(x, y)| format!("{x:?} {y:?}")).collect();
+        ring.push(ring[0].clone());
+        let wkt = format!("POLYGON(({}))", ring.join(","));
+        let g = io::st_geom_from_text(&wkt, None).unwrap();
+        let out = overlay::st_make_valid(&g).unwrap();
+        prop_assert!(accessors::st_is_valid(&out).unwrap(), "{wkt}");
+        prop_assert!(overlay::st_make_valid(&out).unwrap() == out, "not idempotent: {wkt}");
+    }
+
+    #[test]
     fn areal_intersection_never_exceeds_operands(a in rect_wkt(), b in rect_wkt()) {
         use kenro::functions::accessors;
         let ga = io::st_geom_from_text(&a, None).unwrap();

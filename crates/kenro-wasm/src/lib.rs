@@ -292,6 +292,12 @@ pub fn st_buffer(geom: &[u8], distance: f64) -> R<Vec<u8>> {
 }
 
 #[cfg(feature = "overlay")]
+#[wasm_bindgen(js_name = stMakeValid)]
+pub fn st_make_valid(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_make_valid(geom).map_err(err)
+}
+
+#[cfg(feature = "overlay")]
 #[wasm_bindgen(js_name = stBufferOpts)]
 pub fn st_buffer_opts(geom: &[u8], distance: f64, options: &str) -> R<Vec<u8>> {
     kenro::functions::overlay::st_buffer(geom, distance, Some(options)).map_err(err)
@@ -748,6 +754,7 @@ mod tests {
             "stNumPoints",
             "stIsValid",
             "stSimplify",
+            "stMakeValid",
             "stAsMvtGeom",
             "stAsMvtGeomExtent",
             "stAsMvtGeomBuffer",

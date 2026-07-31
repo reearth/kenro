@@ -217,6 +217,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         register_geom2_to_blob(conn, "ST_Difference", overlay::st_difference)?;
         register_geom2_to_blob(conn, "ST_SymDifference", overlay::st_sym_difference)?;
         register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
+        register_geom_to_blob(conn, "ST_MakeValid", overlay::st_make_valid)?;
         conn.create_scalar_function("ST_Buffer", 2, FLAGS, |ctx| {
             let (Some(b), Some(d)) = (
                 blob_or_null(ctx, 0, "ST_Buffer")?,

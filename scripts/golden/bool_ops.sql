@@ -76,3 +76,30 @@ SELECT row_to_json(t)::text FROM (
          jsonb_build_object('error', true) AS kenro_expected,
          'mixed-dimension unions produce GeometryCollections; kenro raises instead' AS note
 ) t;
+
+-- ST_MakeValid: kenro repairs polygons with GEOS's *structure*-method
+-- semantics (areal results only). The reference image's GEOS (3.9) predates
+-- the structure method, so `expected` is the default linework repair;
+-- shapes where kenro legitimately differs carry an explicit kenro_expected
+-- override. jsonb_strip_nulls drops the key when there is no override.
+WITH shapes(id, a, mode, kenro_override, shape_note) AS (VALUES
+  ('mv_bowtie',        'POLYGON((0 0,2 2,2 0,0 2,0 0))', 'areal', NULL, NULL),
+  ('mv_figure8',       'POLYGON((0 0,1 1,2 0,2 2,1 1,0 2,0 0))', 'areal', NULL, NULL),
+  ('mv_hole_outside',  'POLYGON((0 0,4 0,4 4,0 4,0 0),(5 5,6 5,6 6,5 6,5 5))', 'areal', NULL, NULL),
+  ('mv_hole_crossing', 'POLYGON((0 0,4 0,4 4,0 4,0 0),(2 2,6 2,6 3,2 3,2 2))', 'areal', NULL, NULL),
+  ('mv_overlap_multi', 'MULTIPOLYGON(((0 0,2 0,2 2,0 2,0 0)),((1 1,3 1,3 3,1 3,1 1)))', 'areal', NULL, NULL),
+  ('mv_collinear_sliver', 'POLYGON((0 0,2 0,1 0,0 0))', 'exact',
+   'POLYGON((0 0,2 0,1 0,0 0))',
+   'georust validation does not flag collinear zero-area rings (the documented ST_IsValid gap), so kenro returns the input unchanged where PostGIS collapses it to lines'),
+  ('mv_already_valid', 'POLYGON((0 0,3 0,3 3,0 3,0 0))', 'exact', NULL, NULL),
+  ('mv_cw_exterior',   'POLYGON((0 0,0 3,3 3,3 0,0 0))', 'exact', NULL, NULL),
+  ('mv_point',         'POINT(1 2)', 'exact', NULL, NULL),
+  ('mv_crossing_line', 'LINESTRING(0 0,2 2,2 0,0 2)', 'exact', NULL, NULL)
+)
+SELECT jsonb_strip_nulls(row_to_json(t)::jsonb)::text FROM (
+  SELECT s.id || ':makevalid' AS id, s.a, 'makevalid' AS "fn", s.mode,
+         to_jsonb(ST_AsText(ST_MakeValid(ST_GeomFromText(s.a)))) AS expected,
+         to_jsonb(s.kenro_override) AS kenro_expected,
+         coalesce(s.shape_note, 'kenro repairs with structure-method semantics (areal-only results)') AS note
+  FROM shapes s ORDER BY s.id
+) t;

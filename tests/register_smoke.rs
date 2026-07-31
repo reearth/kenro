@@ -68,6 +68,7 @@ fn every_implemented_function_is_callable() {
         "SELECT ST_AsText(ST_MakeEnvelope(0, 0, 2, 3))",
         "SELECT ST_SRID(ST_MakeEnvelope(0, 0, 2, 3, 4326))",
         "SELECT GPKG_IsAssignable('GEOMETRY', 'POINT')",
+        "SELECT ST_AsText(ST_MakeValid(ST_GeomFromText('POLYGON((0 0,2 2,2 0,0 2,0 0))')))",
     ];
     for sql in cases {
         assert!(
@@ -160,6 +161,7 @@ fn null_in_null_out_for_every_function() {
         "SELECT ST_StartPoint(NULL)",
         "SELECT ST_EndPoint(NULL)",
         "SELECT ST_PointN(NULL, 1)",
+        "SELECT ST_MakeValid(NULL)",
         "SELECT ST_Reverse(NULL)",
         "SELECT ST_MakePoint(NULL, 2)",
         "SELECT ST_Point(1, NULL)",
@@ -177,14 +179,14 @@ fn null_in_null_out_for_every_function() {
 #[test]
 fn stubs_error_with_helpful_hints() {
     let conn = conn();
-    let err = query_value(&conn, "SELECT ST_MakeValid(ST_GeomFromText('POINT(0 0)'))")
+    let err = query_value(&conn, "SELECT ST_Collect(ST_GeomFromText('POINT(0 0)'))")
         .unwrap_err()
         .to_string();
-    assert!(err.contains("ST_MakeValid is not implemented"), "{err}");
-    assert!(err.contains("ST_IsValid"), "{err}");
+    assert!(err.contains("ST_Collect is not implemented"), "{err}");
+    assert!(err.contains("ST_Union"), "{err}");
 
     // Stubs are loud for any arity, including NULL args.
-    assert!(query_value(&conn, "SELECT ST_MakeValid(NULL)").is_err());
+    assert!(query_value(&conn, "SELECT ST_Collect(NULL)").is_err());
 }
 
 #[test]

@@ -216,6 +216,7 @@ test("bool_ops vectors", () => {
     if (v.mode === "areal") continue;
     const run = () => {
       const a = geom(v.a);
+      if (v.fn === "makevalid") return wasm.stAsText(wasm.stMakeValid(a));
       const b = geom(v.b);
       switch (v.fn) {
         case "intersection":

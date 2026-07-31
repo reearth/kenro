@@ -63,6 +63,9 @@ fn check(v: &Vector, got: &serde_json::Value) {
 
 fn run_pure(v: &Vector) -> Result<String, kenro::Error> {
     let a = io::st_geom_from_text(v.a.as_ref().unwrap(), None)?;
+    if v.func == "makevalid" {
+        return io::st_as_text(&overlay::st_make_valid(&a)?);
+    }
     let b = io::st_geom_from_text(v.b.as_ref().unwrap(), None)?;
     let blob = match v.func.as_str() {
         "intersection" => overlay::st_intersection(&a, &b)?,
@@ -92,6 +95,17 @@ fn golden_bool_ops_through_sql() {
     let conn = Connection::open_in_memory().unwrap();
     kenro::register(&conn).unwrap();
     for v in common::load("bool_ops") {
+        if v.func == "makevalid" {
+            let got: String = conn
+                .query_row(
+                    "SELECT ST_AsText(ST_MakeValid(ST_GeomFromText(?1)))",
+                    [v.a.as_ref().unwrap()],
+                    |r| r.get(0),
+                )
+                .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+            check(&v, &serde_json::Value::String(got));
+            continue;
+        }
         let sql = match v.func.as_str() {
             "intersection" => {
                 "SELECT ST_AsText(ST_Intersection(ST_GeomFromText(?1), ST_GeomFromText(?2)))"

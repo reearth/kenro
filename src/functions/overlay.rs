@@ -303,6 +303,59 @@ pub fn st_union(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
     encode(result, ga.srid.max(gb.srid), FUNC)
 }
 
+/// `ST_MakeValid(geom)` — pure-Rust polygon repair with GEOS's *structure*
+/// method semantics: the ring linework is resolved into an arrangement and
+/// unioned (via i_overlay), so bowties split into multiple polygons, holes
+/// outside their shell become polygons of their own, and zero-area parts
+/// disappear (`keepcollapsed=false`). PostGIS's default *linework* method
+/// can return lower-dimensional pieces (a collapsed sliver as a LINESTRING,
+/// wrapped in a GeometryCollection) — kenro deliberately returns areal
+/// results only, matching the overlay family. Points and lines are always
+/// OGC-valid and pass through unchanged; already-valid polygons return
+/// unchanged (per kenro's `ST_IsValid`, which shares georust validation's
+/// documented split-interior gap).
+pub fn st_make_valid(bytes: &[u8]) -> Result<Vec<u8>> {
+    use geo::algorithm::Validation;
+    use geo::orient::{Direction, Orient};
+    const FUNC: &str = "ST_MakeValid";
+    let g = geom::decode_auto(bytes)?;
+    let class = classify(FUNC, &g.geometry)?;
+    ensure_finite(FUNC, &g.geometry)?;
+    if geom::is_empty(&g.geometry) || class != Class::Areal || g.geometry.is_valid() {
+        return encode(g.geometry, g.srid, FUNC);
+    }
+    // Drop rings the arrangement cannot use (fewer than 3 distinct
+    // vertices), then resolve self-intersections by unioning with nothing.
+    let cleaned = MultiPolygon(
+        to_multi_polygon(&g.geometry)
+            .0
+            .into_iter()
+            .filter_map(|p| {
+                let keep = |ring: &LineString<f64>| {
+                    let mut distinct = ring.0.clone();
+                    distinct.dedup();
+                    if distinct.first() == distinct.last() {
+                        distinct.pop();
+                    }
+                    distinct.len() >= 3
+                };
+                if !keep(p.exterior()) {
+                    return None;
+                }
+                let (exterior, interiors) = p.into_inner();
+                Some(Polygon::new(
+                    exterior,
+                    interiors.into_iter().filter(keep).collect(),
+                ))
+            })
+            .collect(),
+    );
+    let repaired = cleaned
+        .orient(Direction::Default)
+        .union(&MultiPolygon(vec![]));
+    encode(normalize_polygons(repaired), g.srid, FUNC)
+}
+
 /// Accumulator for the 1-arg `ST_Union(geom)` aggregate (dissolve).
 ///
 /// PostGIS aggregate semantics: NULL rows are skipped (the binding layers
@@ -558,6 +611,35 @@ mod tests {
 
     fn g(wkt: &str) -> Vec<u8> {
         st_geom_from_text(wkt, None).unwrap()
+    }
+
+    #[test]
+    fn make_valid_repairs_a_bowtie_into_two_triangles() {
+        use crate::functions::accessors::{st_area, st_is_valid};
+        let out = st_make_valid(&g("POLYGON((0 0,2 2,2 0,0 2,0 0))")).unwrap();
+        assert!(st_is_valid(&out).unwrap());
+        assert!((st_area(&out).unwrap() - 2.0).abs() < 1e-12);
+        assert!(st_as_text(&out).unwrap().starts_with("MULTIPOLYGON"));
+    }
+
+    #[test]
+    fn make_valid_returns_valid_and_nonareal_input_unchanged() {
+        for wkt in [
+            "POLYGON((0 0,3 0,3 3,0 3,0 0))",
+            "POINT(1 2)",
+            "LINESTRING(0 0,2 2,2 0,0 2)", // self-crossing lines are OGC-valid
+        ] {
+            let out = st_make_valid(&g(wkt)).unwrap();
+            assert_eq!(st_as_text(&out).unwrap(), wkt);
+        }
+    }
+
+    #[test]
+    fn make_valid_moves_an_outside_hole_into_its_own_polygon() {
+        use crate::functions::accessors::st_area;
+        let out =
+            st_make_valid(&g("POLYGON((0 0,4 0,4 4,0 4,0 0),(5 5,6 5,6 6,5 6,5 5))")).unwrap();
+        assert!((st_area(&out).unwrap() - 17.0).abs() < 1e-12);
     }
 
     fn text(blob: &[u8]) -> String {

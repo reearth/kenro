@@ -16,12 +16,11 @@ pub struct Stub {
 }
 
 pub const STUBS: &[Stub] = &[
-    // Planned ("not yet").
+    // Deliberately excluded.
     Stub {
-        name: "ST_MakeValid",
-        hint: "geo has no GEOS-equivalent MakeValid (its polygon repair is \
-               triangulation-based and structurally different); validate with ST_IsValid \
-               and repair in PostGIS for now.",
+        name: "ST_Collect",
+        hint: "kenro never produces GeometryCollection values; for areal dissolve use \
+               the ST_Union aggregate, otherwise collect rows on the application side.",
     },
 ];
 
@@ -52,6 +51,10 @@ pub const H3_OFF: &[Stub] = &[
 ];
 
 pub const OVERLAY_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_MakeValid",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
     Stub {
         name: "ST_Intersection",
         hint: "kenro was built without the `overlay` cargo feature.",

@@ -59,6 +59,7 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_Union(a, b)` | geometry | ✅ | ✅ | Scalar form; line unions error (noding) |
 | `ST_Union(geom)` **aggregate** | geometry | ✅ | ⚠️ named `ST_Union_Agg` | Dissolve in `GROUP BY`; NULL rows skipped, zero rows → NULL (PostGIS aggregate semantics) |
 | `ST_Buffer(geom, d [, opts])` | geometry | ✅ | ⚠️ 3rd arg differs | PostGIS-style options TEXT (`quad_segs= endcap= join= mitre_limit=`) or INTEGER quad_segs; `side=` unsupported. Negative distance erodes polygons. Golden-tested within 2% area of GEOS |
+| `ST_MakeValid(geom)` | geometry | ✅ + params arg | ✅ | GEOS *structure*-method semantics: bowties split, stray holes become polygons, zero-area parts drop — areal results only, where PostGIS's default linework method can return collections with lines. Points/lines pass through unchanged. Property-tested: output always validates and is idempotent |
 | **Processing & affine** | | | | |
 | `ST_ConvexHull(geom)` | geometry | ✅ | ✅ | Degenerate hulls collapse to POINT/LINESTRING like PostGIS |
 | `ST_PointOnSurface(geom)` | geometry | ✅ | ✅ | Guaranteed interior; exact coordinates may differ from GEOS (documented in vectors) |
@@ -97,8 +98,8 @@ geometry-accepting function also auto-detects raw WKB input, so
 | **Vector tiles (MVT)** | | | | |
 | `ST_AsMVTGeom(geom, bounds [, extent [, buffer [, clip]]])` | geometry / NULL | ✅ | ✅ | World → integer tile coordinates (Y down); clipped-away input → NULL. `bounds` is any geometry (its envelope is used). ±1 pixel vs PostGIS at tile edges (kenro clips before grid snapping, PostGIS after) |
 | `ST_AsMVT(geom [, name [, extent [, props_json]]])` **aggregate** | BLOB | ⚠️ record-based signature | ⚠️ | **Deliberate signature divergence**: SQLite has no record type, so properties come from `json_object(...)` instead of row columns. A PostGIS-style call fails loudly at the type level. Layer name/extent must be constant per group |
-| **Stubs — planned** (call = helpful error) | | | | |
-| `ST_MakeValid` | stub | ✅ | ✅ | geo's polygon repair is triangulation-based and structurally different from GEOS — wiring it up would produce confusingly different geometry |
+| **Stubs** (call = helpful error) | | | | |
+| `ST_Collect` | stub | ✅ | ✅ | kenro never produces GeometryCollection values; use the `ST_Union` aggregate for areal dissolve, or collect rows on the application side |
 
 All implemented functions are **deterministic and pure** (no I/O, no clock,
 no randomness) and NULL-strict (NULL in → NULL out; aggregates skip NULL
@@ -109,9 +110,9 @@ Calling a stub raises a helpful error instead of SQLite's
 `no such function`:
 
 ```
-kenro: ST_MakeValid is not implemented in kenro. geo has no GEOS-equivalent
-MakeValid (its polygon repair is triangulation-based and structurally
-different); validate with ST_IsValid and repair in PostGIS for now.
+kenro: ST_Collect is not implemented in kenro. kenro never produces
+GeometryCollection values; for areal dissolve use the ST_Union aggregate,
+otherwise collect rows on the application side.
 ```
 
 Also out of scope: raster, network analysis, full PROJ grid transforms, and

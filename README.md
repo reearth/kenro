@@ -8,7 +8,7 @@ kenro brings the working set of spatial SQL — predicates through overlays to v
 
 - **Geometry I/O** — WKT, WKB, GeoJSON, and GeoPackage blobs as first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
-- **Overlay & buffer** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` in pure Rust, with the differences vs GEOS quantified by golden tests
+- **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree (F.3) and geometry-type (F.4) maintenance triggers require
 - **CRS transform** — pure-Rust [proj4rs]: WGS84, Web Mercator and every UTM zone built in, the full EPSG registry behind a feature flag, with [measured accuracy](docs/accuracy.md)
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
@@ -177,7 +177,7 @@ triggers, measures/processing/affine, CRS transform, H3, GeoJSON.
 
 **`full`** adds the two features excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
-`ST_Buffer` — pulls the [i_overlay] mesh, the largest single contributor to
+`ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest single contributor to
 binary size) and `mvt` (`ST_AsMVTGeom` + `ST_AsMVT`). In wasm terms:
 lite 589 KB (240 KB gzip) vs full 946 KB (353 KB gzip).
 
