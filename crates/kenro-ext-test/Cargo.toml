@@ -1,0 +1,17 @@
+[package]
+name = "kenro-ext-test"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Deliberately depends on NEITHER kenro nor kenro-ext: it links its own
+# bundled SQLite and loads the built cdylib purely as a file, keeping this
+# feature graph free of loadable_extension (see the workspace warning in the
+# root Cargo.toml).
+
+[dev-dependencies]
+rusqlite = { version = "0.40", features = [
+    "bundled",
+    "functions",
+    "load_extension",
+] }

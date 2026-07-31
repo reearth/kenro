@@ -18,7 +18,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: Format
-        run: cargo fmt --check
+        run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Build core without SQLite
@@ -33,3 +33,39 @@ jobs:
         run: cargo test --all-features
       - name: Transform accuracy regression gate
         run: cargo run --example accuracy_report -- --check
+
+  ext:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # Each cargo call below MUST stay a separate invocation so the
+      # loadable_extension and bundled feature graphs never unify (see the
+      # [workspace] warning in Cargo.toml).
+      - name: Clippy (kenro-ext)
+        run: cargo clippy -p kenro-ext --all-targets -- -D warnings
+      - name: Clippy (kenro-ext-test)
+        run: cargo clippy -p kenro-ext-test --all-targets -- -D warnings
+      - name: Build loadable extension
+        run: cargo build -p kenro-ext --release
+      - name: Load test through the built cdylib
+        run: cargo test -p kenro-ext-test --release
+        env:
+          KENRO_EXT_REQUIRE: "1"
+      - name: Python stdlib smoke (ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          python3 - <<'EOF'
+          import sqlite3
+          con = sqlite3.connect(":memory:")
+          con.enable_load_extension(True)
+          con.load_extension("./target/release/libkenro_ext")
+          assert con.execute("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))").fetchone()[0] == "POINT(1 2)"
+          print("python load_extension OK")
+          EOF

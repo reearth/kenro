@@ -1,6 +1,6 @@
 # kenro（間縄）
 
-**Spatial functions for SQLite in pure Rust** — works with rusqlite today; loadable extension and WASM builds are on the roadmap.
+**Spatial functions for SQLite in pure Rust** — works with rusqlite and as a loadable extension (Python / Node / sqlite3 CLI) today; a WASM build is on the roadmap.
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, or *GeoPackage in pure Rust*: this is that crate.
 
@@ -40,6 +40,68 @@ let n: i64 = conn.query_row(
 ```
 
 Inserts, updates and deletes through SQL keep the spatial index in sync via the standard GeoPackage triggers — including files written by GDAL/QGIS.
+
+## Use from Python / Node / the sqlite3 CLI (loadable extension)
+
+kenro also builds as a standard SQLite loadable extension. Until binary
+releases exist, build it yourself (any OS, no C toolchain or SQLite dev
+files needed):
+
+```sh
+cargo build -p kenro-ext --release
+# → target/release/libkenro_ext.so (Linux) / libkenro_ext.dylib (macOS)
+#   / target/release/kenro_ext.dll (Windows)
+```
+
+The host SQLite must be ≥ 3.34. Loading is per-connection; all kenro
+functions become available on the loading connection.
+
+### Python (stdlib `sqlite3`)
+
+```python
+import sqlite3
+
+con = sqlite3.connect("parks.gpkg")
+con.enable_load_extension(True)
+con.load_extension("./target/release/libkenro_ext")  # suffix optional
+con.enable_load_extension(False)
+
+print(con.execute(
+    "SELECT ST_AsText(ST_GeomFromGPB(geom)) FROM parks LIMIT 1").fetchone())
+```
+
+macOS note: python.org installers ship a `sqlite3` module without
+`enable_load_extension`; Homebrew Python has it
+(`hasattr(con, "enable_load_extension")` tells you which you have).
+
+### Node
+
+```js
+// better-sqlite3
+const Database = require("better-sqlite3");
+const db = new Database("parks.gpkg");
+db.loadExtension("./target/release/libkenro_ext");
+
+// or the built-in node:sqlite
+const { DatabaseSync } = require("node:sqlite");
+const db2 = new DatabaseSync("parks.gpkg", { allowExtension: true });
+db2.enableLoadExtension(true);
+db2.loadExtension("./target/release/libkenro_ext");
+```
+
+### sqlite3 CLI
+
+```
+$ sqlite3 parks.gpkg
+sqlite> .load ./target/release/libkenro_ext
+sqlite> SELECT ST_AsGeoJSON(ST_Transform(ST_GeomFromGPB(geom), 4326)) FROM parks LIMIT 1;
+```
+
+macOS: the system `/usr/bin/sqlite3` is compiled without extension loading —
+use `brew install sqlite` and run `$(brew --prefix sqlite)/bin/sqlite3`.
+
+Renamed copies load too (e.g. `libkenro.so`): the binary exports
+`sqlite3_extension_init`, `sqlite3_kenroext_init` and `sqlite3_kenro_init`.
 
 ## Functions
 
@@ -173,7 +235,7 @@ Structural differences that matter more than any single function:
 
 ## Requirements & caveats
 
-- SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`).
+- SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`); the loadable-extension path needs SQLite ≥ 3.34 (it fails with a clear version-mismatch message on older hosts).
 - Loading kenro **and** SpatiaLite into the same connection: both register `ST_` names and SQLite keeps the last registration. Don't mix them (a registration-filter feature flag can be added if needed).
 - `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject first (e.g. `ST_Transform(geom, 6677)` for the Tokyo area).
 
@@ -181,7 +243,7 @@ Structural differences that matter more than any single function:
 
 1. ✅ Core: GeoPackage blobs, WKB/WKT, predicates, R-tree functions, rusqlite registration, PostGIS golden tests
 2. ✅ `ST_Transform` (proj4rs; JGD2000/JGD2011/WGS84 accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
-3. `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
+3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. `kenro-wasm`: sql.js / wa-sqlite builds, browser demo
 5. v0.x releases on crates.io
 

@@ -1,0 +1,30 @@
+[package]
+name = "kenro-ext"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "kenro spatial functions as a SQLite loadable extension (.so/.dylib/.dll)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/reearth/kenro"
+publish = false # until kenro itself is on crates.io
+
+[lib]
+crate-type = ["cdylib"] # lib name defaults to kenro_ext -> libkenro_ext.*
+
+[features]
+default = ["transform", "h3", "geojson"]
+transform = ["kenro/transform"]
+h3 = ["kenro/h3"]
+geojson = ["kenro/geojson"]
+crs-full = ["kenro/crs-full"]
+
+[dependencies]
+kenro = { path = "../..", default-features = false, features = ["rusqlite"] }
+# Unifies with kenro's optional rusqlite (default-features=false, "functions")
+# into functions + loadable_extension: libsqlite3-sys then links nothing and
+# routes every call through sqlite3_api_routines. Keep bundled/modern_sqlite
+# OUT of this graph — they would raise the minimum host SQLite version.
+rusqlite = { version = "0.40", default-features = false, features = [
+    "loadable_extension",
+    "functions",
+] }

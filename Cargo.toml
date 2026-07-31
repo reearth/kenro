@@ -1,3 +1,13 @@
+[workspace]
+members = ["crates/kenro-ext", "crates/kenro-ext-test"]
+# WARNING: never build/test with `--workspace` (or multiple -p spanning kenro
+# and kenro-ext). kenro's dev-deps need rusqlite/bundled while kenro-ext needs
+# rusqlite/loadable_extension; unified in one cargo invocation,
+# loadable_extension wins the libsqlite3-sys build, nothing links a real
+# SQLite, and test binaries crash at runtime (it is NOT a build error).
+# Use separate invocations: `cargo test` (root = kenro only),
+# `cargo build -p kenro-ext`, `cargo test -p kenro-ext-test`.
+
 [package]
 name = "kenro"
 version = "0.1.0"
