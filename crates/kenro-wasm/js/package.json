@@ -1,10 +1,30 @@
 {
   "name": "kenro",
   "version": "0.1.0",
-  "private": true,
-  "description": "kenro spatial functions for browser SQLite (sql.js / wa-sqlite / official SQLite WASM)",
+  "description": "Spatial SQL for SQLite in the browser — PostGIS-style ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build (pure-Rust core compiled to wasm)",
   "license": "(MIT OR Apache-2.0)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reearth/kenro.git",
+    "directory": "crates/kenro-wasm/js"
+  },
+  "homepage": "https://reearth.github.io/kenro/",
+  "keywords": [
+    "sqlite",
+    "spatial",
+    "gis",
+    "postgis",
+    "geopackage",
+    "wasm",
+    "sql.js",
+    "wa-sqlite",
+    "spatialite",
+    "mvt",
+    "geojson",
+    "h3"
+  ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./pkg/kenro_wasm.js",
     "./sqlite-wasm": "./src/sqlite-wasm.mjs",
@@ -12,7 +32,15 @@
     "./wa-sqlite": "./src/wa-sqlite.mjs",
     "./core": "./src/core.mjs"
   },
+  "files": [
+    "pkg",
+    "src",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
   "scripts": {
+    "prepack": "node -e \"fs.rmSync('pkg/.gitignore',{force:true})\"",
     "test": "node --test"
   },
   "devDependencies": {

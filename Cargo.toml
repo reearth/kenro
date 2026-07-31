@@ -29,6 +29,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/reearth/kenro"
 keywords = ["sqlite", "geo", "gis", "spatialite", "geopackage"]
 categories = ["database", "science::geo"]
+readme = "README.md"
+exclude = [".github/"]
 
 [features]
 # The default set covers most use cases (I/O, predicates, GeoPackage
