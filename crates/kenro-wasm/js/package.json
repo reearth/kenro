@@ -1,5 +1,5 @@
 {
-  "name": "kenro",
+  "name": "kenro-wasm",
   "version": "0.1.0",
   "description": "SpatiaLite-style spatial SQL for SQLite in the browser — PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
   "license": "(MIT OR Apache-2.0)",

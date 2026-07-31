@@ -1,4 +1,4 @@
-# kenro
+# kenro-wasm
 
 **SpatiaLite-style spatial SQL for SQLite in the browser** —
 PostGIS-compatible `ST_` functions registered as JS-level UDFs on any wasm
@@ -19,8 +19,8 @@ and query it, entirely client-side.
 
 ```js
 import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
-import initKenro, * as kenroWasm from "kenro";
-import { registerKenro } from "kenro/sqlite-wasm";
+import initKenro, * as kenroWasm from "kenro-wasm";
+import { registerKenro } from "kenro-wasm/sqlite-wasm";
 
 await initKenro();
 const sqlite3 = await sqlite3InitModule();
@@ -32,11 +32,11 @@ db.selectValue("SELECT ST_AsText(ST_GeomFromText('POINT(1 2)'))"); // POINT(1 2)
 
 ```js
 // sql.js
-import { registerKenro } from "kenro/sqljs";
+import { registerKenro } from "kenro-wasm/sqljs";
 registerKenro(db, kenroWasm);
 
 // wa-sqlite
-import { registerKenro } from "kenro/wa-sqlite";
+import { registerKenro } from "kenro-wasm/wa-sqlite";
 registerKenro(sqlite3, db, kenroWasm);
 ```
 
