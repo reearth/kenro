@@ -10,7 +10,7 @@ import (
 	sqlite "modernc.org/sqlite"
 )
 
-// The numbers these produce are quoted in docs/go.md. They measure the whole
+// The numbers these produce are quoted in go/README.md. They measure the whole
 // path — SQLite → Go callback → wasm call → geometry work — against a
 // SQLite-only baseline, so the marginal cost of the wasm hop is visible.
 func benchQuery(b *testing.B, query string) {

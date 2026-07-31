@@ -152,6 +152,11 @@ func (b *binding) manifest(ctx context.Context) (*manifest, error) {
 // registerScalar installs one variadic SQL function per name and dispatches
 // on the argument count, because modernc.org/sqlite allows a single
 // registration per name (SQLite itself keys on name *and* arity).
+//
+// FunctionImpl carries no SQLITE_INNOCUOUS: the driver's API does not expose
+// it. rusqlite sets that flag so kenro can be called from GeoPackage triggers
+// under `PRAGMA trusted_schema = off`; here such a call is rejected by SQLite
+// instead. Pinned by TestTrustedSchemaOffIsRejectedNotIgnored.
 func (b *binding) registerScalar(name string, arities map[int]fnEntry) error {
 	return sqlite.RegisterFunction(name, &sqlite.FunctionImpl{
 		NArgs:         -1,

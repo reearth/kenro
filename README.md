@@ -136,14 +136,11 @@ The wasm module is committed to the repository, so `go get` needs no Rust
 toolchain. GeoPackage R-tree triggers are maintained correctly here too
 (modernc is built with `SQLITE_ENABLE_RTREE`).
 
-**Source: [`go/`](go/) · runnable examples:
-[`go/example_test.go`](go/example_test.go) ·
-[API docs](https://pkg.go.dev/github.com/reearth/kenro/go)** — storing and
-querying geometries, the R-tree filter-then-refine query, dissolve with the
-`ST_Union` aggregate, and reprojection.
-
-The calling convention, the two driver limitations worth knowing about, and
-measured per-call costs are in [docs/go.md](docs/go.md).
+**[`go/README.md`](go/README.md)** has the rest: runnable examples (storing
+and querying geometries, the R-tree filter-then-refine query, dissolve with
+the `ST_Union` aggregate, reprojection), the two modernc.org/sqlite
+limitations worth knowing about, measured per-call costs, and how to embed a
+smaller feature tier.
 
 ## Function reference
 

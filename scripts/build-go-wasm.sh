@@ -6,7 +6,10 @@
 # so an unknown-unknown build imports `__wbindgen_placeholder__` and cannot be
 # instantiated by a non-JS host like wazero. wasip1 also links wasi-libc's
 # math instead of compiling in the whole `libm` crate, which happens to be
-# smaller — and it gives us panic messages on stderr.
+# smaller — measured on an equivalent probe, standard tier 510 KB vs 817 KB
+# and full tier 941 KB vs 1227 KB, against a flat ~15 KB of wasip1 overhead.
+# And a Rust panic on wasip1 writes its message to stderr before aborting,
+# where unknown-unknown gives a bare trap with no explanation.
 #
 # Usage: scripts/build-go-wasm.sh [feature-tier]   (default: full)
 set -euo pipefail
