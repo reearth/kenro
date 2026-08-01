@@ -10,7 +10,7 @@
 -- Neither D1 nor DO SQLite has an R-tree module or user-defined functions.
 CREATE TABLE IF NOT EXISTS features (
   id    TEXT PRIMARY KEY,
-  geom  BLOB NOT NULL,          -- kenro's internal geometry blob
+  geom  BLOB NOT NULL,          -- GeoPackage blob (GPB): header envelope makes ST_MinX free
   props TEXT NOT NULL,          -- JSON
   minx  REAL NOT NULL, miny REAL NOT NULL,
   maxx  REAL NOT NULL, maxy REAL NOT NULL

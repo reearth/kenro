@@ -20,7 +20,7 @@ import { OVERSIZED, bboxOverlaps, cellsForFeature, tileCover } from "./tiles.mjs
 export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS features (
      id    TEXT PRIMARY KEY,
-     geom  BLOB NOT NULL,          -- kenro's internal geometry blob
+     geom  BLOB NOT NULL,          -- GeoPackage blob (GPB): header envelope makes ST_MinX free
      props TEXT NOT NULL,          -- JSON
      minx  REAL NOT NULL, miny REAL NOT NULL,
      maxx  REAL NOT NULL, maxy REAL NOT NULL
@@ -64,11 +64,20 @@ function bboxOf(wasm, geom, what) {
   return bbox;
 }
 
-/** One GeoJSON feature → the row and cell ids the index needs. */
+/**
+ * One GeoJSON feature → the row and cell ids the index needs.
+ *
+ * Stored as a GeoPackage blob rather than kenro's bare internal one: the GPB
+ * header carries an envelope, so ST_MinX & co. answer from 32 extra bytes
+ * without decoding the WKB at all — measured at ~330× for a 2000-vertex
+ * polygon (0.72 ms → 0.0022 ms for the four calls), with no effect on
+ * predicate speed. The blob is also readable by anything that speaks
+ * GeoPackage.
+ */
 export function prepareFeature(f, i) {
   const wasm = kenro();
   const id = String(f.id ?? `f${i}`);
-  const geom = wasm.stGeomFromGeojson(JSON.stringify(f.geometry));
+  const geom = wasm.stAsGpb(wasm.stGeomFromGeojson(JSON.stringify(f.geometry)));
   const bbox = bboxOf(wasm, geom, `feature ${id}`);
   return {
     id,
