@@ -43,6 +43,13 @@ wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --f
 crates/kenro-wasm/demo/serve.sh   # serves http://localhost:8000
 ```
 
+## Cloudflare
+
+`cloudflare/` is a Worker + Durable Object that gives DO SQLite a spatial
+index and PostGIS-style predicates — SQL does the indexed coarse filter,
+kenro does the exact predicate. See
+[cloudflare/README.md](cloudflare/README.md).
+
 ## Tests
 
 ```sh

@@ -258,15 +258,22 @@ loading enabled.)
 
 ## Cloudflare Workers
 
-Workers cannot load native extensions, and **D1 does not support
-user-defined functions at all** — kenro cannot run *inside* D1 queries.
-Two patterns that do work:
+Workers cannot load native extensions, and neither **D1** nor **Durable
+Object SQLite** supports user-defined functions (the supported extension set
+is FTS5, JSON and math — no R-tree either) — kenro cannot run *inside* their
+queries. Three patterns that do work:
 
 - **Process geometry in the Worker** with kenro-wasm's exports directly:
   store GeoPackage blobs in D1 columns, `SELECT` them out, then call
   `stAsText` / `stIntersects` / `stTransform` … on the values in JS. The
   wasm module is well inside Worker size limits (standard tier
   617 KB / 251 KB gzip, minimal 412 KB / 167 KB).
+- **Index in SQL, refine in kenro** — the scalable version of the above:
+  derive the bounding box and a tile cell with kenro at write time, let SQL
+  filter on those with a plain B-tree index, and run the exact predicate in
+  JS on the survivors. A complete Worker + Durable Object doing this, with
+  tests that run in workerd, lives in
+  [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).
 - **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite]
   over bytes fetched from R2/KV (read-only analytics on a shipped
   `.gpkg`/`.sqlite`), and `registerKenro` as usual — the same adapters

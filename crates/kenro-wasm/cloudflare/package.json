@@ -1,0 +1,16 @@
+{
+  "name": "kenro-cloudflare-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-wasm": "./sync-wasm.sh",
+    "dev": "./sync-wasm.sh && wrangler dev",
+    "deploy": "./sync-wasm.sh && wrangler deploy",
+    "test": "./sync-wasm.sh && vitest run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.0",
+    "vitest": "~3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

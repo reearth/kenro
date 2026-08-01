@@ -27,6 +27,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./pkg/kenro_wasm.js",
+    "./pkg/kenro_wasm_bg.wasm": "./pkg/kenro_wasm_bg.wasm",
     "./sqlite-wasm": "./src/sqlite-wasm.mjs",
     "./sqljs": "./src/sqljs.mjs",
     "./wa-sqlite": "./src/wa-sqlite.mjs",

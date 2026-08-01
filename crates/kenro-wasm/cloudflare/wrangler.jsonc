@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kenro-spatial-do",
+  "main": "src/index.mjs",
+  "compatibility_date": "2025-04-01",
+  "durable_objects": {
+    "bindings": [{ "name": "SPATIAL", "class_name": "SpatialIndex" }]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      // SQLite-backed classes only: the KV backend has no `storage.sql`.
+      "new_sqlite_classes": ["SpatialIndex"]
+    }
+  ],
+  "observability": { "enabled": true }
+}
