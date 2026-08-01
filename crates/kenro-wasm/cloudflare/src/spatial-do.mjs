@@ -8,7 +8,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 
-import { OVERSIZED } from "./tiles.mjs";
+import { OVERSIZED } from "../../js/src/tiles.mjs";
 import { SCHEMA, plan, prepareFeature, refine } from "./spatial.mjs";
 
 export class SpatialIndex extends DurableObject {

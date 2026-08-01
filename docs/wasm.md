@@ -92,6 +92,62 @@ sqlite3.capi.sqlite3_deserialize(
 registerKenro(db, kenroWasm, sqlite3);
 ```
 
+## Without SQLite: `Prepared` and `kenro-wasm/tiles`
+
+The exports also stand alone, for hosts where no SQLite can hold kenro's
+UDFs at all — Cloudflare D1 and Durable Object SQLite support neither
+user-defined functions nor an R-tree. There the split is: SQL does an
+indexed coarse filter over columns kenro computed at write time, and kenro
+does the exact predicate in JS.
+
+Two pieces exist for that shape (a full Worker using both:
+[`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md)):
+
+**`Prepared`** — a geometry decoded once and reused. Every blob function
+decodes per call, because that is what a SQLite UDF receives; a JS host
+scanning candidates against one fixed search window does not have to.
+
+```js
+const win = kenroWasm.Prepared.fromText(windowWkt, 4326);
+try {
+  for (const row of rows) {
+    const g = kenroWasm.Prepared.fromBlob(row.geom);
+    try { if (g.stIntersects(win)) hits.push(row); } finally { g.free(); }
+  }
+} finally { win.free(); }
+```
+
+`fromBlob` / `fromText`, then `stIntersects` / `stContains` / `stWithin` /
+`stCovers` / `stDistance` / `stDwithin` — the same code paths as the blob
+functions of those names, so answers and error wording are identical by
+construction (golden vectors are replayed through both and compared).
+
+Measured over a 500-candidate refine loop: **41% faster** with a simple
+window, 17% with a 200-vertex one, 12% with 5000 vertices — the relate
+itself dominates as the window grows, and only the decode is saved.
+
+**`free()` is mandatory.** wasm-bindgen cannot collect a handle for you; a
+leaked one keeps its geometry in the wasm heap for the life of the isolate.
+Use `try`/`finally`, including around early exits.
+
+**`kenro-wasm/tiles`** — a B-tree-indexable stand-in for the R-tree that
+sql.js and D1/DO SQLite lack. It maps a bounding box to Web Mercator tile
+ids, so a window query becomes `WHERE cell IN (…)` instead of a half-open
+`minx <= ?` range scan. Pure arithmetic, no wasm involved.
+
+```js
+import { cellsForFeature, cellsForQuery } from "kenro-wasm/tiles";
+
+const cells = cellsForFeature(bbox);   // write side: store one row per cell
+const search = cellsForQuery(bbox);    // query side: null = scan, don't filter
+```
+
+The asymmetry is the point: `cellsForFeature` files a too-large feature
+under `OVERSIZED` (a permanent candidate), while `cellsForQuery` returns
+`null` for a too-large *window*, meaning "drop the filter and scan". Reading
+the second as the first returns only continent-sized features for a wide
+query and silently drops the rest.
+
 ## Semantics
 
 Identical to native kenro: the adapters reproduce the rusqlite binding's

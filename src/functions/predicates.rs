@@ -108,13 +108,78 @@ fn relate_predicate(
     pred: impl Fn(&geo::relate::IntersectionMatrix) -> bool,
 ) -> Result<bool> {
     let (ga, gb) = decode_pair(func, a, b)?;
-    if geom::is_empty(&ga.geometry) || geom::is_empty(&gb.geometry) {
+    relate_geoms(func, &ga, &gb, pred)
+}
+
+/// The predicate body, over geometries that are already decoded.
+///
+/// Callers that hold a decoded geometry across many calls — a host that
+/// keeps one search window and tests thousands of candidates against it —
+/// reach the same semantics through [`decoded`] without re-decoding a blob
+/// per call. Everything below the decode is shared, so the two paths cannot
+/// drift.
+fn relate_geoms(
+    func: &'static str,
+    a: &Geom,
+    b: &Geom,
+    pred: impl Fn(&geo::relate::IntersectionMatrix) -> bool,
+) -> Result<bool> {
+    check_pair(func, a, b)?;
+    if geom::is_empty(&a.geometry) || geom::is_empty(&b.geometry) {
         return Ok(false);
     }
-    reject_collection(func, &ga)?;
-    reject_collection(func, &gb)?;
-    let matrix = ga.geometry.relate(&gb.geometry);
+    reject_collection(func, a)?;
+    reject_collection(func, b)?;
+    let matrix = a.geometry.relate(&b.geometry);
     Ok(pred(&matrix))
+}
+
+/// Predicates and measures over already-decoded geometries.
+///
+/// Same contract as the blob functions of the same name — this *is* their
+/// implementation — for hosts that can hold a decoded geometry between
+/// calls. In SQLite that is not possible (a UDF receives bytes), but a
+/// wasm host handing back a handle can.
+pub mod decoded {
+    use super::*;
+
+    pub fn st_intersects(a: &Geom, b: &Geom) -> Result<bool> {
+        relate_geoms("ST_Intersects", a, b, |m| m.is_intersects())
+    }
+
+    pub fn st_contains(a: &Geom, b: &Geom) -> Result<bool> {
+        relate_geoms("ST_Contains", a, b, |m| m.is_contains())
+    }
+
+    pub fn st_within(a: &Geom, b: &Geom) -> Result<bool> {
+        relate_geoms("ST_Within", a, b, |m| m.is_within())
+    }
+
+    pub fn st_covers(a: &Geom, b: &Geom) -> Result<bool> {
+        relate_geoms("ST_Covers", a, b, |m| m.is_covers())
+    }
+
+    /// `None` (SQL NULL) when either side is empty, matching PostGIS.
+    pub fn st_distance(a: &Geom, b: &Geom) -> Result<Option<f64>> {
+        const FUNC: &str = "ST_Distance";
+        check_pair(FUNC, a, b)?;
+        if geom::is_empty(&a.geometry) || geom::is_empty(&b.geometry) {
+            return Ok(None);
+        }
+        reject_collection(FUNC, a)?;
+        reject_collection(FUNC, b)?;
+        Ok(Some(Euclidean.distance(&a.geometry, &b.geometry)))
+    }
+
+    pub fn st_dwithin(a: &Geom, b: &Geom, d: f64) -> Result<bool> {
+        if d < 0.0 {
+            return Err(Error::Unsupported {
+                func: "ST_DWithin",
+                reason: "tolerance cannot be less than zero".into(),
+            });
+        }
+        Ok(st_distance(a, b)?.is_some_and(|dist| dist <= d))
+    }
 }
 
 /// The 9-character DE-9IM string in row order (Interior, Boundary,
@@ -199,17 +264,22 @@ fn de9im_matches(func: &'static str, matrix: &str, pattern: &str) -> Result<bool
 fn decode_pair(func: &'static str, a: &[u8], b: &[u8]) -> Result<(Geom, Geom)> {
     let ga = geom::decode_auto(a)?;
     let gb = geom::decode_auto(b)?;
+    check_pair(func, &ga, &gb)?;
+    Ok((ga, gb))
+}
+
+fn check_pair(func: &'static str, a: &Geom, b: &Geom) -> Result<()> {
     // Mixed *known* SRIDs error (PostGIS behavior). If either side is
     // unknown (srid <= 0 — plain WKB, or ST_GeomFromText without srid),
     // proceed: the headline rtree+predicate query depends on this leniency.
-    if ga.srid > 0 && gb.srid > 0 && ga.srid != gb.srid {
+    if a.srid > 0 && b.srid > 0 && a.srid != b.srid {
         return Err(Error::MixedSrid {
             func,
-            a: ga.srid,
-            b: gb.srid,
+            a: a.srid,
+            b: b.srid,
         });
     }
-    Ok((ga, gb))
+    Ok(())
 }
 
 fn reject_collection(func: &'static str, g: &Geom) -> Result<()> {

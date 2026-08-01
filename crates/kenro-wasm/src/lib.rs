@@ -11,6 +11,7 @@
 use wasm_bindgen::prelude::*;
 
 use kenro::functions::{accessors, io, manifest, predicates, rtree};
+use kenro::geom;
 
 /// kenro::Error → JS exception. The `kenro: `-prefixed message is preserved
 /// so SQL error text matches the rusqlite binding exactly.
@@ -19,6 +20,76 @@ fn err(e: kenro::Error) -> JsError {
 }
 
 type R<T> = Result<T, JsError>;
+
+// ---- Decoded handle ----
+
+/// A geometry decoded once and kept in wasm memory.
+///
+/// Every function in this module takes a blob and decodes it, because that is
+/// what a SQLite UDF receives — bytes, per row, with nowhere to cache. A JS
+/// host is not bound by that: a window query decodes one search geometry and
+/// tests it against thousands of candidates, and only the candidates are
+/// genuinely new each time.
+///
+/// The predicates below are the same code paths as their blob counterparts
+/// (`kenro::functions::predicates::decoded`), so results are identical by
+/// construction — this trades JS-side memory management for the decode.
+///
+/// **The caller must call `free()`**: wasm-bindgen cannot drop this for you,
+/// and a leaked handle keeps its geometry alive in the wasm heap for the life
+/// of the isolate. Prefer `try { … } finally { g.free() }`.
+#[wasm_bindgen]
+pub struct Prepared {
+    inner: geom::Geom,
+}
+
+#[wasm_bindgen]
+impl Prepared {
+    /// Decode any geometry blob kenro produces (internal, WKB or GeoPackage).
+    #[wasm_bindgen(js_name = fromBlob)]
+    pub fn from_blob(blob: &[u8]) -> R<Prepared> {
+        Ok(Prepared {
+            inner: geom::decode_auto(blob).map_err(err)?,
+        })
+    }
+
+    #[wasm_bindgen(js_name = fromText)]
+    pub fn from_text(wkt: &str, srid: i32) -> R<Prepared> {
+        Ok(Prepared {
+            inner: geom::decode_wkt(wkt, srid).map_err(err)?,
+        })
+    }
+
+    #[wasm_bindgen(js_name = stIntersects)]
+    pub fn st_intersects(&self, other: &Prepared) -> R<bool> {
+        predicates::decoded::st_intersects(&self.inner, &other.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stContains)]
+    pub fn st_contains(&self, other: &Prepared) -> R<bool> {
+        predicates::decoded::st_contains(&self.inner, &other.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stWithin)]
+    pub fn st_within(&self, other: &Prepared) -> R<bool> {
+        predicates::decoded::st_within(&self.inner, &other.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stCovers)]
+    pub fn st_covers(&self, other: &Prepared) -> R<bool> {
+        predicates::decoded::st_covers(&self.inner, &other.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stDistance)]
+    pub fn st_distance(&self, other: &Prepared) -> R<Option<f64>> {
+        predicates::decoded::st_distance(&self.inner, &other.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stDwithin)]
+    pub fn st_dwithin(&self, other: &Prepared, d: f64) -> R<bool> {
+        predicates::decoded::st_dwithin(&self.inner, &other.inner, d).map_err(err)
+    }
+}
 
 // ---- Geometry I/O ----
 

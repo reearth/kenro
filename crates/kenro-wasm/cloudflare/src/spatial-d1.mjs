@@ -9,7 +9,7 @@
 //   - there is no synchronous transaction; writes go through `batch()`,
 //     which D1 runs as one atomic unit
 
-import { OVERSIZED } from "./tiles.mjs";
+import { OVERSIZED } from "../../js/src/tiles.mjs";
 import { plan, prepareFeature, refine } from "./spatial.mjs";
 
 // The schema lives in migrations/0001_init.sql, applied by

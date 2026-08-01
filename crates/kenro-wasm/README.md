@@ -34,6 +34,20 @@ Adapters: `kenro-wasm/sqlite-wasm` (primary), `kenro-wasm/wa-sqlite`,
 limitations (sql.js: no int64 → h3 functions error loudly; no R-tree
 module): [docs/wasm.md](../../docs/wasm.md).
 
+## Without a SQLite host
+
+The exports work standalone too, for hosts whose SQLite takes no UDFs at all
+(Cloudflare D1, Durable Objects) — SQL filters on columns kenro computed at
+write time, kenro runs the exact predicate in JS:
+
+- **`Prepared`** — decode a geometry once and test many candidates against
+  it, instead of re-decoding a blob per call (41% faster over a refine loop
+  with a simple window; `free()` is mandatory)
+- **`kenro-wasm/tiles`** — bounding box → Web Mercator tile ids, the
+  B-tree-indexable stand-in for the R-tree that sql.js and D1/DO SQLite lack
+
+Both are documented in [docs/wasm.md](../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
+
 ## Demo
 
 `demo/` is a static drag-a-GeoPackage-and-query page:

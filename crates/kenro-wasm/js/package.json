@@ -31,7 +31,8 @@
     "./sqlite-wasm": "./src/sqlite-wasm.mjs",
     "./sqljs": "./src/sqljs.mjs",
     "./wa-sqlite": "./src/wa-sqlite.mjs",
-    "./core": "./src/core.mjs"
+    "./core": "./src/core.mjs",
+    "./tiles": "./src/tiles.mjs"
   },
   "files": [
     "pkg",

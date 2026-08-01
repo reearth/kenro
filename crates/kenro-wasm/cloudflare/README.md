@@ -13,7 +13,7 @@ appear in the SQL itself. What *can* happen is a split:
 | stage | where | what |
 |---|---|---|
 | coarse filter | SQL | tile cells (`WHERE cell IN (…)`), then bounding boxes |
-| exact predicate | kenro-wasm, in JS | `ST_Intersects` / `ST_Within` / `ST_DWithin` … |
+| exact predicate | kenro-wasm, in JS | `ST_Intersects` / `ST_Within` / `ST_DWithin` …, over a `Prepared` window decoded once per scan |
 | output | kenro-wasm, in JS | `ST_Transform`, `ST_AsGeoJSON` |
 
 The trick that makes the SQL half indexable is that **kenro runs at write
@@ -121,7 +121,7 @@ published package works directly.
 | `src/spatial.mjs` | the plan — write-time derivation, the coarse-filter SQL, the refine loop. Backend-independent. |
 | `src/spatial-do.mjs` | Durable Object plumbing |
 | `src/spatial-d1.mjs` | D1 plumbing |
-| `src/tiles.mjs` | the R-tree stand-in |
+| `kenro-wasm/tiles` | the R-tree stand-in — published with the package, imported here by path |
 | `src/kenro.mjs` | wasm init |
 | `migrations/` | D1 schema (kept in step with the DO's by `test/schema.test.mjs`) |
 
