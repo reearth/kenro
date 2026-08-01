@@ -154,23 +154,21 @@ export function refine(rows, { search, window, test, srid, limit }) {
       if (!bboxOverlaps(search, row)) continue; // cheap reject before wasm
       refined++;
       const candidate = wasm.Prepared.fromBlob(row.geom);
-      let hit;
+      // Reprojection returns a second handle, so a hit holds two at once.
+      let projected;
       try {
-        hit = test(candidate, win);
+        if (!test(candidate, win)) continue;
+        projected = srid ? candidate.stTransform(srid) : null;
+        features.push({
+          type: "Feature",
+          id: row.id,
+          geometry: JSON.parse((projected ?? candidate).stAsGeojson()),
+          properties: JSON.parse(row.props),
+        });
       } finally {
+        projected?.free();
         candidate.free();
       }
-      if (!hit) continue;
-      // Output still goes through the blob functions: the handle carries
-      // predicates only, and a hit is rare enough that its extra decode does
-      // not show up next to the scan.
-      const out = srid ? wasm.stTransform(row.geom, srid) : row.geom;
-      features.push({
-        type: "Feature",
-        id: row.id,
-        geometry: JSON.parse(wasm.stAsGeojson(out)),
-        properties: JSON.parse(row.props),
-      });
       if (features.length >= limit) break;
     }
   } finally {

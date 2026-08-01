@@ -2,29 +2,43 @@
 //! `io.rs`: it is byte-level and independent of the `transform` feature.)
 
 use crate::error::{Error, Result};
-use crate::geom;
+use crate::geom::{self, Geom};
 
 /// `ST_Transform(geom, to_srid)` — PostGIS-exact two-argument form: the
 /// source CRS is the geometry's embedded SRID. (PostGIS has no
 /// `(geom, from, to)` integer overload, so neither does kenro.)
 pub fn st_transform(bytes: &[u8], to_srid: i32) -> Result<Vec<u8>> {
     let mut geom = geom::decode_auto(bytes)?;
-    if geom.srid <= 0 {
-        // Mirrors PostGIS's "Input geometry has unknown (0) SRID".
-        return Err(Error::Unsupported {
-            func: "ST_Transform",
-            reason: format!(
-                "Input geometry has unknown ({}) SRID; set one with ST_SetSRID, \
-                 ST_GeomFromText(wkt, srid), or read it from a GeoPackage blob",
-                geom.srid.max(0)
-            ),
-        });
-    }
-    if geom.srid != to_srid {
-        crate::crs::transform_geometry("ST_Transform", &mut geom.geometry, geom.srid, to_srid)?;
-        geom.srid = to_srid;
-    }
+    decoded::st_transform_in_place(&mut geom, to_srid)?;
     geom::encode_canonical_gpb(&geom, "ST_Transform")
+}
+
+/// Reprojection for a geometry that is already decoded — see
+/// [`crate::functions::predicates::decoded`] for why that exists.
+pub mod decoded {
+    use super::*;
+
+    /// Reproject in place. Takes `&mut` rather than returning a new `Geom`
+    /// so the blob path above pays no clone; a caller holding a shared
+    /// handle clones first.
+    pub fn st_transform_in_place(geom: &mut Geom, to_srid: i32) -> Result<()> {
+        if geom.srid <= 0 {
+            // Mirrors PostGIS's "Input geometry has unknown (0) SRID".
+            return Err(Error::Unsupported {
+                func: "ST_Transform",
+                reason: format!(
+                    "Input geometry has unknown ({}) SRID; set one with ST_SetSRID, \
+                     ST_GeomFromText(wkt, srid), or read it from a GeoPackage blob",
+                    geom.srid.max(0)
+                ),
+            });
+        }
+        if geom.srid != to_srid {
+            crate::crs::transform_geometry("ST_Transform", &mut geom.geometry, geom.srid, to_srid)?;
+            geom.srid = to_srid;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

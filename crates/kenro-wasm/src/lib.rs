@@ -89,6 +89,53 @@ impl Prepared {
     pub fn st_dwithin(&self, other: &Prepared, d: f64) -> R<bool> {
         predicates::decoded::st_dwithin(&self.inner, &other.inner, d).map_err(err)
     }
+
+    // ---- Output, without a round trip through a blob ----
+
+    #[wasm_bindgen(js_name = stSrid)]
+    pub fn st_srid(&self) -> i32 {
+        self.inner.srid
+    }
+
+    #[cfg(feature = "geojson")]
+    #[wasm_bindgen(js_name = stAsGeojson)]
+    pub fn st_as_geojson(&self) -> R<String> {
+        kenro::functions::geojson::decoded::st_as_geojson(&self.inner, None).map_err(err)
+    }
+
+    #[cfg(feature = "geojson")]
+    #[wasm_bindgen(js_name = stAsGeojsonDigits)]
+    pub fn st_as_geojson_digits(&self, digits: i32) -> R<String> {
+        kenro::functions::geojson::decoded::st_as_geojson(&self.inner, Some(digits as i64))
+            .map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stAsText)]
+    pub fn st_as_text(&self) -> R<String> {
+        io::decoded::st_as_text(&self.inner).map_err(err)
+    }
+
+    #[wasm_bindgen(js_name = stAsBinary)]
+    pub fn st_as_binary(&self) -> R<Vec<u8>> {
+        io::decoded::st_as_binary(&self.inner).map_err(err)
+    }
+
+    /// Storage-grade GeoPackage blob — what to write back to SQLite.
+    #[wasm_bindgen(js_name = stAsGpb)]
+    pub fn st_as_gpb(&self) -> R<Vec<u8>> {
+        io::decoded::st_as_gpb(&self.inner).map_err(err)
+    }
+
+    /// Reproject into a **new handle**, which the caller must also free.
+    /// (`self` is shared, so this cannot reproject in place.)
+    #[cfg(feature = "transform")]
+    #[wasm_bindgen(js_name = stTransform)]
+    pub fn st_transform(&self, to_srid: i32) -> R<Prepared> {
+        let mut out = self.inner.clone();
+        kenro::functions::transform::decoded::st_transform_in_place(&mut out, to_srid)
+            .map_err(err)?;
+        Ok(Prepared { inner: out })
+    }
 }
 
 // ---- Geometry I/O ----

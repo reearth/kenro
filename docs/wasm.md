@@ -112,19 +112,40 @@ const win = kenroWasm.Prepared.fromText(windowWkt, 4326);
 try {
   for (const row of rows) {
     const g = kenroWasm.Prepared.fromBlob(row.geom);
-    try { if (g.stIntersects(win)) hits.push(row); } finally { g.free(); }
+    try {
+      if (!g.stIntersects(win)) continue;
+      hits.push(JSON.parse(g.stAsGeojson()));   // output, no second decode
+    } finally { g.free(); }
   }
 } finally { win.free(); }
 ```
 
-`fromBlob` / `fromText`, then `stIntersects` / `stContains` / `stWithin` /
-`stCovers` / `stDistance` / `stDwithin` — the same code paths as the blob
-functions of those names, so answers and error wording are identical by
-construction (golden vectors are replayed through both and compared).
+Constructors `fromBlob` (internal, WKB or GeoPackage) / `fromText(wkt, srid)`.
 
-Measured over a 500-candidate refine loop: **41% faster** with a simple
-window, 17% with a 200-vertex one, 12% with 5000 vertices — the relate
-itself dominates as the window grows, and only the decode is saved.
+| | |
+|---|---|
+| predicates | `stIntersects` `stContains` `stWithin` `stCovers` `stDistance` `stDwithin` |
+| output | `stAsGeojson` `stAsGeojsonDigits` `stAsText` `stAsBinary` `stAsGpb` `stSrid` |
+| reprojection | `stTransform(srid)` → **a new handle**, freed separately |
+
+Each is the same code path as the blob function of that name (the `decoded`
+submodules in the core), so answers and error wording are identical by
+construction — the golden predicate, geojson and transform vectors are
+replayed through both APIs and compared.
+
+Measured over a 500-candidate loop, half of them hits:
+
+| loop | saved |
+|---|---|
+| predicate only, simple window | **41%** |
+| predicate only, 200-vertex window | 17% |
+| predicate only, 5000-vertex window | 12% |
+| predicate + GeoJSON output | 16% |
+| predicate + reproject + GeoJSON | 22% |
+| …with a 200-vertex window | 26% |
+
+Only decoding is saved, so the gain shrinks as the relate itself grows to
+dominate, and widens as more calls per row are chained onto one handle.
 
 **`free()` is mandatory.** wasm-bindgen cannot collect a handle for you; a
 leaked one keeps its geometry in the wasm heap for the life of the isolate.

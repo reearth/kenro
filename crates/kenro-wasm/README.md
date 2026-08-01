@@ -40,9 +40,10 @@ The exports work standalone too, for hosts whose SQLite takes no UDFs at all
 (Cloudflare D1, Durable Objects) — SQL filters on columns kenro computed at
 write time, kenro runs the exact predicate in JS:
 
-- **`Prepared`** — decode a geometry once and test many candidates against
-  it, instead of re-decoding a blob per call (41% faster over a refine loop
-  with a simple window; `free()` is mandatory)
+- **`Prepared`** — decode a geometry once, then chain predicates, GeoJSON/WKT
+  output and reprojection off that one handle instead of re-decoding a blob
+  per call (16–41% over a refine loop, depending on how much is chained;
+  `free()` is mandatory)
 - **`kenro-wasm/tiles`** — bounding box → Web Mercator tile ids, the
   B-tree-indexable stand-in for the R-tree that sql.js and D1/DO SQLite lack
 

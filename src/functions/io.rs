@@ -1,7 +1,7 @@
 //! Geometry constructors and output functions.
 
 use crate::error::Result;
-use crate::geom;
+use crate::geom::{self, Geom};
 use crate::gpb::{self, GpbHeader};
 
 /// `ST_GeomFromText(wkt [, srid])` → canonical GPB.
@@ -40,21 +40,38 @@ pub fn st_geom_from_gpb(bytes: &[u8]) -> Result<Vec<u8>> {
 
 /// `ST_AsText(geom)` → WKT.
 pub fn st_as_text(bytes: &[u8]) -> Result<String> {
-    let geom = geom::decode_auto(bytes)?;
-    geom::encode_wkt(&geom, "ST_AsText")
+    decoded::st_as_text(&geom::decode_auto(bytes)?)
 }
 
 /// `ST_AsBinary(geom)` → ISO WKB, little-endian, SRID dropped (as in PostGIS).
 pub fn st_as_binary(bytes: &[u8]) -> Result<Vec<u8>> {
-    let geom = geom::decode_auto(bytes)?;
-    geom::encode_wkb(&geom, "ST_AsBinary")
+    decoded::st_as_binary(&geom::decode_auto(bytes)?)
 }
 
 /// `ST_AsGPB(geom)` → storage-grade GPB (XY envelope for non-point
 /// geometries), preserving srid.
 pub fn st_as_gpb(bytes: &[u8]) -> Result<Vec<u8>> {
-    let geom = geom::decode_auto(bytes)?;
-    geom::encode_storage_gpb(&geom, "ST_AsGPB")
+    decoded::st_as_gpb(&geom::decode_auto(bytes)?)
+}
+
+/// Serialization for a geometry that is already decoded — see
+/// [`crate::functions::predicates::decoded`] for why that exists. These are
+/// one-liners over `geom::encode_*`; they exist so the function name in an
+/// error message is the SQL one either way.
+pub mod decoded {
+    use super::*;
+
+    pub fn st_as_text(geom: &Geom) -> Result<String> {
+        geom::encode_wkt(geom, "ST_AsText")
+    }
+
+    pub fn st_as_binary(geom: &Geom) -> Result<Vec<u8>> {
+        geom::encode_wkb(geom, "ST_AsBinary")
+    }
+
+    pub fn st_as_gpb(geom: &Geom) -> Result<Vec<u8>> {
+        geom::encode_storage_gpb(geom, "ST_AsGPB")
+    }
 }
 
 /// `ST_SetSRID(geom, srid)` — relabel only, coordinates unchanged. Operates

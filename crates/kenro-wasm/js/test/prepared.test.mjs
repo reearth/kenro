@@ -60,6 +60,91 @@ test("every predicate vector agrees between the blob and handle APIs", () => {
   assert.ok(compared > 20, `only ${compared} vectors compared`);
 });
 
+test("every geojson vector agrees between the blob and handle APIs", () => {
+  let compared = 0;
+  for (const v of loadVectors("geojson")) {
+    if (v.fn !== "asgeojson") continue;
+    const blob = wasm.stGeomFromTextSrid(v.a, v.srid ?? 0);
+    const digits = v.arg ?? null;
+    const viaBlob = outcome(() =>
+      digits === null ? wasm.stAsGeojson(blob) : wasm.stAsGeojsonDigits(blob, digits),
+    );
+    const p = wasm.Prepared.fromBlob(blob);
+    try {
+      const viaHandle = outcome(() =>
+        digits === null ? p.stAsGeojson() : p.stAsGeojsonDigits(digits),
+      );
+      assert.deepEqual(viaHandle, viaBlob, v.id);
+    } finally {
+      p.free();
+    }
+    compared++;
+  }
+  assert.ok(compared > 5, `only ${compared} vectors compared`);
+});
+
+test("every transform vector agrees between the blob and handle APIs", () => {
+  let compared = 0;
+  for (const v of loadVectors("transform")) {
+    if (v.fn !== "transform") continue;
+    const blob = wasm.stGeomFromTextSrid(v.a, v.src_srid);
+    const viaBlob = outcome(() => wasm.stAsText(wasm.stTransform(blob, v.to_srid)));
+
+    const p = wasm.Prepared.fromBlob(blob);
+    let projected;
+    try {
+      const viaHandle = outcome(() => {
+        projected = p.stTransform(v.to_srid);
+        return projected.stAsText();
+      });
+      assert.deepEqual(viaHandle, viaBlob, v.id);
+    } finally {
+      projected?.free();
+      p.free();
+    }
+    compared++;
+  }
+  assert.ok(compared > 5, `only ${compared} vectors compared`);
+});
+
+test("stTransform leaves the source handle untouched", () => {
+  // It returns a new handle rather than reprojecting in place — the source
+  // must still be usable, and at its original SRID.
+  const p = wasm.Prepared.fromText("POINT(139.7 35.68)", 4326);
+  const projected = p.stTransform(3857);
+  try {
+    assert.equal(p.stSrid(), 4326);
+    assert.equal(p.stAsText(), "POINT(139.7 35.68)");
+    assert.equal(projected.stSrid(), 3857);
+  } finally {
+    projected.free();
+    p.free();
+  }
+});
+
+test("text, WKB and GPB output match the blob functions", () => {
+  const blob = wasm.stGeomFromTextSrid("POLYGON((0 0, 4 0, 4 4, 0 4, 0 0))", 4326);
+  const p = wasm.Prepared.fromBlob(blob);
+  try {
+    assert.equal(p.stAsText(), wasm.stAsText(blob));
+    assert.deepEqual(p.stAsBinary(), wasm.stAsBinary(blob));
+    assert.deepEqual(p.stAsGpb(), wasm.stAsGpb(blob));
+    // Round-trips back through the blob API.
+    assert.equal(wasm.stAsText(p.stAsGpb()), "POLYGON((0 0,4 0,4 4,0 4,0 0))");
+  } finally {
+    p.free();
+  }
+});
+
+test("an unknown SRID refuses to transform, in PostGIS's words", () => {
+  const p = wasm.Prepared.fromText("POINT(1 2)", 0);
+  try {
+    assert.throws(() => p.stTransform(3857), /unknown \(0\) SRID/);
+  } finally {
+    p.free();
+  }
+});
+
 test("fromText and fromBlob describe the same geometry", () => {
   const wkt = "POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))";
   const fromText = wasm.Prepared.fromText(wkt, 4326);

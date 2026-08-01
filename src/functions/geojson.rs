@@ -14,19 +14,28 @@ use crate::geom::{self, Geom};
 /// A `crs` member is included iff the SRID is neither 0 nor 4326 (PostGIS
 /// default options=8 "short CRS when not EPSG:4326").
 pub fn st_as_geojson(bytes: &[u8], maxdecimaldigits: Option<i64>) -> Result<String> {
-    let geom = geom::decode_auto(bytes)?;
-    if geom.has_zm {
-        return Err(Error::Unsupported {
-            func: "ST_AsGeoJSON",
-            reason: "3D/M output is not supported in kenro 0.1; predicates and \
-                     R-tree functions accept 3D input"
-                .into(),
-        });
+    decoded::st_as_geojson(&geom::decode_auto(bytes)?, maxdecimaldigits)
+}
+
+/// GeoJSON output for a geometry that is already decoded — see
+/// [`crate::functions::predicates::decoded`] for why that exists.
+pub mod decoded {
+    use super::*;
+
+    pub fn st_as_geojson(geom: &Geom, maxdecimaldigits: Option<i64>) -> Result<String> {
+        if geom.has_zm {
+            return Err(Error::Unsupported {
+                func: "ST_AsGeoJSON",
+                reason: "3D/M output is not supported in kenro 0.1; predicates and \
+                         R-tree functions accept 3D input"
+                    .into(),
+            });
+        }
+        let digits = maxdecimaldigits.unwrap_or(9).clamp(0, 15) as i32;
+        let mut out = String::new();
+        write_geometry(&mut out, geom, digits, true);
+        Ok(out)
     }
-    let digits = maxdecimaldigits.unwrap_or(9).clamp(0, 15) as i32;
-    let mut out = String::new();
-    write_geometry(&mut out, &geom, digits, true);
-    Ok(out)
 }
 
 /// `ST_GeomFromGeoJSON(text)` → geometry with SRID 4326 (PostGIS ≥ 3.0,
