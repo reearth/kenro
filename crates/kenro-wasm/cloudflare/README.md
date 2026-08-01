@@ -1,7 +1,9 @@
-# Spatial queries on Cloudflare Durable Object SQLite
+# Spatial queries on Cloudflare D1 and Durable Object SQLite
 
-A working Worker that gives Durable Object SQLite a spatial index and
-PostGIS-style predicates, using [kenro-wasm](../README.md).
+A working Worker that gives D1 and Durable Object SQLite a spatial index and
+PostGIS-style predicates, using [kenro-wasm](../README.md). Both backends run
+the same plan from the same code (`src/spatial.mjs`) and the same test suite;
+only the row plumbing differs.
 
 Neither D1 nor Durable Object SQLite supports user-defined functions or
 loadable extensions — the supported extension set is FTS5, JSON and the math
@@ -19,11 +21,20 @@ time too**: `load()` parses each geometry once and derives the bounding box
 and the tile cover before the row reaches SQLite, so the columns SQL needs
 are plain REALs and INTEGERs with plain B-tree indexes on them.
 
-A Durable Object is the better host for this than D1: `sql.exec` is
-synchronous and the wasm lives in the same isolate, so refining a candidate
-is a function call rather than a network round trip. One DO per
-region/tile/tenant shards naturally — each holds its own SQLite and its own
-copy of the wasm.
+## D1 or a Durable Object
+
+The plan is identical; the economics are not.
+
+| | Durable Object | D1 |
+|---|---|---|
+| refine loop | `sql.exec` is synchronous and the wasm is in the same isolate → a function call per candidate | every candidate crosses the network as a geometry blob and is billed as a row read |
+| schema | DDL in the constructor | `migrations/0001_init.sql`, via `wrangler d1 migrations apply` |
+| BLOB reads | `ArrayBuffer` | plain `number[]` — wrap before handing to kenro |
+| writes | `transactionSync` | `batch()`, atomic |
+| scaling | one DO per region/tile/tenant, each with its own SQLite and its own wasm, no coordination | one shared database; the coarse filter matters much more |
+
+A DO is the better host when the refine step is hot, because a bad tile zoom
+costs you CPU there and money on D1.
 
 ## The R-tree stand-in
 
@@ -34,12 +45,25 @@ the Web Mercator tiles its bbox covers at a fixed zoom, in a side table keyed
 on the tile id — a window query becomes an equality lookup, which an index
 serves exactly.
 
-Features whose cover is too large to enumerate (a country outline) are filed
-under a single `OVERSIZED` cell and scanned on every query. That bounds the
-work without ever making the index lossy: correctness never depends on the
-cover being complete, only performance does. `stats` in every query response
-reports how many rows reached the predicate — if that number tracks the table
-size, the zoom is wrong for the data.
+**The tile grid is internal to the index. Queries take an arbitrary
+geometry** — any WKT, any size, aligned to nothing — and the cells are
+derived from *its* bounding box at query time. Tiles are how rows are found,
+never what can be asked for.
+
+Two cases keep that true, and they read the same "cover too large to
+enumerate" signal in opposite directions:
+
+- **A feature too big to tile** (a country outline) is filed under a single
+  `OVERSIZED` cell and is a candidate for every query.
+- **A window too big to tile** drops the cell filter entirely and scans the
+  table. Falling back to the `OVERSIZED` bucket here would be the subtle bug:
+  that bucket holds only the continent-sized features, so a large window
+  would return a handful of them and silently miss everything else.
+
+So the index is never lossy — correctness never depends on a cover being
+complete, only performance does. `stats` in every query response reports how
+many rows reached the predicate; if that number tracks the table size, the
+zoom is wrong for the data.
 
 ## Run it
 
@@ -62,8 +86,16 @@ curl -X POST 'localhost:8787/query' -d '{
 }'
 ```
 
-Routes: `POST /load`, `POST /query`, `GET /stats`, `POST /clear`, all taking
-`?shard=<name>` to pick the Durable Object.
+Routes: `POST /load`, `POST /query`, `GET /stats`, `POST /clear`.
+
+`?backend=do` (default) or `?backend=d1` picks the storage; `?shard=<name>`
+picks the Durable Object and is ignored by D1. To use D1 for real, create the
+database and apply the schema:
+
+```sh
+wrangler d1 create kenro-spatial     # put the id in wrangler.jsonc
+wrangler d1 migrations apply kenro-spatial
+```
 
 Query fields: `wkt` (required), `predicate` (`intersects` | `within` |
 `contains` | `dwithin`), `distance` (required for `dwithin`, in SRID units —
@@ -82,31 +114,22 @@ pool cannot resolve a `.wasm` module from outside the project root. In your
 own project, `import wasm from "kenro-wasm/pkg/kenro_wasm_bg.wasm"` off the
 published package works directly.
 
-## Doing the same on D1
+## Layout
 
-The shape carries over, with the round trip moved to the outside:
+| file | |
+|---|---|
+| `src/spatial.mjs` | the plan — write-time derivation, the coarse-filter SQL, the refine loop. Backend-independent. |
+| `src/spatial-do.mjs` | Durable Object plumbing |
+| `src/spatial-d1.mjs` | D1 plumbing |
+| `src/tiles.mjs` | the R-tree stand-in |
+| `src/kenro.mjs` | wasm init |
+| `migrations/` | D1 schema (kept in step with the DO's by `test/schema.test.mjs`) |
 
-```js
-const { results } = await env.DB.prepare(
-  `SELECT f.id, f.geom, f.props FROM features f
-    WHERE f.id IN (SELECT id FROM feature_cells WHERE cell IN (${qs}) OR cell = -1)`,
-).bind(...cells).all();
+## Limits
 
-const wasm = kenro();
-const window = wasm.stGeomFromText(wkt);
-const hits = results.filter((r) => wasm.stIntersects(toBytes(r.geom), window));
-```
-
-Two things change:
-
-- **Keep the candidate set small.** Every candidate crosses the network as a
-  geometry blob and is billed as a row read, so the tile zoom matters much
-  more than it does in a DO.
-- **BLOBs come back as arrays**, not `Uint8Array` — wrap them before handing
-  them to kenro.
-
-Aggregates (`ST_Union`, `ST_AsMVT`) can't join a `GROUP BY` on either
-backend; fetch the rows and fold them in JS.
+Aggregates (`ST_Union`, `ST_AsMVT`) can't join a `GROUP BY` on either backend
+— fetch the rows and fold them in JS. Likewise anything that wants a geometry
+in `ORDER BY` or a join condition: the SQL half only ever sees numbers.
 
 ## What this is not
 

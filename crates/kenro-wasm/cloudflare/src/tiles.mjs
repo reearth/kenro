@@ -31,11 +31,20 @@ function tileY(lat, n) {
 }
 
 /**
- * Tile ids covering a WGS84 bounding box, or `[OVERSIZED]` if the cover
- * exceeds MAX_CELLS. Ids are `y * n + x`, which fits in a JS-safe integer
- * for any zoom below 26.
+ * Tile ids covering a WGS84 bounding box, or `null` if the cover exceeds
+ * MAX_CELLS. Ids are `y * n + x`, which fits in a JS-safe integer for any
+ * zoom below 26.
+ *
+ * `null` means "too big to enumerate", and the two sides read it
+ * differently — which is the whole subtlety of this index:
+ *
+ *   write side  → file the feature under OVERSIZED (always a candidate)
+ *   query side  → drop the cell filter entirely (every row is a candidate)
+ *
+ * Reading `null` as OVERSIZED on the query side would return *only* the
+ * oversized features for a large window. Callers must not conflate them.
  */
-export function cellsForBbox({ minx, miny, maxx, maxy }) {
+export function tileCover({ minx, miny, maxx, maxy }) {
   const n = 2 ** ZOOM;
   const x0 = tileX(minx, n);
   const x1 = tileX(maxx, n);
@@ -43,13 +52,18 @@ export function cellsForBbox({ minx, miny, maxx, maxy }) {
   const y0 = tileY(maxy, n);
   const y1 = tileY(miny, n);
 
-  if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) return [OVERSIZED];
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > MAX_CELLS) return null;
 
   const cells = [];
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) cells.push(y * n + x);
   }
   return cells;
+}
+
+/** Cells a feature is filed under at write time. */
+export function cellsForFeature(bbox) {
+  return tileCover(bbox) ?? [OVERSIZED];
 }
 
 /** True if two bounding boxes overlap (the cheap pre-refine check). */

@@ -1,15 +1,9 @@
-// Runs the Worker + Durable Object in workerd (the real runtime, real
-// SQLite, real wasm) via @cloudflare/vitest-pool-workers.
+// Runs the Worker in workerd (the real runtime, real SQLite, real wasm) via
+// @cloudflare/vitest-pool-workers. The whole suite runs twice — once per
+// backend — because the point of spatial.mjs is that the plan is identical
+// and only the row plumbing differs.
 import { SELF } from "cloudflare:test";
-import { beforeEach, expect, it } from "vitest";
-
-const post = async (path, body) => {
-  const res = await SELF.fetch(`http://x${path}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  return { status: res.status, body: await res.json() };
-};
+import { beforeEach, describe, expect, it } from "vitest";
 
 function square(id, cx, cy, half = 0.05) {
   return {
@@ -59,68 +53,96 @@ const FIXTURE = {
   ],
 };
 
-beforeEach(async () => {
-  await post("/clear", {});
-  const { body } = await post("/load", FIXTURE);
-  expect(body.inserted).toBe(5);
-});
+const TOKYO_WINDOW = "POLYGON((139.6 35.6, 139.8 35.6, 139.8 35.75, 139.6 35.75, 139.6 35.6))";
 
-it("indexes tile cells, with the huge feature marked oversized", async () => {
-  const res = await SELF.fetch("http://x/stats");
-  const stats = await res.json();
-  expect(stats.features).toBe(5);
-  expect(stats.oversized).toBe(1);
-});
+describe.each(["do", "d1"])("backend=%s", (backend) => {
+  const post = async (path, body) => {
+    const res = await SELF.fetch(`http://x${path}?backend=${backend}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json() };
+  };
+  const ids = ({ body }) => body.features.map((f) => f.id).sort();
 
-it("intersects: returns only the features the window really hits", async () => {
-  const { body } = await post("/query", {
-    wkt: "POLYGON((139.6 35.6, 139.8 35.6, 139.8 35.75, 139.6 35.75, 139.6 35.6))",
+  beforeEach(async () => {
+    await post("/clear", {});
+    const { body } = await post("/load", FIXTURE);
+    expect(body.inserted).toBe(FIXTURE.features.length);
   });
-  const ids = body.features.map((f) => f.id).sort();
-  // `wide` covers all of Japan, so it is a true hit — not an index artifact.
-  expect(ids).toEqual(["tokyo", "wide"]);
-  // The coarse filter did its job: not every row reached the predicate.
-  expect(body.stats.refined).toBeLessThan(FIXTURE.features.length);
-});
 
-it("within: the window must contain the feature", async () => {
-  const { body } = await post("/query", {
-    wkt: "POLYGON((139.5 35.5, 140 35.5, 140 36, 139.5 36, 139.5 35.5))",
-    predicate: "within",
+  it("indexes tile cells, with the huge feature marked oversized", async () => {
+    const res = await SELF.fetch(`http://x/stats?backend=${backend}`);
+    const stats = await res.json();
+    expect(stats.features).toBe(5);
+    expect(stats.oversized).toBe(1);
   });
-  expect(body.features.map((f) => f.id)).toEqual(["tokyo"]);
-});
 
-it("dwithin: pads the coarse filter so near-misses are not dropped", async () => {
-  const near = { wkt: "POINT(139.7 35.9)", predicate: "dwithin", distance: 0.2 };
-  const { body } = await post("/query", near);
-  expect(body.features.map((f) => f.id).sort()).toEqual(["tokyo", "wide"]);
-
-  // Without the padding this same query would find nothing: the point's own
-  // bbox touches no feature bbox at all.
-  const { body: tight } = await post("/query", { ...near, distance: 0.01 });
-  expect(tight.features.map((f) => f.id)).toEqual(["wide"]);
-});
-
-it("srid: output geometry is reprojected by kenro", async () => {
-  const { body } = await post("/query", {
-    wkt: "POLYGON((139.6 35.6, 139.8 35.6, 139.8 35.75, 139.6 35.75, 139.6 35.6))",
-    srid: 3857,
-    limit: 1,
+  it("intersects: returns only the features the window really hits", async () => {
+    const got = await post("/query", { wkt: TOKYO_WINDOW });
+    // `wide` covers all of Japan, so it is a true hit — not an index artifact.
+    expect(ids(got)).toEqual(["tokyo", "wide"]);
+    // The coarse filter did its job: not every row reached the predicate.
+    expect(got.body.stats.refined).toBeLessThan(FIXTURE.features.length);
   });
-  const [x, y] = body.features[0].geometry.coordinates[0][0];
-  expect(x).toBeGreaterThan(1e7); // Web Mercator metres, not degrees
-  expect(y).toBeGreaterThan(4e6);
+
+  it("takes an arbitrary window, not a tile: a sliver between features", async () => {
+    // Deliberately not aligned to anything — the tile grid is internal.
+    const got = await post("/query", {
+      wkt: "POLYGON((139.66 35.5, 139.665 35.5, 139.665 35.62, 139.66 35.62, 139.66 35.5))",
+    });
+    expect(ids(got)).toEqual(["wide"]); // between Tokyo and Yokohama, missing both
+  });
+
+  it("a window too large to tile still returns everything it covers", async () => {
+    // Regression: a cover over MAX_CELLS must drop the cell filter, not fall
+    // back to the OVERSIZED bucket — which would return only `wide`.
+    const got = await post("/query", {
+      wkt: "POLYGON((100 0, 160 0, 160 60, 100 60, 100 0))",
+    });
+    expect(ids(got)).toEqual(["osaka", "sapporo", "tokyo", "wide", "yokohama"]);
+    expect(got.body.stats.candidates).toBe(5); // whole table, by design
+  });
+
+  it("within: the window must contain the feature", async () => {
+    const got = await post("/query", {
+      wkt: "POLYGON((139.5 35.5, 140 35.5, 140 36, 139.5 36, 139.5 35.5))",
+      predicate: "within",
+    });
+    expect(ids(got)).toEqual(["tokyo"]);
+  });
+
+  it("dwithin: pads the coarse filter so near-misses are not dropped", async () => {
+    const near = { wkt: "POINT(139.7 35.9)", predicate: "dwithin", distance: 0.2 };
+    expect(ids(await post("/query", near))).toEqual(["tokyo", "wide"]);
+
+    // Without the padding this same query would find nothing: the point's own
+    // bbox touches no feature bbox at all.
+    expect(ids(await post("/query", { ...near, distance: 0.01 }))).toEqual(["wide"]);
+  });
+
+  it("srid: output geometry is reprojected by kenro", async () => {
+    const { body } = await post("/query", { wkt: TOKYO_WINDOW, srid: 3857, limit: 1 });
+    const [x, y] = body.features[0].geometry.coordinates[0][0];
+    expect(x).toBeGreaterThan(1e7); // Web Mercator metres, not degrees
+    expect(y).toBeGreaterThan(4e6);
+  });
+
+  it("reports kenro's own error wording", async () => {
+    const { status, body } = await post("/query", { wkt: "NOT WKT" });
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/^kenro: /);
+  });
+
+  it("rejects an unknown predicate", async () => {
+    const { status, body } = await post("/query", { wkt: "POINT(0 0)", predicate: "nope" });
+    expect(status).toBe(400);
+    expect(body.error).toMatch(/unknown predicate/);
+  });
 });
 
-it("reports kenro's own error wording", async () => {
-  const { status, body } = await post("/query", { wkt: "NOT WKT" });
-  expect(status).toBe(400);
-  expect(body.error).toMatch(/^kenro: /);
-});
-
-it("rejects an unknown predicate", async () => {
-  const { status, body } = await post("/query", { wkt: "POINT(0 0)", predicate: "nope" });
-  expect(status).toBe(400);
-  expect(body.error).toMatch(/unknown predicate/);
+it("rejects an unknown backend", async () => {
+  const res = await SELF.fetch("http://x/stats?backend=postgis");
+  expect(res.status).toBe(400);
+  expect((await res.json()).error).toMatch(/unknown backend/);
 });

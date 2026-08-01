@@ -3,6 +3,15 @@
   "name": "kenro-spatial-do",
   "main": "src/index.mjs",
   "compatibility_date": "2025-04-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kenro-spatial",
+      // Replace with your own: `wrangler d1 create kenro-spatial`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
   "durable_objects": {
     "bindings": [{ "name": "SPATIAL", "class_name": "SpatialIndex" }]
   },

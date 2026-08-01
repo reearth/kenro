@@ -271,8 +271,8 @@ queries. Three patterns that do work:
 - **Index in SQL, refine in kenro** — the scalable version of the above:
   derive the bounding box and a tile cell with kenro at write time, let SQL
   filter on those with a plain B-tree index, and run the exact predicate in
-  JS on the survivors. A complete Worker + Durable Object doing this, with
-  tests that run in workerd, lives in
+  JS on the survivors. A complete Worker doing this on both D1 and Durable
+  Object SQLite, with tests that run in workerd, lives in
   [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).
 - **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite]
   over bytes fetched from R2/KV (read-only analytics on a shipped
