@@ -4,7 +4,7 @@
 // runtime — workerd, real D1, real DO SQLite — because getting either wrong
 // would be silent: a float-ified id still compares "close enough" to look
 // right in a small test, and a missed index only shows up as latency.
-import { env } from "cloudflare:test";
+import { env, runInDurableObject } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { CELL_DEPTH, cellFilterSql, cellsForFeature, cellsForQuery } from "../../js/src/quadtree.mjs";
@@ -86,6 +86,40 @@ describe("cell ids survive the hosts", () => {
     const detail = plan.results.map((r) => r.detail).join(" | ");
     expect(detail).toMatch(/USING (PRIMARY KEY|INDEX|COVERING INDEX)/);
     expect(detail).not.toMatch(/SCAN cell_plan(?! USING)/);
+  });
+
+  // These three pin the reasons the index is shaped the way it is, rather than
+  // leaving them as prose in the README that nothing checks. If any of them
+  // starts behaving differently, the design is worth revisiting.
+  it("neither host offers SQLite's own R-tree module", async () => {
+    const create = "CREATE VIRTUAL TABLE IF NOT EXISTS rt USING rtree(id, minx, maxx, miny, maxy)";
+    await expect(env.DB.prepare(create).run()).rejects.toThrow(/SQLITE_AUTH/);
+    const stub = env.SPATIAL.get(env.SPATIAL.idFromName("rtree-probe"));
+    await runInDurableObject(stub, (instance) => {
+      expect(() => instance.sql.exec(create)).toThrow(/SQLITE_AUTH/);
+    });
+  });
+
+  it("both hosts reject SQL-level transactions", async () => {
+    // Why an R-tree built on top would be read-decide-write across round trips:
+    // there is no interactive transaction to hold open while descending.
+    await expect(env.DB.prepare("BEGIN").run()).rejects.toThrow(/transaction/i);
+    const stub = env.SPATIAL.get(env.SPATIAL.idFromName("txn-probe"));
+    await runInDurableObject(stub, (instance) => {
+      expect(() => instance.sql.exec("BEGIN")).toThrow(/transaction/i);
+    });
+  });
+
+  it("both hosts do support recursive CTEs", async () => {
+    // So the *read* half of an R-tree would be one statement; it is the write
+    // half that rules it out. Recorded so the README's claim stays honest.
+    const cte = "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM c WHERE n<5) SELECT sum(n) AS s FROM c";
+    const { results } = await env.DB.prepare(cte).all();
+    expect(results[0].s).toBe(15);
+    const stub = env.SPATIAL.get(env.SPATIAL.idFromName("cte-probe"));
+    await runInDurableObject(stub, (instance) => {
+      expect(instance.sql.exec(cte).one().s).toBe(15);
+    });
   });
 
   it("compound SELECT is capped at five terms on these hosts", async () => {

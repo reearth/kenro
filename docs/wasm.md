@@ -328,6 +328,14 @@ So: `tiles` if your windows are all about one size and you will tune for it,
 table; CI runs it with `--check`, which fails if either index moves away from
 these numbers without the docs following.
 
+Neither is an R-tree, and neither host will give you one: `USING rtree` answers
+`SQLITE_AUTH` on both D1 and Durable Object SQLite. Building one in ordinary
+tables is possible — both hosts run recursive CTEs, so the descent is one
+statement — but an R-tree insert is read-decide-write, and neither host offers
+an interactive transaction to do that in. The Cloudflare example's README works
+through [why that was not the trade to make
+first](../crates/kenro-wasm/cloudflare/README.md#why-not-build-a-real-r-tree-on-top).
+
 ## Cloudflare Workers, D1 and Durable Objects
 
 Workers cannot load native extensions, and neither **D1** nor **Durable

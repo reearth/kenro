@@ -97,6 +97,44 @@ Pick `kenro-wasm/tiles` if your windows are all about one size and you are
 willing to tune for it. Pick `kenro-wasm/quadtree` if they are not — a map that
 zooms is the obvious case.
 
+### Why not build a real R-tree on top
+
+The obvious alternative is to stop approximating and keep an actual R-tree in
+ordinary tables — a node row per box, children by parent id — descending it
+from JS. Neither host offers the built-in module — `CREATE VIRTUAL TABLE …
+USING rtree` answers `SQLITE_AUTH` on both — but nothing stops you implementing
+one, and it is worth being clear that this was a choice rather than an
+oversight. Each claim below is pinned by a test in `test/cell-ids.test.mjs`
+that runs against the real hosts.
+
+**Reading would work.** Both hosts support recursive CTEs, so the descent fits
+in one statement — the overlap test at each level is plain `REAL` comparisons,
+no user-defined function required. That half is not the problem.
+
+**Writing is.** An R-tree insert is read-decide-write: descend to choose a
+subtree, split the leaf if it is full, then propagate the enlarged boxes back
+up. D1 has no interactive transaction — `BEGIN` and `SAVEPOINT` are rejected,
+and `batch()` runs statements you committed to before you saw any results — so
+you cannot branch on a node you just read without another round trip. Loading
+*n* features costs round trips proportional to *n* × depth, against one batched
+insert per feature here. Worse, two writers splitting the same interior node
+interleave and corrupt the tree, and there is no lock to take. A Durable Object
+escapes both problems (single-threaded, `transactionSync`), but it is also the
+host that needs the help least, since its SQLite is local.
+
+The cell index has no shared mutable structure at all. A row is `(cell, id)`,
+computed by arithmetic from one feature's bounding box, independent of every
+other row and idempotent on re-insert — which is why loading is a plain batch
+and concurrent writers cannot corrupt anything.
+
+**And the ceiling is the same.** An R-tree returns bounding-box candidates,
+exactly like the cell index; the exact predicate still runs in kenro afterwards
+either way. What it buys is splits that follow the data — tighter candidate
+sets in dense areas, where a fixed grid line falls wherever it falls. That is a
+real gain, and a bounded one: it changes the constant, not the shape. Set
+against maintaining Guttman splits and rebalancing in JS, where every bug is a
+silently missing row, it did not look like the trade to make first.
+
 ## End to end
 
 Two tables. Nothing in them is spatial — which is the point, because that is
