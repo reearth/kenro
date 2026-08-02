@@ -57,7 +57,7 @@ survivors.
 ```js
 import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";  // Workers hand you the Module
 import * as kenro from "kenro-wasm";
-import { cellsForQuery } from "kenro-wasm/tiles";
+import { cellFilterSql } from "kenro-wasm/quadtree";
 
 kenro.initSync({ module: wasmModule });                      // once per isolate
 
@@ -68,12 +68,13 @@ const hits = rows.filter((r) => {
 });
 ```
 
-Three subpaths carry this, all typed:
+Four subpaths carry this, all typed:
 
 | | |
 |---|---|
 | `kenro-wasm` → `Prepared` | a geometry decoded once, then predicates, GeoJSON/WKT output and reprojection chained off it |
-| `kenro-wasm/tiles` | bounding box → Web Mercator tile ids: the B-tree-indexable stand-in for the missing R-tree (sql.js lacks one too) |
+| `kenro-wasm/quadtree` | bounding box → variable-depth quadtree cell ids: the B-tree-indexable stand-in for the missing R-tree (sql.js lacks one too), with nothing to tune |
+| `kenro-wasm/tiles` | the same idea at one fixed zoom — simpler, and faster for windows near that zoom |
 | `kenro-wasm/prepared` | handle lifetimes where `using` isn't available |
 
 A complete Worker on both backends, with tests that run in workerd:

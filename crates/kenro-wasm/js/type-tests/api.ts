@@ -62,7 +62,7 @@ const filed: number[] = quadCellsForFeature(bbox);
 const query: CellQuery = quadCellsForQuery(bbox, { maxCells: 32 });
 const lo: number = query.ranges[0][0];
 const covered: number[] = quadCover(bbox, { maxDepth: 12 });
-const filter: { sql: string; params: number[] } = cellFilterSql(bbox, { table: "cells" });
+const filter: { sql: string; params: number[] } = cellFilterSql(bbox, { table: "cells", maxParams: 60 });
 const depth: number = CELL_DEPTH;
 const d0: number = cellDepth(filed[0]);
 

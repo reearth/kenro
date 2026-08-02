@@ -7,7 +7,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-import { CELL_DEPTH, cellsForFeature, cellsForQuery } from "../../js/src/quadtree.mjs";
+import { CELL_DEPTH, cellFilterSql, cellsForFeature, cellsForQuery } from "../../js/src/quadtree.mjs";
 
 const MAX_CELL_ID = 2 ** (2 * CELL_DEPTH + 1) - 1;
 
@@ -67,5 +67,33 @@ describe("cell ids survive the hosts", () => {
     const detail = plan.results.map((r) => r.detail).join(" ");
     expect(detail).toMatch(/USING (PRIMARY KEY|INDEX|COVERING INDEX)/);
     expect(detail).not.toMatch(/SCAN cell_plan(?! USING)/);
+  });
+
+  it("the filter's OR shape is planned as index lookups, not a scan", async () => {
+    await env.DB.prepare(
+      "CREATE TABLE IF NOT EXISTS cell_plan (cell INTEGER NOT NULL, id TEXT NOT NULL, PRIMARY KEY (cell, id)) WITHOUT ROWID",
+    ).run();
+    const { sql, params } = cellFilterSql(
+      { minx: 139.66, miny: 35.5, maxx: 139.665, maxy: 35.62 },
+      { table: "cell_plan" },
+    );
+    // Runs at all — the UNION shape this replaced dies at six terms here.
+    const { results } = await env.DB.prepare(sql).bind(...params).all();
+    expect(results).toEqual([]);
+
+    const inlined = params.reduce((q, v) => q.replace("?", String(v)), sql);
+    const plan = await env.DB.prepare(`EXPLAIN QUERY PLAN ${inlined}`).all();
+    const detail = plan.results.map((r) => r.detail).join(" | ");
+    expect(detail).toMatch(/USING (PRIMARY KEY|INDEX|COVERING INDEX)/);
+    expect(detail).not.toMatch(/SCAN cell_plan(?! USING)/);
+  });
+
+  it("compound SELECT is capped at five terms on these hosts", async () => {
+    // The reason cellFilterSql emits OR rather than UNION. If this ever starts
+    // passing at six, the constraint has been lifted — not the other way round.
+    const arms = (n) =>
+      Array.from({ length: n }, () => "SELECT 1 AS x").join(" UNION ");
+    await expect(env.DB.prepare(arms(5)).all()).resolves.toBeDefined();
+    await expect(env.DB.prepare(arms(6)).all()).rejects.toThrow(/too many terms in compound SELECT/);
   });
 });

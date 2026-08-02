@@ -15,7 +15,7 @@ not by preference:
 | your SQLite | what you do | start at |
 |---|---|---|
 | accepts JS user-defined functions (`@sqlite.org/sqlite-wasm`, sql.js, wa-sqlite) | register kenro and write ordinary spatial SQL | [Usage](#usage) |
-| does not (**Cloudflare D1, Durable Objects**) | index in SQL on columns kenro computes at write time, run the predicates in JS | [Without SQLite](#without-sqlite-prepared-and-kenro-wasmtiles), then the [Cloudflare example](../crates/kenro-wasm/cloudflare/README.md) |
+| does not (**Cloudflare D1, Durable Objects**) | index in SQL on columns kenro computes at write time, run the predicates in JS | [Without SQLite](#without-sqlite-prepared-and-the-spatial-indexes), then the [Cloudflare example](../crates/kenro-wasm/cloudflare/README.md) |
 
 ## Size
 
@@ -100,7 +100,7 @@ sqlite3.capi.sqlite3_deserialize(
 registerKenro(db, kenroWasm, sqlite3);
 ```
 
-## Without SQLite: `Prepared` and `kenro-wasm/tiles`
+## Without SQLite: `Prepared` and the spatial indexes
 
 The exports also stand alone, for hosts where no SQLite can hold kenro's
 UDFs at all — Cloudflare D1 and Durable Object SQLite support neither
@@ -187,10 +187,70 @@ const geojson = withScope((own) => {          // one scope per row, not per scan
 });
 ```
 
-**`kenro-wasm/tiles`** — a B-tree-indexable stand-in for the R-tree that
-sql.js and D1/DO SQLite lack. It maps a bounding box to Web Mercator tile
-ids, so a window query becomes `WHERE cell IN (…)` instead of a half-open
-`minx <= ?` range scan. Pure arithmetic, no wasm involved.
+Two B-tree-indexable stand-ins for the R-tree that sql.js and D1/DO SQLite
+lack. Both map a bounding box to integer cell ids stored in a side table, so a
+window query becomes an index lookup instead of a half-open `minx <= ?` range
+scan. Pure arithmetic, no wasm involved in either.
+
+| | |
+|---|---|
+| **`kenro-wasm/quadtree`** | variable depth: each feature is filed at whatever cell size fits it. Nothing to tune, one row per feature, no cliff. Start here. |
+| **`kenro-wasm/tiles`** | one fixed zoom for the whole dataset. Faster than the quadtree for windows near that zoom, much worse away from it. |
+
+### `kenro-wasm/quadtree`
+
+Each feature goes in the deepest quadtree cell that contains its bounding box.
+Two such cells are always either nested or disjoint, so if a feature's box
+overlaps a window, its cell is necessarily an ancestor or a descendant of one
+of the window's cells. That makes the query two indexed shapes and no others:
+
+```js
+import { cellFilterSql, cellsForFeature } from "kenro-wasm/quadtree";
+
+const cells = cellsForFeature(bbox);        // write side: one cell, one row
+const { sql, params } = cellFilterSql(bbox); // query side: the whole filter
+```
+
+| | |
+|---|---|
+| `cellsForFeature(bbox, opts?)` → `number[]` | cells to store a feature under; one by default |
+| `cellsForQuery(bbox, opts?)` → `{ancestors, ranges, wholeTable}` | `ancestors` are equality lookups, `ranges` are `[lo, hi]` id spans |
+| `quadCover(bbox, opts?)` → `number[]` | the cover both sides build on |
+| `cellFilterSql(bbox, opts?)` → `{sql, params, wholeTable}` | the filter as one statement, every value bound |
+| `cellDepth(cell)` → `number` | the depth an id sits at; `0` is the world |
+| `CELL_DEPTH` = `24`, `DEFAULT_QUERY_MAX_CELLS` = `16`, `DEFAULT_MAX_PARAMS` = `90` | |
+
+A cell id is a Hilbert code shifted left and terminated by a single 1 bit that
+records the depth — the S2 design. The sentinel is what keeps a depth-3 cell
+from colliding with a depth-5 one, and it puts a cell's descendants in the ids
+immediately around it, so they come out as one `BETWEEN`. Hilbert rather than
+Z-order because neighbouring cells then tend to be neighbouring ids, which lets
+adjacent ranges merge: measured at ~40% fewer range terms for the same rows.
+Ids are 49 bits, so they stay ordinary JS numbers and SQLite stores them as
+INTEGER.
+
+**Nothing here has to match between the two sides.** Ids are always encoded at
+`CELL_DEPTH`, and nesting makes the result complete for any combination of
+`maxCells` and `maxDepth`, so the write side and the query side can be
+configured independently — or by different people. `maxCells` only trades SQL
+length against precision, and `maxDepth` only caps how fine a cover gets.
+
+`cellFilterSql` emits one statement using `OR`, not a `UNION` per range,
+because D1 and Durable Object SQLite cap a compound SELECT at five terms and
+refuse at 100 bound variables. Over `maxParams` it coarsens the cover until it
+fits, which widens the search rather than narrowing it — a tight budget costs
+precision, never a hit.
+
+There is no `OVERSIZED` bucket and nothing returns `null`: a feature too big
+for a fine cell is simply filed at a coarse one, which is an ordinary cell that
+happens to be an ancestor of a lot. A window covering the world reports
+`wholeTable`, and the filter is dropped rather than applied to no purpose.
+
+### `kenro-wasm/tiles`
+
+The simple one, kept because a fixed grid tuned to the size you actually query
+beats the quadtree in that band. It maps a bounding box to the Web Mercator
+tile ids it covers at one zoom, so a window query becomes `WHERE cell IN (…)`.
 
 ```js
 import { cellsForFeature, cellsForQuery } from "kenro-wasm/tiles";
@@ -255,7 +315,7 @@ increasing order of how much data they scale to:
 2. **Index in SQL, refine in kenro** — the scalable version: derive a
    bounding box and tile cells with kenro at *write* time, let SQL filter on
    those with a plain B-tree index, then run the exact predicate in JS on the
-   survivors. This is what [`Prepared` and `kenro-wasm/tiles`](#without-sqlite-prepared-and-kenro-wasmtiles)
+   survivors. This is what [`Prepared` and the spatial indexes](#without-sqlite-prepared-and-the-spatial-indexes)
    above are for. A complete Worker doing it on both backends — schema,
    migrations, and tests that run in workerd — is in
    [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).

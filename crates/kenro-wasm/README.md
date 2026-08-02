@@ -46,12 +46,15 @@ write time, kenro runs the exact predicate in JS:
   handle must be freed: `using` does it where available, and
   **`kenro-wasm/prepared`** (`freeOnce` / `withPrepared` / `withScope`) does
   it everywhere else
-- **`kenro-wasm/tiles`** — bounding box → Web Mercator tile ids, the
-  B-tree-indexable stand-in for the R-tree that sql.js and D1/DO SQLite lack
+- **`kenro-wasm/quadtree`** — bounding box → variable-depth quadtree cell
+  ids, the B-tree-indexable stand-in for the R-tree that sql.js and D1/DO
+  SQLite lack, with no zoom to choose
+- **`kenro-wasm/tiles`** — the same idea at one fixed zoom: simpler, and
+  faster for windows near that zoom
 
 Every subpath ships TypeScript types, checked in CI against the exports map.
 
-Both are documented in [docs/wasm.md](../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
+All are documented in [docs/wasm.md](../../docs/wasm.md#without-sqlite-prepared-and-the-spatial-indexes).
 
 ## Demo
 

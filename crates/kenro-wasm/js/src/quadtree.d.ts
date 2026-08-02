@@ -17,6 +17,12 @@ export interface QuadOptions {
 }
 
 export interface CellFilterOptions extends QuadOptions {
+  /**
+   * Most bound parameters the filter may use. D1 and Durable Object SQLite
+   * refuse at 100. Over budget, the cover is coarsened until it fits — wider,
+   * never narrower, so the result stays complete. Default 90.
+   */
+  maxParams?: number;
   /** Table holding `(cell, id)` rows. Default `"feature_cells"`. */
   table?: string;
   /** Cell id column. Default `"cell"`. */
@@ -40,6 +46,9 @@ export const CELL_DEPTH: 24;
 
 /** Cells one feature is filed under by default. */
 export const DEFAULT_FEATURE_MAX_CELLS: 1;
+
+/** Bound parameters a single filter statement may use. */
+export const DEFAULT_MAX_PARAMS: 90;
 
 /** Cells a query window is covered with by default. */
 export const DEFAULT_QUERY_MAX_CELLS: 16;

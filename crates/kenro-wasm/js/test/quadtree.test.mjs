@@ -9,6 +9,7 @@ import { test } from "node:test";
 import {
   CELL_DEPTH,
   DEFAULT_FEATURE_MAX_CELLS,
+  DEFAULT_MAX_PARAMS,
   DEFAULT_QUERY_MAX_CELLS,
   bboxOverlaps,
   cellDepth,
@@ -198,12 +199,15 @@ test("cellFilterSql binds every value and rejects injected identifiers", () => {
   const { sql, params } = cellFilterSql(bbox(139.70, 35.68, 139.72, 35.70));
   assert.equal(sql.match(/\?/g).length, params.length);
   assert.ok(sql.includes("BETWEEN ? AND ?"));
+  // One statement, not a compound one: D1 and DO SQLite cap UNION at 5 terms.
+  assert.ok(!sql.includes("UNION"), "compound SELECT is not portable to D1/DO");
+  assert.ok(sql.startsWith("SELECT DISTINCT "));
   assert.ok(params.every(Number.isSafeInteger));
   for (const bad of ["feature_cells; DROP TABLE features", "a b", "", 1]) {
     assert.throws(() => cellFilterSql(bbox(0, 0, 1, 1), { table: bad }), /plain SQL identifier/);
   }
   const custom = cellFilterSql(bbox(0, 0, 1, 1), { table: "t", cell: "c", id: "fid" });
-  assert.ok(custom.sql.includes("SELECT fid FROM t WHERE c"));
+  assert.ok(custom.sql.includes("SELECT DISTINCT fid FROM t WHERE c"));
 });
 
 test("bad options are rejected rather than silently coerced", () => {
@@ -211,6 +215,25 @@ test("bad options are rejected rather than silently coerced", () => {
   assert.throws(() => quadCover(bbox(0, 0, 1, 1), { maxCells: 2.5 }), /positive integer/);
   assert.throws(() => quadCover(bbox(0, 0, 1, 1), { maxDepth: 25 }), /0\.\.24/);
   assert.throws(() => quadCover(bbox(0, 0, 1, 1), { maxDepth: -1 }), /0\.\.24/);
+});
+
+test("the filter stays inside the hosts' bound-parameter limit", () => {
+  // A sliver window needs many cells; D1 and DO SQLite refuse past 100 vars.
+  const awkward = [
+    bbox(139.66, 35.5, 139.665, 35.62),
+    bbox(-0.001, -0.001, 0.001, 0.001), // straddles both prime meridian and equator
+    bbox(100, 0, 160, 60),
+  ];
+  for (const b of awkward) {
+    for (const maxCells of [16, 64, 256]) {
+      const { params } = cellFilterSql(b, { maxCells });
+      assert.ok(params.length <= DEFAULT_MAX_PARAMS, `${params.length} params for ${JSON.stringify(b)}`);
+    }
+  }
+  // Coarsening to fit must widen the search, never drop a hit.
+  const feature = cellsForFeature(bbox(139.6615, 35.51, 139.6625, 35.515));
+  const tight = cellsForQuery(bbox(139.66, 35.5, 139.665, 35.62), { maxCells: 256 });
+  assert.ok(feature.some((c) => selects(tight, c)));
 });
 
 test("cellDepth reads the depth back off an id", () => {

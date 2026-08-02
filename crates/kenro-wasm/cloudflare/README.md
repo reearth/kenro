@@ -4,7 +4,7 @@ A working Worker that gives D1 and Durable Object SQLite a spatial index and
 PostGIS-style predicates, using [kenro-wasm](../README.md) — whose API
 reference for the two pieces this leans on, the `Prepared` handle and
 `kenro-wasm/tiles`, is
-[docs/wasm.md](../../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
+[docs/wasm.md](../../../docs/wasm.md#without-sqlite-prepared-and-the-spatial-indexes).
 Both backends run the same plan from the same code (`src/spatial.mjs`) and the
 same test suite; only the row plumbing differs.
 
@@ -43,30 +43,58 @@ costs you CPU there and money on D1.
 
 Bounding-box columns alone index badly: `minx <= ? AND maxx >= ? …` gives a
 B-tree only a half-open range to work with, so it degrades to a scan of
-everything left of the window. `kenro-wasm/tiles` instead tags each feature with
-the Web Mercator tiles its bbox covers at a fixed zoom, in a side table keyed
-on the tile id — a window query becomes an equality lookup, which an index
-serves exactly.
+everything left of the window. `kenro-wasm/quadtree` instead files each
+feature under the deepest quadtree cell that contains its bounding box, in a
+side table keyed on the cell id — a small building lands in a small cell, a
+prefecture in a large one, and a window query becomes an index lookup.
 
-**The tile grid is internal to the index. Queries take an arbitrary
+**The cell grid is internal to the index. Queries take an arbitrary
 geometry** — any WKT, any size, aligned to nothing — and the cells are
-derived from *its* bounding box at query time. Tiles are how rows are found,
+derived from *its* bounding box at query time. Cells are how rows are found,
 never what can be asked for.
 
-Two cases keep that true, and they read the same "cover too large to
-enumerate" signal in opposite directions:
+What makes that complete is that two quadtree cells are always either nested
+or disjoint. If a feature's box overlaps the window, the feature's cell is
+necessarily an ancestor or a descendant of one of the window's cells — never
+off to the side. So the query is two indexed shapes and nothing else:
 
-- **A feature too big to tile** (a country outline) is filed under a single
-  `OVERSIZED` cell and is a candidate for every query.
-- **A window too big to tile** drops the cell filter entirely and scans the
-  table. Falling back to the `OVERSIZED` bucket here would be the subtle bug:
-  that bucket holds only the continent-sized features, so a large window
-  would return a handful of them and silently miss everything else.
+- **ancestors** — the coarser cells containing the window, a handful of
+  equality lookups. A country outline is filed at a shallow cell and is picked
+  up here, by being an ancestor of everything inside it.
+- **descendants** — one contiguous id range per cell the window is covered
+  by, because a cell id is a Hilbert code with the depth marked in its low
+  bit, so a cell's descendants are the ids immediately around it.
 
-So the index is never lossy — correctness never depends on a cover being
-complete, only performance does. `stats` in every query response reports how
-many rows reached the predicate; if that number tracks the table size, the
-zoom is wrong for the data.
+There is no bucket for features too large to file and no signal the two sides
+have to read in opposite directions, because "too large" is not a case: a big
+feature is just a shallow cell. `stats` reports `shallowestDepth`, the coarsest
+cell in the table — the feature that stays a candidate for the widest range of
+queries — and `refined` per query, the rows that reached the predicate.
+
+### What this costs, honestly
+
+A fixed grid tuned to the size you actually query is *faster* than this. Over
+50,000 buildings, 500 line features and 20 large polygons, candidate rows per
+window (fewer is better):
+
+| window | true hits | `tiles` z10 | `tiles` z12 | `tiles` z14 | `quadtree` |
+|---|---|---|---|---|---|
+| 0.005° | 16 | 10,088 | 860 | **110** | 475 |
+| 0.05° | 333 | 12,334 | 1,854 | **620** | 1,076 |
+| 0.25° | 5,411 | 21,607 | **9,081** | 50,520 | 11,416 |
+| 1° | 14,182 | **27,908** | 50,520 | 50,520 | 32,150 |
+
+Every fixed zoom wins in a band around what it was tuned for, then falls off a
+cliff: past `maxCells` the cover stops being enumerable and the query scans the
+whole table. The quadtree is never the fastest column and never the cliff
+either — it degrades smoothly across four orders of magnitude of window size,
+with no zoom to choose. It also stores exactly one row per feature (50,520)
+where z14 stores 61,050, because a feature spanning four tiles needs four rows
+in the fixed grid and one cell here.
+
+Pick `kenro-wasm/tiles` if your windows are all about one size and you are
+willing to tune for it. Pick `kenro-wasm/quadtree` if they are not — a map that
+zooms is the obvious case.
 
 ## End to end
 
@@ -81,7 +109,7 @@ CREATE TABLE features (
   minx  REAL NOT NULL, miny REAL NOT NULL,
   maxx  REAL NOT NULL, maxy REAL NOT NULL
 );
-CREATE TABLE feature_cells (   -- one row per (tile, feature): the R-tree stand-in
+CREATE TABLE feature_cells (   -- one row per (cell, feature): the R-tree stand-in
   cell INTEGER NOT NULL,
   id   TEXT NOT NULL,
   PRIMARY KEY (cell, id)
@@ -89,13 +117,12 @@ CREATE TABLE feature_cells (   -- one row per (tile, feature): the R-tree stand-
 ```
 
 **Write.** kenro parses the geometry once and hands SQL the numbers it can
-index. `cellsForFeature` returns one cell per tile the feature touches — or
-`[OVERSIZED]` when that would be too many, which keeps the index complete
-without exploding:
+index. `cellsForFeature` returns the one cell the feature fits in — whatever
+its size, and with nothing to configure:
 
 ```js
 import * as kenro from "kenro-wasm";
-import { cellsForFeature } from "kenro-wasm/tiles";
+import { cellsForFeature } from "kenro-wasm/quadtree";
 
 function load(feature) {
   const id = String(feature.id);
@@ -115,12 +142,12 @@ function load(feature) {
 }
 ```
 
-**Read.** `cellsForQuery` turns the window's bounding box into the cell list
-to look up — or `null`, meaning the window is too large to enumerate, so drop
-the filter and scan. Then SQL narrows, and kenro decides:
+**Read.** `cellFilterSql` turns the window's bounding box into the whole
+coarse filter — the ancestor lookups and the descendant ranges, with every
+value bound. Then SQL narrows, and kenro decides:
 
 ```js
-import { bboxOverlaps, cellsForQuery } from "kenro-wasm/tiles";
+import { bboxOverlaps, cellFilterSql } from "kenro-wasm/quadtree";
 
 function query(wkt) {
   const window = kenro.stGeomFromText(wkt);
@@ -128,17 +155,15 @@ function query(wkt) {
     minx: kenro.stMinX(window), miny: kenro.stMinY(window),
     maxx: kenro.stMaxX(window), maxy: kenro.stMaxY(window),
   };
-  const cells = cellsForQuery(search);
+  const filter = cellFilterSql(search);
   const columns = "id, geom, props, minx, miny, maxx, maxy";
 
   //  stage 1 — indexed lookup in SQL
-  const rows = (cells === null
+  const rows = (filter.wholeTable
     ? sql.exec(`SELECT ${columns} FROM features`)
     : sql.exec(
-        `SELECT ${columns} FROM features
-          WHERE id IN (SELECT id FROM feature_cells
-                        WHERE cell IN (${cells.map(() => "?").join(", ")}))`,
-        ...cells)
+        `SELECT ${columns} FROM features WHERE id IN (${filter.sql})`,
+        ...filter.params)
   ).toArray();
 
   const hits = [];
@@ -153,6 +178,16 @@ function query(wkt) {
   return hits;
 }
 ```
+
+`cellFilterSql` emits **one** statement — `cell IN (…) OR cell BETWEEN ? AND ?
+OR …` — rather than a `UNION` per range, because D1 and Durable Object SQLite
+allow only **five** terms in a compound SELECT and a cover of any useful size
+runs straight past that. They also refuse at 100 bound variables, so the filter
+coarsens its cover until it fits under `maxParams` (90 by default); that widens
+the search and never narrows it, so a tight parameter budget costs precision,
+never a hit. Both limits are pinned by tests in `test/cell-ids.test.mjs`
+against the real runtime, along with the fact that a 49-bit cell id round-trips
+through D1 as an exact INTEGER rather than a float.
 
 That is the whole design. `src/spatial.mjs` is this with the predicate made
 selectable, reprojection on output, and a candidate counter; the two backend
