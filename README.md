@@ -250,10 +250,12 @@ GeoPackage triggers, measures/processing/affine, CRS transform, H3,
 GeoJSON, and MVT vector tiles (tile clipping uses dedicated rectangle
 algorithms, so MVT costs almost nothing).
 
-**`full`** adds the one feature excluded from the default for size:
+**`full`** adds the two features excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
 `ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest
-single contributor to binary size). With overlay present, `ST_AsMVTGeom`
+single contributor to binary size) and `spheroid`
+(`ST_DistanceSpheroid`/`ST_LengthSpheroid` — pulls geographiclib for a 0.1%
+refinement over the always-available spherical `ST_DistanceSphere`). With overlay present, `ST_AsMVTGeom`
 also upgrades to PostGIS-grade validity repair (invalid input and
 snap-induced self-intersections are made valid before tiling). In wasm terms: standard 617 KB
 (251 KB gzip) vs full 946 KB (353 KB gzip); `--no-default-features`

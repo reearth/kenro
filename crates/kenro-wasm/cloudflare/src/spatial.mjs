@@ -15,14 +15,18 @@
 // spatial-do.mjs / spatial-d1.mjs.
 
 import { kenro } from "./kenro.mjs";
-// Published as `kenro-wasm/tiles`; imported by path here because this example
-// builds the wasm from the working tree rather than installing the package.
+// Published as `kenro-wasm/quadtree`; imported by path here because this
+// example builds the wasm from the working tree rather than installing the
+// package. The fixed-grid `kenro-wasm/tiles` would work too, but it makes the
+// caller pick a zoom for the whole dataset and needs an OVERSIZED bucket for
+// features too big to enumerate; the quadtree files each feature at its own
+// depth instead, so neither choice arises.
 import {
   bboxOverlaps,
+  cellFilterSql,
   cellsForFeature,
-  cellsForQuery,
   padBbox,
-} from "../../js/src/tiles.mjs";
+} from "../../js/src/quadtree.mjs";
 // Published as `kenro-wasm/prepared`.
 import { withPrepared, withScope } from "../../js/src/prepared.mjs";
 
@@ -103,13 +107,13 @@ export function prepareFeature(f, i) {
 }
 
 /**
- * The coarse filter, as SQL. `wkt` is any geometry — the tile grid is purely
+ * The coarse filter, as SQL. `wkt` is any geometry — the cell grid is purely
  * internal, and a query window of any size or shape is fair game.
  *
- * A window too large to enumerate cells for drops the cell filter entirely
- * rather than falling back to the OVERSIZED bucket: that bucket holds only
- * the features too big to file, so selecting it alone would silently return
- * a handful of continent-sized rows and nothing else.
+ * `cellFilterSql` returns the whole filter: equality lookups for the cells
+ * containing the window, plus one id range per cell the window is covered by.
+ * A window big enough to cover the world reports `wholeTable`, and the filter
+ * is dropped rather than applied to no purpose.
  */
 export function plan({ wkt, predicate = "intersects", distance, srid, limit = 1000 }) {
   const wasm = kenro();
@@ -121,21 +125,23 @@ export function plan({ wkt, predicate = "intersects", distance, srid, limit = 10
   // Validate the predicate name before the window handle is allocated, so a
   // bad request cannot leak it.
   const test = predicateFn(predicate, distance);
-  // null = the window is too large to enumerate cells for → scan the table.
-  // (`cellsForQuery` already folds in OVERSIZED; see kenro-wasm/tiles.)
-  const cells = cellsForQuery(search);
+  const filter = cellFilterSql(search);
 
   const columns = "f.id, f.geom, f.props, f.minx, f.miny, f.maxx, f.maxy";
-  const sql =
-    cells === null
-      ? `SELECT ${columns} FROM features f`
-      : `SELECT ${columns} FROM features f
-           WHERE f.id IN (
-             SELECT id FROM feature_cells
-              WHERE cell IN (${cells.map(() => "?").join(", ")})
-           )`;
+  const sql = filter.wholeTable
+    ? `SELECT ${columns} FROM features f`
+    : `SELECT ${columns} FROM features f WHERE f.id IN (${filter.sql})`;
 
-  return { sql, params: cells ?? [], search, window, test, srid, limit, wholeTable: cells === null };
+  return {
+    sql,
+    params: filter.params,
+    search,
+    window,
+    test,
+    srid,
+    limit,
+    wholeTable: filter.wholeTable,
+  };
 }
 
 /**

@@ -9,7 +9,7 @@
 //   - there is no synchronous transaction; writes go through `batch()`,
 //     which D1 runs as one atomic unit
 
-import { OVERSIZED } from "../../js/src/tiles.mjs";
+import { cellDepth } from "../../js/src/quadtree.mjs";
 import { plan, prepareFeature, refine } from "./spatial.mjs";
 
 // The schema lives in migrations/0001_init.sql, applied by
@@ -58,15 +58,20 @@ export class D1SpatialIndex {
   }
 
   async stats() {
-    const [features, cells, oversized] = await this.db.batch([
+    // `cell & -cell` isolates the sentinel bit, which is where the depth is
+    // recorded — so the shallowest cell in the table is a plain SQL max().
+    const [features, cells, shallowest] = await this.db.batch([
       this.db.prepare("SELECT count(*) AS n FROM features"),
       this.db.prepare("SELECT count(*) AS n FROM feature_cells"),
-      this.db.prepare("SELECT count(*) AS n FROM feature_cells WHERE cell = ?").bind(OVERSIZED),
+      this.db.prepare("SELECT max(cell & -cell) AS lsb FROM feature_cells"),
     ]);
+    const lsb = shallowest.results[0].lsb;
     return {
       features: features.results[0].n,
       cells: cells.results[0].n,
-      oversized: oversized.results[0].n,
+      // The broadest feature in the table: the one that stays a candidate for
+      // the widest range of queries. Low means something is filed very coarsely.
+      shallowestDepth: lsb === null ? null : cellDepth(lsb),
     };
   }
 

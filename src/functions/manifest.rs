@@ -303,6 +303,91 @@ pub const FUNCTIONS: &[FnEntry] = &[
     ),
     entry!("ST_ShiftLongitude", "stShiftLongitude", [Blob], Blob, None),
     entry!("ST_Expand", "stExpand", [Blob, Real], OptBlob, None),
+    // Sphere/spheroid measures (functions::geodesic) — the answer to
+    // ST_Distance being planar on EPSG:4326 data.
+    entry!(
+        "ST_DistanceSphere",
+        "stDistanceSphere",
+        [Blob, Blob],
+        Real,
+        None
+    ),
+    entry!(
+        "ST_DistanceSpheroid",
+        "stDistanceSpheroid",
+        [Blob, Blob],
+        Real,
+        Some("spheroid")
+    ),
+    entry!(
+        "ST_DistanceSpheroid",
+        "stDistanceSpheroidOn",
+        [Blob, Blob, Text],
+        Real,
+        Some("spheroid")
+    ),
+    entry!(
+        "ST_LengthSpheroid",
+        "stLengthSpheroid",
+        [Blob, Text],
+        Real,
+        Some("spheroid")
+    ),
+    entry!(
+        "ST_Length2DSpheroid",
+        "stLengthSpheroid",
+        [Blob, Text],
+        Real,
+        Some("spheroid")
+    ),
+    entry!("ST_Project", "stProject", [Blob, Real, Real], Blob, None),
+    // Dimension and validity reporting.
+    entry!("ST_Dimension", "stDimension", [Blob], Int, None),
+    entry!("ST_CoordDim", "stCoordDim", [Blob], Int, None),
+    entry!("ST_NDims", "stCoordDim", [Blob], Int, None),
+    entry!("ST_IsValidReason", "stIsValidReason", [Blob], Text, None),
+    // Ring orientation.
+    entry!("ST_ForcePolygonCW", "stForcePolygonCw", [Blob], Blob, None),
+    entry!(
+        "ST_ForcePolygonCCW",
+        "stForcePolygonCcw",
+        [Blob],
+        Blob,
+        None
+    ),
+    entry!("ST_ForceRHR", "stForcePolygonCw", [Blob], Blob, None),
+    entry!("ST_IsPolygonCW", "stIsPolygonCw", [Blob], Bool, None),
+    entry!("ST_IsPolygonCCW", "stIsPolygonCcw", [Blob], Bool, None),
+    // Linear referencing and distance geometry (functions::linear).
+    entry!("ST_Segmentize", "stSegmentize", [Blob, Real], Blob, None),
+    entry!(
+        "ST_LineSubstring",
+        "stLineSubstring",
+        [Blob, Real, Real],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_ShortestLine",
+        "stShortestLine",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_LongestLine",
+        "stLongestLine",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MaxDistance",
+        "stMaxDistance",
+        [Blob, Blob],
+        OptReal,
+        None
+    ),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -620,6 +705,7 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("geojson") => cfg!(feature = "geojson"),
         Some("overlay") => cfg!(feature = "overlay"),
         Some("mvt") => cfg!(feature = "mvt"),
+        Some("spheroid") => cfg!(feature = "spheroid"),
         Some(_) => false,
     })
 }
@@ -634,6 +720,9 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Difference", &[2]),
     ("ST_SymDifference", &[2]),
     ("ST_SymmetricDifference", &[2]),
+    ("ST_DistanceSpheroid", &[2, 3]),
+    ("ST_LengthSpheroid", &[2]),
+    ("ST_Length2DSpheroid", &[2]),
     ("ST_Union", &[1, 2]),
     ("ST_Buffer", &[2, 3]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
@@ -666,6 +755,7 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("geojson") => cfg!(feature = "geojson"),
         Some("overlay") => cfg!(feature = "overlay"),
         Some("mvt") => cfg!(feature = "mvt"),
+        Some("spheroid") => cfg!(feature = "spheroid"),
         Some(_) => false,
     })
 }
@@ -676,6 +766,9 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     let mut stubs: Vec<&'static super::stubs::Stub> = super::stubs::STUBS.iter().collect();
     if !cfg!(feature = "transform") {
         stubs.extend(super::stubs::TRANSFORM_OFF.iter());
+    }
+    if !cfg!(feature = "spheroid") {
+        stubs.extend(super::stubs::SPHEROID_OFF.iter());
     }
     if !cfg!(feature = "h3") {
         stubs.extend(super::stubs::H3_OFF.iter());

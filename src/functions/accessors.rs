@@ -376,6 +376,53 @@ pub fn st_simplify(bytes: &[u8], tolerance: f64) -> Result<Vec<u8>> {
     )
 }
 
+/// `ST_Dimension(geom)` — 0 for puntal, 1 for lineal, 2 for areal.
+pub fn st_dimension(bytes: &[u8]) -> Result<i64> {
+    let g = geom::decode_auto(bytes)?;
+    Ok(match g.geometry {
+        Geometry::Point(_) | Geometry::MultiPoint(_) => 0,
+        Geometry::Line(_) | Geometry::LineString(_) | Geometry::MultiLineString(_) => 1,
+        Geometry::Polygon(_)
+        | Geometry::MultiPolygon(_)
+        | Geometry::Rect(_)
+        | Geometry::Triangle(_) => 2,
+        // PostGIS returns the largest member's dimension; kenro never
+        // produces collections, so this only comes from foreign input.
+        Geometry::GeometryCollection(ref gc) => gc
+            .iter()
+            .map(|g| match g {
+                Geometry::Point(_) | Geometry::MultiPoint(_) => 0,
+                Geometry::Line(_) | Geometry::LineString(_) | Geometry::MultiLineString(_) => 1,
+                _ => 2,
+            })
+            .max()
+            .unwrap_or(0),
+    })
+}
+
+/// `ST_CoordDim(geom)` / `ST_NDims(geom)` — always 2: kenro is 2D, and 3D
+/// input has its Z/M dropped on decode (see `ST_Force2D`).
+pub fn st_coord_dim(bytes: &[u8]) -> Result<i64> {
+    geom::decode_auto(bytes)?;
+    Ok(2)
+}
+
+/// `ST_IsValidReason(geom)` — `"Valid Geometry"`, or a description of the
+/// first problem found.
+///
+/// ⚠️ The wording is geo's, not PostGIS's: PostGIS says
+/// `Self-intersection[1 1]` with the offending coordinate, while geo reports
+/// the ring and the kind of defect. Use it as a diagnostic, not as a string
+/// to match on.
+pub fn st_is_valid_reason(bytes: &[u8]) -> Result<String> {
+    use geo::algorithm::Validation;
+    let g = geom::decode_auto(bytes)?;
+    Ok(match g.geometry.validation_errors().into_iter().next() {
+        None => "Valid Geometry".to_string(),
+        Some(e) => e.to_string(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

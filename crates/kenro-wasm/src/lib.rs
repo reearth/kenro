@@ -10,7 +10,9 @@
 
 use wasm_bindgen::prelude::*;
 
-use kenro::functions::{accessors, compat, edit, io, manifest, predicates, rtree};
+use kenro::functions::{
+    accessors, compat, edit, geodesic, io, linear, manifest, predicates, rtree,
+};
 use kenro::geom;
 
 /// kenro::Error → JS exception. The `kenro: `-prefixed message is preserved
@@ -397,6 +399,96 @@ pub fn st_shift_longitude(geom: &[u8]) -> R<Vec<u8>> {
 #[wasm_bindgen(js_name = stExpand)]
 pub fn st_expand(geom: &[u8], units: f64) -> R<Option<Vec<u8>>> {
     edit::st_expand(geom, units).map_err(err)
+}
+
+// ---- Sphere/spheroid measures, dimension, orientation, linear referencing ----
+
+#[wasm_bindgen(js_name = stDistanceSphere)]
+pub fn st_distance_sphere(a: &[u8], b: &[u8]) -> R<f64> {
+    geodesic::st_distance_sphere(a, b).map_err(err)
+}
+
+#[cfg(feature = "spheroid")]
+#[wasm_bindgen(js_name = stDistanceSpheroid)]
+pub fn st_distance_spheroid(a: &[u8], b: &[u8]) -> R<f64> {
+    geodesic::st_distance_spheroid(a, b).map_err(err)
+}
+
+#[cfg(feature = "spheroid")]
+#[wasm_bindgen(js_name = stDistanceSpheroidOn)]
+pub fn st_distance_spheroid_on(a: &[u8], b: &[u8], spheroid: &str) -> R<f64> {
+    geodesic::st_distance_spheroid_on(a, b, spheroid).map_err(err)
+}
+
+#[cfg(feature = "spheroid")]
+#[wasm_bindgen(js_name = stLengthSpheroid)]
+pub fn st_length_spheroid(geom: &[u8], spheroid: &str) -> R<f64> {
+    geodesic::st_length_spheroid(geom, spheroid).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stProject)]
+pub fn st_project(geom: &[u8], distance: f64, azimuth: f64) -> R<Vec<u8>> {
+    geodesic::st_project(geom, distance, azimuth).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stDimension)]
+pub fn st_dimension(geom: &[u8]) -> R<i32> {
+    accessors::st_dimension(geom).map(|v| v as i32).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stCoordDim)]
+pub fn st_coord_dim(geom: &[u8]) -> R<i32> {
+    accessors::st_coord_dim(geom).map(|v| v as i32).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stIsValidReason)]
+pub fn st_is_valid_reason(geom: &[u8]) -> R<String> {
+    accessors::st_is_valid_reason(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stForcePolygonCw)]
+pub fn st_force_polygon_cw(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_force_polygon_cw(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stForcePolygonCcw)]
+pub fn st_force_polygon_ccw(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_force_polygon_ccw(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stIsPolygonCw)]
+pub fn st_is_polygon_cw(geom: &[u8]) -> R<bool> {
+    edit::st_is_polygon_cw(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stIsPolygonCcw)]
+pub fn st_is_polygon_ccw(geom: &[u8]) -> R<bool> {
+    edit::st_is_polygon_ccw(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSegmentize)]
+pub fn st_segmentize(geom: &[u8], max_length: f64) -> R<Vec<u8>> {
+    linear::st_segmentize(geom, max_length).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineSubstring)]
+pub fn st_line_substring(geom: &[u8], from: f64, to: f64) -> R<Option<Vec<u8>>> {
+    linear::st_line_substring(geom, from, to).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stShortestLine)]
+pub fn st_shortest_line(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    linear::st_shortest_line(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLongestLine)]
+pub fn st_longest_line(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    linear::st_longest_line(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMaxDistance)]
+pub fn st_max_distance(a: &[u8], b: &[u8]) -> R<Option<f64>> {
+    linear::st_max_distance(a, b).map_err(err)
 }
 
 // ---- SRID ----
@@ -1139,6 +1231,23 @@ mod tests {
             "stFlipCoordinates",
             "stShiftLongitude",
             "stExpand",
+            "stDistanceSphere",
+            "stDistanceSpheroid",
+            "stDistanceSpheroidOn",
+            "stLengthSpheroid",
+            "stProject",
+            "stDimension",
+            "stCoordDim",
+            "stIsValidReason",
+            "stForcePolygonCw",
+            "stForcePolygonCcw",
+            "stIsPolygonCw",
+            "stIsPolygonCcw",
+            "stSegmentize",
+            "stLineSubstring",
+            "stShortestLine",
+            "stLongestLine",
+            "stMaxDistance",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

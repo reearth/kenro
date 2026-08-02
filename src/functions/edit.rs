@@ -482,6 +482,82 @@ fn map_polygon(p: &mut Polygon<f64>, f: &mut impl FnMut(Coord<f64>) -> Coord<f64
     *p = Polygon::new(exterior, interiors);
 }
 
+// ---- Ring orientation (geo's Orient) ----
+
+/// `ST_ForcePolygonCW(geom)` — exterior rings clockwise, interiors
+/// counter-clockwise. `ST_ForceRHR` is PostGIS's older name for the same
+/// thing (the right-hand rule puts the interior on the right).
+pub fn st_force_polygon_cw(bytes: &[u8]) -> Result<Vec<u8>> {
+    orient(
+        bytes,
+        geo::algorithm::orient::Direction::Reversed,
+        "ST_ForcePolygonCW",
+    )
+}
+
+/// `ST_ForcePolygonCCW(geom)` — exterior counter-clockwise, interiors
+/// clockwise (geo's default convention).
+pub fn st_force_polygon_ccw(bytes: &[u8]) -> Result<Vec<u8>> {
+    orient(
+        bytes,
+        geo::algorithm::orient::Direction::Default,
+        "ST_ForcePolygonCCW",
+    )
+}
+
+fn orient(
+    bytes: &[u8],
+    direction: geo::algorithm::orient::Direction,
+    func: &'static str,
+) -> Result<Vec<u8>> {
+    use geo::algorithm::Orient;
+    let g = geom::decode_auto(bytes)?;
+    let oriented = match g.geometry {
+        Geometry::Polygon(p) => Geometry::Polygon(p.orient(direction)),
+        Geometry::MultiPolygon(mp) => Geometry::MultiPolygon(mp.orient(direction)),
+        // Non-areal input passes through, as in PostGIS.
+        other => other,
+    };
+    out(oriented, g.srid, func)
+}
+
+/// `ST_IsPolygonCW(geom)` — true when every exterior ring is clockwise (and
+/// every interior ring counter-clockwise). Non-areal input is true, matching
+/// PostGIS's "vacuously oriented" answer.
+pub fn st_is_polygon_cw(bytes: &[u8]) -> Result<bool> {
+    ring_orientation(bytes, true)
+}
+
+/// `ST_IsPolygonCCW(geom)` — the mirror of [`st_is_polygon_cw`].
+pub fn st_is_polygon_ccw(bytes: &[u8]) -> Result<bool> {
+    ring_orientation(bytes, false)
+}
+
+fn ring_orientation(bytes: &[u8], want_cw: bool) -> Result<bool> {
+    let g = geom::decode_auto(bytes)?;
+    fn check(p: &Polygon<f64>, want_cw: bool) -> bool {
+        let exterior_cw = signed_area(p.exterior()) < 0.0;
+        exterior_cw == want_cw
+            && p.interiors()
+                .iter()
+                .all(|r| (signed_area(r) < 0.0) != want_cw)
+    }
+    Ok(match &g.geometry {
+        Geometry::Polygon(p) => check(p, want_cw),
+        Geometry::MultiPolygon(mp) => mp.iter().all(|p| check(p, want_cw)),
+        _ => true,
+    })
+}
+
+/// Shoelace sign: positive is counter-clockwise in a y-up frame.
+fn signed_area(ring: &LineString<f64>) -> f64 {
+    let mut sum = 0.0;
+    for line in ring.lines() {
+        sum += (line.end.x - line.start.x) * (line.end.y + line.start.y);
+    }
+    -sum / 2.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

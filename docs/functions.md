@@ -6,9 +6,9 @@ PostGIS 3.5, a live DuckDB 1.4.0 + spatial session, and a live
 mod_spatialite 5.1 session, July–August 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
-Functions marked with the `overlay` feature need a `full` build (default
-builds register them as stubs naming the feature); everything else,
-including MVT, is in the default set (see
+Functions marked with the `overlay` or `spheroid` feature need a `full`
+build (default builds register them as stubs naming the feature); everything
+else, including MVT, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
 "Geometry" values in and out of kenro functions are GeoPackage blobs — they
@@ -174,6 +174,46 @@ so each was read off a live PostGIS 3.5 and is golden-tested:
 | `ST_FlipCoordinates(geom)` | geometry | ✅ | ✅ | ✅ | The lat/lon-order fix |
 | `ST_ShiftLongitude(geom)` | geometry | ✅ | ❌ | ✅ | x from [-180,180) into [0,360) |
 | `ST_Expand(geom, units)` | geometry / NULL | ✅ | ❌ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for |
+
+## Measures on a sphere and an ellipsoid
+
+kenro's `ST_Distance` and `ST_Length` are planar, so on EPSG:4326 data — the
+common case for a GeoPackage — they answer in **degrees**. PostGIS users
+reach for `geography` there; kenro has no geography type, so these functions
+are the answer instead.
+
+`ST_DistanceSphere` is in every build. The **ellipsoidal** pair needs the
+`spheroid` feature (in `full`), because geographiclib costs ~17 KB of wasm
+for a 0.1% refinement over the sphere; without it they register as stubs
+naming the feature.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_DistanceSphere(a, b)` | REAL | ✅ | ❌ | ✅ | Great-circle metres, radius 6 371 008.7714 m — the same radius PostGIS uses (golden-tested against it). **POINT arguments only**; PostGIS takes any pair |
+| `ST_DistanceSpheroid(a, b [, spheroid])` | REAL | ✅ | ❌ | ✅ | `spheroid` feature. WGS84 by default; the third argument takes PostGIS's `SPHEROID["name",a,1/f]` text. POINT arguments only |
+| `ST_LengthSpheroid(geom, spheroid)` / `ST_Length2DSpheroid` | REAL | ✅ | ❌ | ✅ | `spheroid` feature. Geodesic length in metres; PostGIS has no one-argument form, so neither does kenro |
+| `ST_Project(point, distance, azimuth)` | geometry | ✅ | ❌ | ❌ | ⚠️ **planar**, matching PostGIS's *geometry* overload (verified live). PostGIS's geodesic behavior belongs to its `geography` overload — transform to a projected CRS first |
+
+## Dimension, validity and orientation
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_Dimension(geom)` | INTEGER | ✅ | ✅ | ✅ | 0/1/2 for puntal/lineal/areal |
+| `ST_CoordDim(geom)` / `ST_NDims(geom)` | INTEGER | ✅ | ✅ | ✅ | Always 2 — kenro is 2D, and 3D input has Z/M dropped on decode (see `ST_Force2D`) |
+| `ST_IsValidReason(geom)` | TEXT | ✅ | ✅ | ✅ | `"Valid Geometry"` or a description. ⚠️ **wording is geo's, not PostGIS's**: PostGIS says `Self-intersection[1 1]` with the coordinate, geo names the ring and defect. A diagnostic, not a string to match on |
+| `ST_ForcePolygonCW(geom)` / `ST_ForceRHR(geom)` | geometry | ✅ | ❌ | ✅ | Exterior clockwise, interiors counter-clockwise; non-areal input passes through |
+| `ST_ForcePolygonCCW(geom)` | geometry | ✅ | ❌ | ✅ | The mirror |
+| `ST_IsPolygonCW(geom)` / `ST_IsPolygonCCW(geom)` | INTEGER | ✅ | ❌ | ✅ | Non-areal input is true |
+
+## Linear referencing and distance geometry
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_Segmentize(geom, max_length)` | geometry | ✅ | ❌ | ✅ | Splits each segment into **equal** parts, as PostGIS does: 10 units at a maximum of 4 gives three 3⅓ segments, not 4+4+2 |
+| `ST_LineSubstring(line, from, to)` | geometry / NULL | ✅ | ❌ | ✅ | Fractions in [0,1]; NULL for non-linear input, error for a bad range |
+| `ST_ShortestLine(a, b)` | geometry / NULL | ✅ | ✅ | ✅ | Searched vertex-against-segment both ways — exact when the geometries are disjoint; when they intersect the distance is 0 and PostGIS may pick a different, equally valid zero-length line |
+| `ST_LongestLine(a, b)` | geometry / NULL | ✅ | ❌ | ✅ | Always attained at a vertex pair |
+| `ST_MaxDistance(a, b)` | REAL / NULL | ✅ | ❌ | ✅ | The length of `ST_LongestLine` |
 
 ## Deliberately out of scope
 

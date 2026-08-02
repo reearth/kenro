@@ -18,6 +18,15 @@ import {
   tileCover,
 } from "kenro-wasm/tiles";
 import type { Bbox } from "kenro-wasm/tiles";
+import {
+  CELL_DEPTH,
+  cellDepth,
+  cellFilterSql,
+  cellsForFeature as quadCellsForFeature,
+  cellsForQuery as quadCellsForQuery,
+  quadCover,
+} from "kenro-wasm/quadtree";
+import type { CellQuery } from "kenro-wasm/quadtree";
 import { registerKenro as registerWaSqlite } from "kenro-wasm/wa-sqlite";
 
 declare const db: object;
@@ -47,6 +56,16 @@ const raw: number[] | null = tileCover(bbox, { maxCells: 128 });
 const overlaps: boolean = bboxOverlaps(bbox, bbox);
 const sentinel: number = OVERSIZED;
 
+// Quadtree — the variable-depth index. Nothing here is nullable, and the
+// query side is a record rather than an array.
+const filed: number[] = quadCellsForFeature(bbox);
+const query: CellQuery = quadCellsForQuery(bbox, { maxCells: 32 });
+const lo: number = query.ranges[0][0];
+const covered: number[] = quadCover(bbox, { maxDepth: 12 });
+const filter: { sql: string; params: number[] } = cellFilterSql(bbox, { table: "cells" });
+const depth: number = CELL_DEPTH;
+const d0: number = cellDepth(filed[0]);
+
 // Handle lifetime.
 const wkt: string = withScope((own) => {
   const g = own(kenro.Prepared.fromText("POINT(1 1)", 4326));
@@ -58,3 +77,4 @@ const hit: boolean = withPrepared(kenro.Prepared.fromText("POINT(1 1)", 4326), (
 freeOnce(null);
 
 export { value, folded, boom, stored, searched, raw, overlaps, sentinel, wkt, hit };
+export { filed, query, lo, covered, filter, depth, d0 };

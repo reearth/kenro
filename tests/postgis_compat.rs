@@ -80,6 +80,7 @@ fn measure_and_constructor_aliases_share_their_originals() {
 }
 
 #[test]
+#[cfg(feature = "overlay")]
 fn symmetric_difference_accepts_both_postgis_spellings() {
     let conn = conn();
     let a = "ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))')";
@@ -492,6 +493,216 @@ fn edit_functions_are_null_strict() {
         "SELECT ST_AddPoint(NULL, NULL)",
         "SELECT ST_SnapToGrid(NULL, 1.0)",
         "SELECT ST_Expand(NULL, 1.0)",
+    ] {
+        let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+        assert!(v.is_none(), "{sql} was not NULL-strict");
+    }
+}
+
+// ---- Sphere/spheroid, dimension, orientation, linear referencing ----
+
+const WGS84_SPHEROID: &str = "SPHEROID[\"WGS 84\",6378137,298.257223563]";
+
+#[test]
+fn geodesic_measures_answer_in_metres_where_the_planar_ones_answer_in_degrees() {
+    let conn = conn();
+    let a = "ST_GeomFromText('POINT(0 0)', 4326)";
+    let b = "ST_GeomFromText('POINT(1 0)', 4326)";
+    // The trap this group exists to fix: ST_Distance on 4326 is degrees.
+    assert_eq!(real(&conn, &format!("SELECT ST_Distance({a}, {b})")), 1.0);
+    // PostGIS 3.5: 111195.07973463 — spherical, available in every build.
+    assert!(
+        (real(&conn, &format!("SELECT ST_DistanceSphere({a}, {b})")) - 111_195.079_734_63).abs()
+            < 1e-3
+    );
+    spheroid_measures(&conn, a, b);
+}
+
+/// The ellipsoidal half sits behind the `spheroid` feature (it pulls
+/// geographiclib). Both states are asserted, so a build without the feature
+/// has to fail loudly rather than quietly answer with the sphere.
+#[cfg(feature = "spheroid")]
+fn spheroid_measures(conn: &Connection, a: &str, b: &str) {
+    // PostGIS 3.5: 111319.49079327357
+    assert!(
+        (real(conn, &format!("SELECT ST_DistanceSpheroid({a}, {b})")) - 111_319.490_793_273_57)
+            .abs()
+            < 1e-3
+    );
+    assert!(
+        (real(
+            conn,
+            &format!("SELECT ST_DistanceSpheroid({a}, {b}, '{WGS84_SPHEROID}')")
+        ) - 111_319.490_793_273_57)
+            .abs()
+            < 1e-3
+    );
+    assert!(
+        (real(
+            conn,
+            &format!("SELECT ST_LengthSpheroid(ST_GeomFromText('LINESTRING(0 0,1 0)', 4326), '{WGS84_SPHEROID}')")
+        ) - 111_319.490_793_273_57)
+            .abs()
+            < 1e-3
+    );
+    // A malformed spheroid is a loud error, not a silent default.
+    assert!(
+        conn.query_row(
+            "SELECT ST_LengthSpheroid(ST_GeomFromText('LINESTRING(0 0,1 0)', 4326), 'WGS 84')",
+            [],
+            |r| r.get::<_, f64>(0)
+        )
+        .is_err()
+    );
+}
+
+#[cfg(not(feature = "spheroid"))]
+fn spheroid_measures(conn: &Connection, a: &str, b: &str) {
+    let err = conn
+        .query_row(&format!("SELECT ST_DistanceSpheroid({a}, {b})"), [], |r| {
+            r.get::<_, f64>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("spheroid"), "{err}");
+}
+
+#[test]
+fn dimension_and_validity_reporting() {
+    let conn = conn();
+    assert_eq!(
+        int(&conn, "SELECT ST_Dimension(ST_GeomFromText('POINT(0 0)'))"),
+        Some(0)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_Dimension(ST_GeomFromText('LINESTRING(0 0,1 1)'))"
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_Dimension(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 0))'))"
+        ),
+        Some(2)
+    );
+    assert_eq!(
+        int(&conn, "SELECT ST_CoordDim(ST_GeomFromText('POINT(1 2)'))"),
+        Some(2)
+    );
+    assert_eq!(
+        int(&conn, "SELECT ST_NDims(ST_GeomFromText('POINT(1 2)'))"),
+        Some(2)
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_IsValidReason(ST_GeomFromText('POINT(1 1)'))"
+        )
+        .as_deref(),
+        Some("Valid Geometry")
+    );
+    // Wording is geo's, not PostGIS's — documented divergence; what matters
+    // is that a bowtie is reported at all.
+    let reason = text(
+        &conn,
+        "SELECT ST_IsValidReason(ST_GeomFromText('POLYGON((0 0,2 2,2 0,0 2,0 0))'))",
+    )
+    .unwrap();
+    assert_ne!(reason, "Valid Geometry");
+    assert!(reason.to_lowercase().contains("intersection"), "{reason}");
+}
+
+#[test]
+fn ring_orientation_round_trips() {
+    let conn = conn();
+    let ccw = "ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')";
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_IsPolygonCCW({ccw})")),
+        Some(1)
+    );
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_IsPolygonCW({ccw})")),
+        Some(0)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_IsPolygonCW(ST_ForcePolygonCW({ccw}))")
+        ),
+        Some(1)
+    );
+    // ST_ForceRHR is PostGIS's older spelling of ST_ForcePolygonCW.
+    assert_eq!(
+        text(&conn, &format!("SELECT ST_AsText(ST_ForceRHR({ccw}))")),
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_ForcePolygonCW({ccw}))")
+        )
+    );
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_IsPolygonCCW(ST_ForcePolygonCCW(ST_ForcePolygonCW({ccw})))")
+        ),
+        Some(1)
+    );
+}
+
+#[test]
+fn linear_referencing_matches_postgis() {
+    let conn = conn();
+    // PostGIS 3.5: LINESTRING(0 0,3.333333333333334 0,6.666666666666667 0,10 0)
+    let segmentized = text(
+        &conn,
+        "SELECT ST_AsText(ST_Segmentize(ST_GeomFromText('LINESTRING(0 0,10 0)'), 4))",
+    )
+    .unwrap();
+    assert!(
+        segmentized.starts_with("LINESTRING(0 0,3.33"),
+        "{segmentized}"
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_LineSubstring(ST_GeomFromText('LINESTRING(0 0,10 0)'), 0.3, 0.7))"
+        )
+        .as_deref(),
+        Some("LINESTRING(3 0,7 0)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_ShortestLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)')))"
+        )
+        .as_deref(),
+        Some("LINESTRING(0 0,2 0)")
+    );
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_MaxDistance(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)'))"
+        ) - 2.236_067_977_499_79)
+            .abs()
+            < 1e-12
+    );
+}
+
+#[test]
+fn phase3_functions_are_null_strict() {
+    let conn = conn();
+    for sql in [
+        "SELECT ST_DistanceSphere(NULL, NULL)",
+        "SELECT ST_Project(NULL, 1.0, 1.0)",
+        "SELECT ST_Dimension(NULL)",
+        "SELECT ST_IsValidReason(NULL)",
+        "SELECT ST_ForcePolygonCW(NULL)",
+        "SELECT ST_Segmentize(NULL, 1.0)",
+        "SELECT ST_LineSubstring(NULL, 0.0, 1.0)",
+        "SELECT ST_ShortestLine(NULL, NULL)",
+        "SELECT ST_MaxDistance(NULL, NULL)",
     ] {
         let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
         assert!(v.is_none(), "{sql} was not NULL-strict");

@@ -746,6 +746,89 @@ export const SMOKE_SQL = {
     check: (v) => v === "POLYGON((-1 -1,-1 3,3 3,3 -1,-1 -1))",
   },
 
+
+  // --- sphere/spheroid, dimension, orientation, linear referencing ---
+  "ST_DistanceSphere/2": {
+    sql: "SELECT ST_DistanceSphere(ST_GeomFromText('POINT(0 0)', 4326), ST_GeomFromText('POINT(1 0)', 4326))",
+    check: (v) => Math.abs(Number(v) - 111195.07973463) < 1e-3,
+  },
+  "ST_DistanceSpheroid/2": {
+    sql: "SELECT ST_DistanceSpheroid(ST_GeomFromText('POINT(0 0)', 4326), ST_GeomFromText('POINT(1 0)', 4326))",
+    check: (v) => Math.abs(Number(v) - 111319.49079327357) < 1e-3,
+  },
+  "ST_DistanceSpheroid/3": {
+    sql: "SELECT ST_DistanceSpheroid(ST_GeomFromText('POINT(0 0)', 4326), ST_GeomFromText('POINT(1 0)', 4326), 'SPHEROID[\"WGS 84\",6378137,298.257223563]')",
+    check: (v) => Math.abs(Number(v) - 111319.49079327357) < 1e-3,
+  },
+  "ST_LengthSpheroid/2": {
+    sql: "SELECT ST_LengthSpheroid(ST_GeomFromText('LINESTRING(0 0,1 0)', 4326), 'SPHEROID[\"WGS 84\",6378137,298.257223563]')",
+    check: (v) => Math.abs(Number(v) - 111319.49079327357) < 1e-3,
+  },
+  "ST_Length2DSpheroid/2": {
+    sql: "SELECT ST_Length2DSpheroid(ST_GeomFromText('LINESTRING(0 0,1 0)', 4326), 'SPHEROID[\"WGS 84\",6378137,298.257223563]')",
+    check: (v) => Math.abs(Number(v) - 111319.49079327357) < 1e-3,
+  },
+  "ST_Project/3": {
+    sql: "SELECT ST_X(ST_Project(ST_GeomFromText('POINT(0 0)'), 100, 1.5707963267948966))",
+    check: (v) => Math.abs(Number(v) - 100) < 1e-6,
+  },
+  "ST_Dimension/1": {
+    sql: "SELECT ST_Dimension(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 0))'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_CoordDim/1": {
+    sql: "SELECT ST_CoordDim(ST_GeomFromText('POINT(1 2)'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_NDims/1": {
+    sql: "SELECT ST_NDims(ST_GeomFromText('POINT(1 2)'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_IsValidReason/1": {
+    sql: "SELECT ST_IsValidReason(ST_GeomFromText('POINT(1 1)'))",
+    check: (v) => v === "Valid Geometry",
+  },
+  "ST_ForcePolygonCW/1": {
+    sql: "SELECT ST_IsPolygonCW(ST_ForcePolygonCW(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_ForceRHR/1": {
+    sql: "SELECT ST_IsPolygonCW(ST_ForceRHR(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_ForcePolygonCCW/1": {
+    sql: "SELECT ST_IsPolygonCCW(ST_ForcePolygonCCW(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_IsPolygonCW/1": {
+    sql: "SELECT ST_IsPolygonCW(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+    check: (v) => Number(v) === 0,
+  },
+  "ST_IsPolygonCCW/1": {
+    sql: "SELECT ST_IsPolygonCCW(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Segmentize/2": {
+    sql: "SELECT ST_NPoints(ST_Segmentize(ST_GeomFromText('LINESTRING(0 0,10 0)'), 4))",
+    check: (v) => Number(v) === 4,
+  },
+  "ST_LineSubstring/3": {
+    sql: "SELECT ST_AsText(ST_LineSubstring(ST_GeomFromText('LINESTRING(0 0,10 0)'), 0.3, 0.7))",
+    check: (v) => v === "LINESTRING(3 0,7 0)",
+  },
+  "ST_ShortestLine/2": {
+    sql: "SELECT ST_AsText(ST_ShortestLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)')))",
+    check: (v) => v === "LINESTRING(0 0,2 0)",
+  },
+  "ST_LongestLine/2": {
+    sql: "SELECT ST_NPoints(ST_LongestLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)')))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_MaxDistance/2": {
+    sql: "SELECT ST_MaxDistance(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)'))",
+    check: (v) => Math.abs(Number(v) - 2.23606797749979) < 1e-9,
+  },
+
 };
 
 /**

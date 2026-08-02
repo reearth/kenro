@@ -32,7 +32,8 @@ const FIXTURE = {
     square("yokohama", 139.63, 35.44),
     square("osaka", 135.5, 34.69),
     square("sapporo", 141.35, 43.06),
-    // Spans far more tiles than MAX_CELLS at z8 → filed as OVERSIZED.
+    // Too big for a fine cell: filed at a shallow one, which is an ordinary
+    // cell — there is no special bucket for it.
     {
       type: "Feature",
       id: "wide",
@@ -71,11 +72,14 @@ describe.each(["do", "d1"])("backend=%s", (backend) => {
     expect(body.inserted).toBe(FIXTURE.features.length);
   });
 
-  it("indexes tile cells, with the huge feature marked oversized", async () => {
+  it("files one cell per feature, the huge one shallow", async () => {
     const res = await SELF.fetch(`http://x/stats?backend=${backend}`);
     const stats = await res.json();
     expect(stats.features).toBe(5);
-    expect(stats.oversized).toBe(1);
+    // One row per feature: the quadtree picks a depth instead of spanning tiles.
+    expect(stats.cells).toBe(5);
+    // `wide` covers Japan, so the shallowest cell is coarse — but it is a cell.
+    expect(stats.shallowestDepth).toBeLessThan(4);
   });
 
   it("intersects: returns only the features the window really hits", async () => {
@@ -94,9 +98,9 @@ describe.each(["do", "d1"])("backend=%s", (backend) => {
     expect(ids(got)).toEqual(["wide"]); // between Tokyo and Yokohama, missing both
   });
 
-  it("a window too large to tile still returns everything it covers", async () => {
-    // Regression: a cover over MAX_CELLS must drop the cell filter, not fall
-    // back to the OVERSIZED bucket — which would return only `wide`.
+  it("a window far larger than any feature still returns everything", async () => {
+    // Regression: the coarse cells containing a wide window must be searched
+    // as ancestors, or only the finely-filed features would come back.
     const got = await post("/query", {
       wkt: "POLYGON((100 0, 160 0, 160 60, 100 60, 100 0))",
     });

@@ -48,6 +48,10 @@
       "types": "./src/tiles.d.ts",
       "default": "./src/tiles.mjs"
     },
+    "./quadtree": {
+      "types": "./src/quadtree.d.ts",
+      "default": "./src/quadtree.mjs"
+    },
     "./prepared": {
       "types": "./src/prepared.d.ts",
       "default": "./src/prepared.mjs"

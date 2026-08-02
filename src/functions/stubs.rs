@@ -102,3 +102,21 @@ pub const GEOJSON_OFF: &[Stub] = &[
         hint: "kenro was built without the `geojson` cargo feature.",
     },
 ];
+
+/// Registered when the `spheroid` feature is off: the ellipsoidal measures.
+/// The spherical `ST_DistanceSphere` is always available.
+pub static SPHEROID_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_DistanceSpheroid",
+        hint: "kenro was built without the `spheroid` cargo feature; \
+               ST_DistanceSphere (spherical) is available in every build.",
+    },
+    Stub {
+        name: "ST_LengthSpheroid",
+        hint: "kenro was built without the `spheroid` cargo feature.",
+    },
+    Stub {
+        name: "ST_Length2DSpheroid",
+        hint: "kenro was built without the `spheroid` cargo feature.",
+    },
+];

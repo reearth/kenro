@@ -474,6 +474,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_accessors(conn)?;
     register_compat(conn)?;
     register_edit(conn)?;
+    register_geodesic_and_linear(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -484,6 +485,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::OVERLAY_OFF)?;
     #[cfg(not(feature = "mvt"))]
     register_stubs(conn, stubs::MVT_OFF)?;
+    #[cfg(not(feature = "spheroid"))]
+    register_stubs(conn, stubs::SPHEROID_OFF)?;
 
     Ok(())
 }
@@ -1023,6 +1026,144 @@ fn register_predicate_1(
         };
         f(b).map(|v| Some(Value::Integer(v as i64)))
             .map_err(sql_err)
+    })
+}
+
+/// Sphere/spheroid measures, dimension reporting, ring orientation and
+/// linear referencing (`functions::geodesic`, `edit`, `linear`).
+fn register_geodesic_and_linear(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::{accessors, edit, geodesic, linear};
+
+    register_geom2_to_real(conn, "ST_DistanceSphere", geodesic::st_distance_sphere)?;
+    #[cfg(feature = "spheroid")]
+    register_geom2_to_real(conn, "ST_DistanceSpheroid", geodesic::st_distance_spheroid)?;
+    #[cfg(feature = "spheroid")]
+    conn.create_scalar_function("ST_DistanceSpheroid", 3, FLAGS, |ctx| {
+        let (Some(a), Some(b), Some(s)) = (
+            blob_or_null(ctx, 0, "ST_DistanceSpheroid")?,
+            blob_or_null(ctx, 1, "ST_DistanceSpheroid")?,
+            text_or_null(ctx, 2, "ST_DistanceSpheroid")?,
+        ) else {
+            return Ok(None);
+        };
+        geodesic::st_distance_spheroid_on(a, b, s)
+            .map(|v| Some(Value::Real(v)))
+            .map_err(sql_err)
+    })?;
+    #[cfg(feature = "spheroid")]
+    for name in ["ST_LengthSpheroid", "ST_Length2DSpheroid"] {
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(g), Some(s)) = (blob_or_null(ctx, 0, name)?, text_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            geodesic::st_length_spheroid(g, s)
+                .map(|v| Some(Value::Real(v)))
+                .map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_Project", 3, FLAGS, |ctx| {
+        let (Some(g), Some(d), Some(a)) = (
+            blob_or_null(ctx, 0, "ST_Project")?,
+            real_or_null(ctx, 1, "ST_Project")?,
+            real_or_null(ctx, 2, "ST_Project")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(geodesic::st_project(g, d, a))
+    })?;
+
+    for (name, f) in [
+        (
+            "ST_Dimension",
+            accessors::st_dimension as fn(&[u8]) -> crate::error::Result<i64>,
+        ),
+        ("ST_CoordDim", accessors::st_coord_dim),
+        ("ST_NDims", accessors::st_coord_dim),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(b) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            f(b).map(|v| Some(Value::Integer(v))).map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_IsValidReason", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_IsValidReason")? else {
+            return Ok(None);
+        };
+        accessors::st_is_valid_reason(b)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+
+    register_geom_to_blob(conn, "ST_ForcePolygonCW", edit::st_force_polygon_cw)?;
+    register_geom_to_blob(conn, "ST_ForceRHR", edit::st_force_polygon_cw)?;
+    register_geom_to_blob(conn, "ST_ForcePolygonCCW", edit::st_force_polygon_ccw)?;
+    register_predicate_1(conn, "ST_IsPolygonCW", edit::st_is_polygon_cw)?;
+    register_predicate_1(conn, "ST_IsPolygonCCW", edit::st_is_polygon_ccw)?;
+
+    conn.create_scalar_function("ST_Segmentize", 2, FLAGS, |ctx| {
+        let (Some(g), Some(max)) = (
+            blob_or_null(ctx, 0, "ST_Segmentize")?,
+            real_or_null(ctx, 1, "ST_Segmentize")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(linear::st_segmentize(g, max))
+    })?;
+    conn.create_scalar_function("ST_LineSubstring", 3, FLAGS, |ctx| {
+        let (Some(g), Some(from), Some(to)) = (
+            blob_or_null(ctx, 0, "ST_LineSubstring")?,
+            real_or_null(ctx, 1, "ST_LineSubstring")?,
+            real_or_null(ctx, 2, "ST_LineSubstring")?,
+        ) else {
+            return Ok(None);
+        };
+        linear::st_line_substring(g, from, to)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    for (name, f) in [
+        (
+            "ST_ShortestLine",
+            linear::st_shortest_line as fn(&[u8], &[u8]) -> crate::error::Result<Option<Vec<u8>>>,
+        ),
+        ("ST_LongestLine", linear::st_longest_line),
+    ] {
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(a), Some(b)) = (blob_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            f(a, b).map(|v| v.map(Value::Blob)).map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_MaxDistance", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_MaxDistance")?,
+            blob_or_null(ctx, 1, "ST_MaxDistance")?,
+        ) else {
+            return Ok(None);
+        };
+        linear::st_max_distance(a, b)
+            .map(|v| v.map(Value::Real))
+            .map_err(sql_err)
+    })?;
+    Ok(())
+}
+
+/// Two geometries in, one REAL out.
+fn register_geom2_to_real(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8], &[u8]) -> crate::error::Result<f64>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+        let (Some(a), Some(b)) = (blob_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?) else {
+            return Ok(None);
+        };
+        f(a, b).map(|v| Some(Value::Real(v))).map_err(sql_err)
     })
 }
 

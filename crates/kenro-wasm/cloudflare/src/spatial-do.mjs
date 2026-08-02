@@ -8,7 +8,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 
-import { OVERSIZED } from "../../js/src/tiles.mjs";
+import { cellDepth } from "../../js/src/quadtree.mjs";
 import { SCHEMA, plan, prepareFeature, refine } from "./spatial.mjs";
 
 export class SpatialIndex extends DurableObject {
@@ -61,10 +61,15 @@ export class SpatialIndex extends DurableObject {
 
   stats() {
     const one = (sql) => this.sql.exec(sql).one().n;
+    // `cell & -cell` isolates the sentinel bit, which is where the depth is
+    // recorded — so the shallowest cell in the table is a plain SQL max().
+    const lsb = this.sql.exec("SELECT max(cell & -cell) AS n FROM feature_cells").one().n;
     return {
       features: one("SELECT count(*) AS n FROM features"),
       cells: one("SELECT count(*) AS n FROM feature_cells"),
-      oversized: one(`SELECT count(*) AS n FROM feature_cells WHERE cell = ${OVERSIZED}`),
+      // The broadest feature in the table: the one that stays a candidate for
+      // the widest range of queries. Low means something is filed very coarsely.
+      shallowestDepth: lsb === null ? null : cellDepth(lsb),
     };
   }
 
