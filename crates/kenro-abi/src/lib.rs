@@ -47,7 +47,14 @@
 
 use core::cell::UnsafeCell;
 
-use kenro::functions::{accessors, affine, io, manifest, measures, predicates, processing, rtree};
+#[cfg(any(feature = "concave-hull", feature = "delaunay"))]
+use kenro::functions::hull;
+#[cfg(feature = "overlay")]
+use kenro::functions::overlay;
+use kenro::functions::{
+    accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, predicates,
+    processing, rtree,
+};
 
 // ---------------------------------------------------------------- status
 
@@ -179,6 +186,10 @@ fn opt_blob(r: kenro::Result<Option<Vec<u8>>>) -> i32 {
 
 fn text(r: kenro::Result<String>) -> i32 {
     blob(r.map(String::into_bytes))
+}
+
+fn opt_text(r: kenro::Result<Option<String>>) -> i32 {
+    opt_blob(r.map(|o| o.map(String::into_bytes)))
 }
 
 fn int(r: kenro::Result<impl Into<i64>>) -> i32 {
@@ -799,12 +810,14 @@ pub extern "C" fn k_stSimplify(p: *const u8, l: u32, tolerance: f64) -> i32 {
 /// Aggregate kind, as passed to [`k_agg_new`].
 const AGG_UNION: i32 = 0;
 const AGG_MVT: i32 = 1;
+const AGG_EXTENT: i32 = 2;
 
 enum Agg {
     #[cfg(feature = "overlay")]
     Union(kenro::functions::overlay::UnionAggregate),
     #[cfg(feature = "mvt")]
     Mvt(kenro::functions::mvt::MvtAggregate),
+    Extent(extra::ExtentAggregate),
 }
 
 static AGGS: Slot<Vec<Option<Agg>>> = Slot::new(Vec::new());
@@ -822,6 +835,7 @@ pub extern "C" fn k_agg_new(kind: i32) -> i32 {
         AGG_UNION => Agg::Union(kenro::functions::overlay::UnionAggregate::new()),
         #[cfg(feature = "mvt")]
         AGG_MVT => Agg::Mvt(kenro::functions::mvt::MvtAggregate::new()),
+        AGG_EXTENT => Agg::Extent(extra::ExtentAggregate::new()),
         _ => return -1,
     };
     let slot = aggs().iter().position(Option::is_none);
@@ -843,6 +857,17 @@ fn agg_gone() -> i32 {
 }
 
 #[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_agg_extent_step(h: i32, p: *const u8, l: u32) -> i32 {
+    let Some(Some(Agg::Extent(a))) = aggs().get_mut(h as usize) else {
+        return agg_gone();
+    };
+    match a.step(s(p, l)) {
+        Ok(()) => OK,
+        Err(e) => fail(e),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn k_agg_union_step(h: i32, p: *const u8, l: u32) -> i32 {
     match aggs().get_mut(h as usize).and_then(Option::as_mut) {
@@ -905,6 +930,7 @@ pub extern "C" fn k_agg_finish(h: i32) -> i32 {
         Some(Agg::Union(a)) => opt_blob(a.finish()),
         #[cfg(feature = "mvt")]
         Some(Agg::Mvt(a)) => opt_blob(a.finish()),
+        Some(Agg::Extent(a)) => opt_blob(a.finish()),
         None => agg_gone(),
     }
 }
@@ -915,6 +941,625 @@ pub extern "C" fn k_agg_drop(h: i32) {
     if let Some(slot) = aggs().get_mut(h as usize) {
         *slot = None;
     }
+}
+
+// ---- PostGIS surface added in the T1-T4 phases ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stForce2d(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(compat::st_force_2d(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsEwkt(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(compat::st_as_ewkt(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeomFromEwkt(text_p: *const u8, text_l: u32) -> i32 {
+    blob(compat::st_geom_from_ewkt(try_str!(text_p, text_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsEwkb(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(compat::st_as_ewkb(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsHexEwkb(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(compat::st_as_hex_ewkb(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stExteriorRing(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_blob(edit::st_exterior_ring(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stInteriorRingN(geom_p: *const u8, geom_l: u32, n: i32) -> i32 {
+    opt_blob(edit::st_interior_ring_n(s(geom_p, geom_l), n as i64))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stNumInteriorRings(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_int(edit::st_num_interior_rings(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stNRings(geom_p: *const u8, geom_l: u32) -> i32 {
+    int(edit::st_nrings(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stBoundary(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_boundary(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsClosed(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(edit::st_is_closed(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsRing(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(edit::st_is_ring(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAddPoint(
+    line_p: *const u8,
+    line_l: u32,
+    point_p: *const u8,
+    point_l: u32,
+) -> i32 {
+    opt_blob(edit::st_add_point(
+        s(line_p, line_l),
+        s(point_p, point_l),
+        None,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAddPointAt(
+    line_p: *const u8,
+    line_l: u32,
+    point_p: *const u8,
+    point_l: u32,
+    position: i32,
+) -> i32 {
+    opt_blob(edit::st_add_point(
+        s(line_p, line_l),
+        s(point_p, point_l),
+        Some(position as i64),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSetPoint(
+    line_p: *const u8,
+    line_l: u32,
+    index: i32,
+    point_p: *const u8,
+    point_l: u32,
+) -> i32 {
+    opt_blob(edit::st_set_point(
+        s(line_p, line_l),
+        index as i64,
+        s(point_p, point_l),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stRemovePoint(line_p: *const u8, line_l: u32, index: i32) -> i32 {
+    opt_blob(edit::st_remove_point(s(line_p, line_l), index as i64))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMakeLine(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    blob(edit::st_make_line(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMakePolygon(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_make_polygon(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMulti(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_multi(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSnapToGrid(geom_p: *const u8, geom_l: u32, size: f64) -> i32 {
+    blob(edit::st_snap_to_grid(s(geom_p, geom_l), size, size))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSnapToGridXy(
+    geom_p: *const u8,
+    geom_l: u32,
+    size_x: f64,
+    size_y: f64,
+) -> i32 {
+    blob(edit::st_snap_to_grid(s(geom_p, geom_l), size_x, size_y))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stFlipCoordinates(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_flip_coordinates(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stShiftLongitude(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_shift_longitude(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stExpand(geom_p: *const u8, geom_l: u32, units: f64) -> i32 {
+    opt_blob(edit::st_expand(s(geom_p, geom_l), units))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDistanceSphere(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    real(geodesic::st_distance_sphere(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[cfg(feature = "spheroid")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDistanceSpheroid(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    real(geodesic::st_distance_spheroid(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[cfg(feature = "spheroid")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDistanceSpheroidOn(
+    a_p: *const u8,
+    a_l: u32,
+    b_p: *const u8,
+    b_l: u32,
+    spheroid_p: *const u8,
+    spheroid_l: u32,
+) -> i32 {
+    real(geodesic::st_distance_spheroid_on(
+        s(a_p, a_l),
+        s(b_p, b_l),
+        try_str!(spheroid_p, spheroid_l),
+    ))
+}
+
+#[cfg(feature = "spheroid")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLengthSpheroid(
+    geom_p: *const u8,
+    geom_l: u32,
+    spheroid_p: *const u8,
+    spheroid_l: u32,
+) -> i32 {
+    real(geodesic::st_length_spheroid(
+        s(geom_p, geom_l),
+        try_str!(spheroid_p, spheroid_l),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stProject(geom_p: *const u8, geom_l: u32, distance: f64, azimuth: f64) -> i32 {
+    blob(geodesic::st_project(s(geom_p, geom_l), distance, azimuth))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDimension(geom_p: *const u8, geom_l: u32) -> i32 {
+    int(accessors::st_dimension(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stCoordDim(geom_p: *const u8, geom_l: u32) -> i32 {
+    int(accessors::st_coord_dim(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsValidReason(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(accessors::st_is_valid_reason(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stForcePolygonCw(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_force_polygon_cw(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stForcePolygonCcw(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(edit::st_force_polygon_ccw(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsPolygonCw(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(edit::st_is_polygon_cw(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsPolygonCcw(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(edit::st_is_polygon_ccw(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSegmentize(geom_p: *const u8, geom_l: u32, max_length: f64) -> i32 {
+    blob(linear::st_segmentize(s(geom_p, geom_l), max_length))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineSubstring(geom_p: *const u8, geom_l: u32, from: f64, to: f64) -> i32 {
+    opt_blob(linear::st_line_substring(s(geom_p, geom_l), from, to))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stShortestLine(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    opt_blob(linear::st_shortest_line(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLongestLine(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    opt_blob(linear::st_longest_line(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMaxDistance(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    opt_real(linear::st_max_distance(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMinimumBoundingRadius(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_real(linear::st_minimum_bounding_radius(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMinimumBoundingCircle(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_blob(linear::st_minimum_bounding_circle(s(geom_p, geom_l), 48))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMinimumBoundingCircleSegs(geom_p: *const u8, geom_l: u32, segs: i32) -> i32 {
+    opt_blob(linear::st_minimum_bounding_circle(
+        s(geom_p, geom_l),
+        segs as i64,
+    ))
+}
+
+#[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stUnaryUnion(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(overlay::st_unary_union(s(geom_p, geom_l)))
+}
+
+#[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stClipByBox2d(
+    geom_p: *const u8,
+    geom_l: u32,
+    box_geom_p: *const u8,
+    box_geom_l: u32,
+) -> i32 {
+    blob(overlay::st_clip_by_box_2d(
+        s(geom_p, geom_l),
+        s(box_geom_p, box_geom_l),
+    ))
+}
+
+#[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSubdivide(geom_p: *const u8, geom_l: u32, max_vertices: i32) -> i32 {
+    blob(overlay::st_subdivide(
+        s(geom_p, geom_l),
+        max_vertices as i64,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stContainsProperly(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    boolean(extra::st_contains_properly(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDfullyWithin(
+    a_p: *const u8,
+    a_l: u32,
+    b_p: *const u8,
+    b_l: u32,
+    d: f64,
+) -> i32 {
+    boolean(extra::st_d_fully_within(s(a_p, a_l), s(b_p, b_l), d))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stRelateMatch(
+    matrix_p: *const u8,
+    matrix_l: u32,
+    pattern_p: *const u8,
+    pattern_l: u32,
+) -> i32 {
+    boolean(extra::st_relate_match(
+        try_str!(matrix_p, matrix_l),
+        try_str!(pattern_p, pattern_l),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAffine(
+    geom_p: *const u8,
+    geom_l: u32,
+    a: f64,
+    b: f64,
+    d: f64,
+    e: f64,
+    xoff: f64,
+    yoff: f64,
+) -> i32 {
+    blob(extra::st_affine(s(geom_p, geom_l), a, b, d, e, xoff, yoff))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stTransScale(
+    geom_p: *const u8,
+    geom_l: u32,
+    dx: f64,
+    dy: f64,
+    x_factor: f64,
+    y_factor: f64,
+) -> i32 {
+    blob(extra::st_trans_scale(
+        s(geom_p, geom_l),
+        dx,
+        dy,
+        x_factor,
+        y_factor,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stReducePrecision(geom_p: *const u8, geom_l: u32, gridsize: f64) -> i32 {
+    blob(extra::st_reduce_precision(s(geom_p, geom_l), gridsize))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAngle3(
+    p1_p: *const u8,
+    p1_l: u32,
+    p2_p: *const u8,
+    p2_l: u32,
+    p3_p: *const u8,
+    p3_l: u32,
+) -> i32 {
+    opt_real(extra::st_angle_3(
+        s(p1_p, p1_l),
+        s(p2_p, p2_l),
+        s(p3_p, p3_l),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAngle4(
+    p1_p: *const u8,
+    p1_l: u32,
+    p2_p: *const u8,
+    p2_l: u32,
+    p3_p: *const u8,
+    p3_l: u32,
+    p4_p: *const u8,
+    p4_l: u32,
+) -> i32 {
+    opt_real(extra::st_angle_4(
+        s(p1_p, p1_l),
+        s(p2_p, p2_l),
+        s(p3_p, p3_l),
+        s(p4_p, p4_l),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineInterpolatePoints(geom_p: *const u8, geom_l: u32, fraction: f64) -> i32 {
+    opt_blob(extra::st_line_interpolate_points(
+        s(geom_p, geom_l),
+        fraction,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPoints(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(extra::st_points(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stBoundingDiagonal(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_blob(extra::st_bounding_diagonal(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stOrderingEquals(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    boolean(extra::st_ordering_equals(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeohash(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_text(extra::st_geohash(s(geom_p, geom_l), None))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeohashChars(geom_p: *const u8, geom_l: u32, maxchars: i32) -> i32 {
+    opt_text(extra::st_geohash(s(geom_p, geom_l), Some(maxchars as i64)))
+}
+
+#[cfg(feature = "concave-hull")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stConcaveHull(geom_p: *const u8, geom_l: u32, target_percent: f64) -> i32 {
+    blob(hull::st_concave_hull(s(geom_p, geom_l), target_percent))
+}
+
+#[cfg(feature = "delaunay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stDelaunayTriangles(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(hull::st_delaunay_triangles(s(geom_p, geom_l)))
+}
+
+#[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::Point,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::Point,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::LineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::LineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPolyFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::Polygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPolyFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::Polygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPointFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::MultiPoint,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPointFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiPoint,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMLineFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::MultiLineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMLineFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiLineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPolyFromText(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        None,
+        compat::Expect::MultiPolygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPolyFromTextSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_text_typed(
+        try_str!(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiPolygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::Point,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::Point,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::LineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::LineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPolyFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::Polygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPolyFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::Polygon,
+    ))
 }
 
 // =============================================================== manifest
@@ -931,6 +1576,8 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::OptReal => "opt_real",
         Kind::OptI64 => "opt_i64",
         Kind::OptBlob => "opt_blob",
+        Kind::OptInt => "opt_int",
+        Kind::OptText => "opt_text",
         Kind::TextOrInt => "text_or_int",
     }
 }
@@ -996,6 +1643,7 @@ pub extern "C" fn k_manifest() -> i32 {
         j.push_str(",\"agg_kind\":");
         j.push_str(match e.ctor_export {
             "UnionAgg" => "0",
+            "ExtentAgg" => "2",
             _ => "1",
         });
         j.push_str(",\"args\":");

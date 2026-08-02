@@ -293,7 +293,13 @@ func readResult(ctx context.Context, in *instance, status int32, ret string) (dr
 			return nil, err
 		}
 		return string(b), nil
-	case "int", "i64", "opt_i64", "bool":
+	case "opt_text":
+		b, err := in.out(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return string(b), nil
+	case "int", "i64", "opt_i64", "opt_int", "bool":
 		return in.i64(ctx)
 	case "real", "opt_real":
 		return in.f64(ctx)
@@ -385,6 +391,21 @@ func (a *aggregate) step(ctx context.Context, e aggEntry, args []driver.Value) e
 			return err
 		}
 		status, err := a.in.call(ctx, a.in.unionStep, append([]uint64{api.EncodeI32(a.handle)}, params...)...)
+		if err != nil {
+			return err
+		}
+		if status == statusErr {
+			return a.in.errFromOut(ctx)
+		}
+		return nil
+
+	case aggExtent:
+		// ST_Extent steps one geometry per row, like ST_Union.
+		params, err := marshalArgs(ctx, a.in, a.name, e.Args, args)
+		if err != nil {
+			return err
+		}
+		status, err := a.in.call(ctx, a.in.extentStep, append([]uint64{api.EncodeI32(a.handle)}, params...)...)
 		if err != nil {
 			return err
 		}

@@ -49,10 +49,12 @@ fn input_blob(v: &Vector) -> Vec<u8> {
     io::st_geom_from_text(v.a.as_ref().unwrap(), (src > 0).then_some(src)).unwrap()
 }
 
-/// The unknown-EPSG vector asserts the curated-table error; with `crs-full`
-/// the code resolves from the full registry instead.
+/// EPSG:27700 is outside kenro's curated table, so that vector only runs
+/// where `crs-full` supplies the registry — and there it stops being a
+/// negative test and becomes a real national-grid accuracy check against
+/// PostGIS.
 fn skipped(v: &Vector) -> bool {
-    cfg!(feature = "crs-full") && v.id.starts_with("unknown_epsg")
+    !cfg!(feature = "crs-full") && v.id.starts_with("unknown_epsg")
 }
 
 #[test]

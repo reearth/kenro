@@ -123,7 +123,7 @@ millions of rows will be slower than a native extension.
 
 ## Choosing a smaller build
 
-The embedded module is the `full` tier (~980 KB). Smaller tiers drop features
+The embedded module is the `full` tier (~1.9 MB, the EPSG registry included). Smaller tiers drop features
 you may not need; functions outside the tier register as stubs naming the
 missing cargo feature.
 

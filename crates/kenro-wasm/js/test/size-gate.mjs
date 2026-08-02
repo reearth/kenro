@@ -5,8 +5,12 @@
 import { readFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 
-const MAX_RAW_BYTES = 1_500_000;
-const MAX_GZIP_BYTES = 500_000;
+// The full tier carries the whole EPSG registry (crs-full), so a national
+// grid works without a rebuild; that is ~155 KB of the gzip budget. Raised
+// deliberately, with the measured table in docs/wasm.md — still an order of
+// magnitude under mod_spatialite's ~25 MB chain.
+const MAX_RAW_BYTES = 2_200_000;
+const MAX_GZIP_BYTES = 700_000;
 
 const wasmPath = new URL("../pkg/kenro_wasm_bg.wasm", import.meta.url);
 const raw = readFileSync(wasmPath);

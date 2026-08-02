@@ -21,7 +21,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **1.1 MB** file with zero dependencies, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~23× smaller**, measured); the wasm build starts at 412 KB (167 KB wire), 25–57× smaller than DuckDB-WASM spatial. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, GML/XML, spreadsheet import, datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
+- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 489 KB (192 KB wire), and the everything-included tier is 1.9 MB (580 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, GML/XML, spreadsheet import, datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -87,7 +87,7 @@ cross-compilation, …). JavaScript hosts — browser and Cloudflare — are
 
 Browser SQLite builds can't load native extensions, but they all accept
 JS-level user-defined functions — so kenro's SQLite-free core compiles to
-wasm — **412–946 KB (167–353 KB wire) depending on the feature tier**
+wasm — **489–1918 KB (192–580 KB wire) depending on the feature tier**
 ([sizes](docs/wasm.md#size)) — with one adapter per host:
 
 ```js
@@ -207,7 +207,7 @@ Structural differences that matter more than any single function:
   carry their SRID; DuckDB's `GEOMETRY` does not, so CRS bookkeeping is the
   user's job there (and `always_xy` axis-order care is needed for EPSG:4326).
 - **Where it runs / weight** — kenro lives *inside* SQLite: pure Rust, a
-  single 1.1 MB extension (SpatiaLite's GEOS/PROJ/proj.db chain is ~25 MB
+  single ~2 MB extension (SpatiaLite's GEOS/PROJ/proj.db chain is ~25 MB
   across 9 files), no C toolchain, deterministic. PostGIS is a server-side
   PostgreSQL extension. DuckDB spatial bundles GEOS + PROJ + GDAL (its
   WASM build is ~23.5 MB uncompressed, ~6.3 MB over the wire).
@@ -233,10 +233,12 @@ globally-defined, algorithmically-derivable systems —
 | 32601–32660 | WGS84 UTM zones 1N–60N |
 | 32701–32760 | WGS84 UTM zones 1S–60S |
 
-Every national and regional system is served the same way: the `crs-full`
-cargo feature adds the full `crs-definitions` registry as a fallback
-(megabytes of tables, EPSG codes ≤ 65535 only); without it, an unknown code
-raises an error naming the code and the feature. Accuracy against PROJ is
+Every national and regional system is served the same way: `crs-full` adds
+the whole `crs-definitions` registry as a fallback, and it is part of
+**`full`** — so a full build transforms to EPSG:6677 or 27700 without a
+rebuild (EPSG codes ≤ 65535 only). The default/standard tiers leave it out
+and raise an error naming the code and the feature, because a build that
+only touches 4326 and 3857 should not carry the tables. Accuracy against PROJ is
 measured and documented in [docs/accuracy.md](docs/accuracy.md) — TL;DR:
 nanometer-level projection math, but **no datum grids**: national datum
 modernizations and earthquake-displacement models are not applied; use full
@@ -257,11 +259,13 @@ single contributor to binary size) and `spheroid`
 (`ST_DistanceSpheroid`/`ST_LengthSpheroid` — pulls geographiclib for a 0.1%
 refinement over the always-available spherical `ST_DistanceSphere`), plus
 `concave-hull` (+41 KB) and `delaunay` (+81 KB, pulling [spade]) — the two
-functions whose algorithms cost more than any other single entry. With overlay present, `ST_AsMVTGeom`
+functions whose algorithms cost more than any other single entry — and
+`crs-full`, the EPSG registry (+155 KB gzipped). With overlay present, `ST_AsMVTGeom`
 also upgrades to PostGIS-grade validity repair (invalid input and
-snap-induced self-intersections are made valid before tiling). In wasm terms: standard 617 KB
-(251 KB gzip) vs full 946 KB (353 KB gzip); `--no-default-features`
-gives a 412 KB (167 KB gzip) minimal build.
+snap-induced self-intersections are made valid before tiling). In wasm terms: standard 688 KB
+(273 KB gzip) vs full 1918 KB (580 KB gzip, the EPSG registry being most of
+the difference); `--no-default-features` gives a 489 KB (192 KB gzip)
+minimal build.
 
 Building with any feature off keeps the corresponding SQL functions
 registered as stubs that explain which feature is missing. `rusqlite` (off

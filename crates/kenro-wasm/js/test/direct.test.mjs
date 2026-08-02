@@ -14,6 +14,7 @@ import {
   geomSameVertexSet,
   initWasm,
   loadVectors,
+  skipForMissingFeature,
 } from "./golden.mjs";
 
 const wasm = await initWasm();
@@ -85,6 +86,7 @@ test("predicates vectors", () => {
 test("transform vectors", () => {
   for (const v of loadVectors("transform")) {
     const run = () => wasm.stAsText(wasm.stTransform(geom(v.a, v.src_srid), v.to_srid));
+    if (skipForMissingFeature(v, run)) continue;
     if (runExpectingError(v, run)) continue;
     assertWithinToleranceMeters(v.id, run(), effective(v), v.to_srid);
   }

@@ -21,8 +21,9 @@ const (
 
 // Aggregate kinds, matching k_agg_new in kenro-abi.
 const (
-	aggUnion = 0
-	aggMVT   = 1
+	aggUnion  = 0
+	aggMVT    = 1
+	aggExtent = 2
 )
 
 // runtime owns the compiled wasm module and a pool of instances.
@@ -116,11 +117,12 @@ type instance struct {
 	retI64 api.Function
 	retF64 api.Function
 
-	aggNew    api.Function
-	aggFinish api.Function
-	aggDrop   api.Function
-	unionStep api.Function
-	mvtStep   api.Function
+	aggNew     api.Function
+	aggFinish  api.Function
+	aggDrop    api.Function
+	unionStep  api.Function
+	extentStep api.Function
+	mvtStep    api.Function
 
 	fns map[string]api.Function
 
@@ -160,6 +162,7 @@ func newInstance(mod api.Module) (*instance, error) {
 	}
 	// Feature-gated: absent when the module was built without overlay/mvt.
 	in.unionStep = mod.ExportedFunction("k_agg_union_step")
+	in.extentStep = mod.ExportedFunction("k_agg_extent_step")
 	in.mvtStep = mod.ExportedFunction("k_agg_mvt_step")
 	return in, nil
 }

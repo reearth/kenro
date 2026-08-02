@@ -12,7 +12,17 @@ publish = false # until kenro itself is on crates.io
 crate-type = ["cdylib"] # lib name defaults to kenro_ext -> libkenro_ext.*
 
 [features]
-default = ["transform", "h3", "geojson", "overlay", "mvt", "spheroid", "concave-hull", "delaunay"]
+default = [
+    "transform",
+    "h3",
+    "geojson",
+    "overlay",
+    "mvt",
+    "spheroid",
+    "concave-hull",
+    "delaunay",
+    "crs-full",
+]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]

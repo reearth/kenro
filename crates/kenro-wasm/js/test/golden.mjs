@@ -47,6 +47,22 @@ export function effective(vector) {
   return vector.kenro_expected ?? vector.expected;
 }
 
+/**
+ * A vector may need a cargo feature the build under test lacks (`crs-full`,
+ * say). Rather than teach the runners which features are compiled in — the
+ * manifest does not say — run it and skip when the failure names the feature.
+ */
+export function skipForMissingFeature(vector, run) {
+  if (!vector.needs_feature) return false;
+  try {
+    run();
+    return false;
+  } catch (e) {
+    if (String(e.message ?? e).includes(vector.needs_feature)) return true;
+    throw e;
+  }
+}
+
 export function expectsError(vector) {
   const want = effective(vector);
   return typeof want === "object" && want !== null && "error" in want;

@@ -20,8 +20,8 @@ not by preference:
 ## Size
 
 Measured on release builds (`wasm-pack build --target web --release`,
-`wasm-opt -Oz`); enforced by a CI size gate (fails above 1.5 MB raw /
-500 KB gzip). Three tiers are built and attached to every GitHub Release
+`wasm-opt -Oz`); enforced by a CI size gate (fails above 2.2 MB raw /
+700 KB gzip). Three tiers are built and attached to every GitHub Release
 (`kenro-wasm-minimal.tar.gz` / `kenro-wasm-standard.tar.gz` /
 `kenro-wasm-full.tar.gz`); functions outside a tier register as stubs
 naming the missing feature:
@@ -30,14 +30,14 @@ naming the missing feature:
 |---|---|---|---|---|
 | minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 489 KB | 192 KB |
 | standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 688 KB | 273 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`) | 1141 KB | 425 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire) | 1918 KB | 580 KB |
 
-`crs-full` is deliberately outside this table. Adding the whole EPSG
-registry to the full tier measures **1918 KB raw / 580 KB gzipped** — past
-the CI gate above, and 155 KB of wire for tables most callers never touch.
-kenro's built-in CRS set (WGS84, Web Mercator, every UTM zone) covers the
-common cases; a national or local system needs that feature and a build of
-your own.
+The full tier carries `crs-full`, so `ST_Transform` reaches every EPSG code
+in the registry — Japan's plane rectangular systems, the British National
+Grid, state planes — rather than only kenro's curated table (WGS84, Web
+Mercator, every UTM zone). That is 155 KB of the wire size, and the reason
+the standard tier does not include it: a browser map that only ever touches
+4326 and 3857 should not pay for the registry.
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
 (~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at

@@ -1077,3 +1077,67 @@ fn the_size_gated_algorithms_name_their_feature_when_off() {
         assert!(err.contains(feature), "{err}");
     }
 }
+
+#[test]
+#[cfg(feature = "crs-full")]
+fn full_builds_transform_to_national_grids() {
+    let conn = conn();
+    // The point of putting crs-full in `full`: a national or local system
+    // works without a rebuild. EPSG:6677 is Japan's plane rectangular CS IX,
+    // EPSG:27700 the British National Grid — neither is in kenro's curated
+    // table (WGS84, Web Mercator, UTM).
+    for (srid, x_range) in [(6677i64, (-30000.0, 30000.0)), (27700, (0.0, 700_000.0))] {
+        let wkt = if srid == 6677 {
+            "POINT(139.7454 35.6586)" // Tokyo Tower
+        } else {
+            "POINT(-0.1246 51.5007)" // Big Ben
+        };
+        let x: f64 = conn
+            .query_row(
+                &format!("SELECT ST_X(ST_Transform(ST_GeomFromText('{wkt}', 4326), {srid}))"),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or_else(|e| panic!("EPSG:{srid}: {e}"));
+        assert!(
+            x > x_range.0 && x < x_range.1,
+            "EPSG:{srid}: x = {x} outside {x_range:?}"
+        );
+        // And it round-trips back to where it started.
+        let lon: f64 = conn
+            .query_row(
+                &format!(
+                    "SELECT ST_X(ST_Transform(ST_Transform(ST_GeomFromText('{wkt}', 4326), {srid}), 4326))"
+                ),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let expected: f64 = conn
+            .query_row(
+                &format!("SELECT ST_X(ST_GeomFromText('{wkt}', 4326))"),
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            (lon - expected).abs() < 1e-6,
+            "EPSG:{srid}: {lon} vs {expected}"
+        );
+    }
+}
+
+#[test]
+#[cfg(all(feature = "transform", not(feature = "crs-full")))]
+fn builds_without_crs_full_name_the_feature() {
+    let conn = conn();
+    let err = conn
+        .query_row(
+            "SELECT ST_Transform(ST_GeomFromText('POINT(139.7 35.6)', 4326), 6677)",
+            [],
+            |r| r.get::<_, Vec<u8>>(0),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("6677") && err.contains("crs-full"), "{err}");
+}

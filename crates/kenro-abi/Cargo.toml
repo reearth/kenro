@@ -14,11 +14,24 @@ crate-type = ["cdylib", "rlib"]
 [features]
 # Same tiers as kenro-wasm, so the Go and JS artifacts stay comparable.
 default = ["transform", "h3", "geojson", "mvt"]
-full = ["transform", "h3", "geojson", "mvt", "overlay"]
+full = [
+    "transform",
+    "h3",
+    "geojson",
+    "mvt",
+    "overlay",
+    "spheroid",
+    "concave-hull",
+    "delaunay",
+    "crs-full",
+]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]
 overlay = ["kenro/overlay"]
+spheroid = ["kenro/spheroid"]
+concave-hull = ["kenro/concave-hull"]
+delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
 

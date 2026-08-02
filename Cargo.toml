@@ -43,7 +43,17 @@ exclude = [".github/"]
 # build small; `full` adds the overlay engine on top (MVT is already in the
 # default set — see the `mvt` feature's note below).
 default = ["transform", "h3", "geojson", "mvt"]
-full = ["transform", "h3", "geojson", "mvt", "overlay", "spheroid", "concave-hull", "delaunay"]
+full = [
+    "transform",
+    "h3",
+    "geojson",
+    "mvt",
+    "overlay",
+    "spheroid",
+    "concave-hull",
+    "delaunay",
+    "crs-full",
+]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
 h3 = ["dep:h3o"]
@@ -67,8 +77,11 @@ delaunay = []
 # dedicated axis-aligned-rectangle algorithms, so this does NOT pull the
 # overlay engine and is cheap enough to sit in the default set.
 mvt = []
-# Escape hatch: the full crs-definitions EPSG database (megabytes of tables,
-# u16 codes only) as a fallback for codes missing from kenro's curated table.
+# The full crs-definitions EPSG registry as a fallback for codes outside
+# kenro's curated table — every national and local grid. In `full`, because a
+# build that says "full" should transform to EPSG:6677 without a rebuild; the
+# cost is measured in docs/wasm.md. Codes are u16, so EPSG > 65535 is still
+# out of reach.
 crs-full = ["transform", "proj4rs/crs-definitions"]
 
 [dependencies]

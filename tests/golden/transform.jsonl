@@ -14,4 +14,4 @@
 {"id":"utm54_inverse:transform","a":"POINT(385000 3946000)","src_srid":32654,"to_srid":4326,"fn":"transform","expected":"POINT(139.7296366934445 35.65114860207944)"}
 {"id":"utm56s_inverse:transform","a":"POINT(334000 6252000)","src_srid":32756,"to_srid":4326,"fn":"transform","expected":"POINT(151.20551468693637 -33.85926170450405)"}
 {"id":"srid0:transform","a":"POINT(1 2)","src_srid":0,"to_srid":4326,"fn":"transform","expected":{"error": true},"note":"PostGIS raises \"Input geometry has unknown (0) SRID\"; kenro raises too"}
-{"id":"unknown_epsg:transform","a":"POINT(1 2)","src_srid":4326,"to_srid":27700,"fn":"transform","expected":{"error": true},"note":"kenro-only: EPSG:27700 is outside the built-in CRS table (PostGIS supports it); use the crs-full feature"}
+{"id": "unknown_epsg:transform", "a": "POINT(1 2)", "src_srid": 4326, "to_srid": 27700, "fn": "transform", "expected": "POINT(733746.4910117043 -5305711.973378752)", "note": "EPSG:27700 (British National Grid) is outside kenro's built-in CRS table, so it needs the crs-full feature — which `full` now enables. Runners skip this vector when the build lacks the feature.", "needs_feature": "crs-full"}
