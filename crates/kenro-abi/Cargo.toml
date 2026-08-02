@@ -25,8 +25,10 @@ full = [
     "delaunay",
     "crs-full",
     "gml",
+    "text-encodings",
 ]
 transform = ["kenro/transform"]
+text-encodings = ["kenro/text-encodings"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]
 overlay = ["kenro/overlay"]

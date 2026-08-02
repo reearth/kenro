@@ -824,6 +824,42 @@ pub fn st_as_gml_version(version: i32, geom: &[u8]) -> R<String> {
     kenro::functions::gml::st_as_gml(geom, version as i64, None).map_err(err)
 }
 
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsKml)]
+pub fn st_as_kml(geom: &[u8]) -> R<String> {
+    kenro::functions::kml::st_as_kml(geom, None, None).map_err(err)
+}
+
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsKmlDigits)]
+pub fn st_as_kml_digits(geom: &[u8], digits: i32) -> R<String> {
+    kenro::functions::kml::st_as_kml(geom, Some(digits as i64), None).map_err(err)
+}
+
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsKmlPrefix)]
+pub fn st_as_kml_prefix(geom: &[u8], digits: i32, prefix: &str) -> R<String> {
+    kenro::functions::kml::st_as_kml(geom, Some(digits as i64), Some(prefix)).map_err(err)
+}
+
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsSvg)]
+pub fn st_as_svg(geom: &[u8]) -> R<String> {
+    kenro::functions::svg::st_as_svg(geom, None, None).map_err(err)
+}
+
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsSvgRel)]
+pub fn st_as_svg_rel(geom: &[u8], rel: i32) -> R<String> {
+    kenro::functions::svg::st_as_svg(geom, Some(rel as i64), None).map_err(err)
+}
+
+#[cfg(feature = "text-encodings")]
+#[wasm_bindgen(js_name = stAsSvgDigits)]
+pub fn st_as_svg_digits(geom: &[u8], rel: i32, digits: i32) -> R<String> {
+    kenro::functions::svg::st_as_svg(geom, Some(rel as i64), Some(digits as i64)).map_err(err)
+}
+
 #[cfg(feature = "gml")]
 #[wasm_bindgen(js_name = stAsGmlDigits)]
 pub fn st_as_gml_digits(version: i32, geom: &[u8], digits: i32) -> R<String> {
@@ -1682,6 +1718,12 @@ mod tests {
             "stAsGml",
             "stAsGmlVersion",
             "stAsGmlDigits",
+            "stAsKml",
+            "stAsKmlDigits",
+            "stAsKmlPrefix",
+            "stAsSvg",
+            "stAsSvgRel",
+            "stAsSvgDigits",
             "stGeomFromGml",
             "stGeomFromGmlSrid",
             "stNumPatches",

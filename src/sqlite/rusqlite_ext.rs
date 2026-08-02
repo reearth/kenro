@@ -495,6 +495,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_lines(conn)?;
     #[cfg(feature = "gml")]
     register_gml(conn)?;
+    #[cfg(feature = "text-encodings")]
+    register_text_encodings(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -509,6 +511,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::SPHEROID_OFF)?;
     #[cfg(not(feature = "concave-hull"))]
     register_stubs(conn, stubs::CONCAVE_HULL_OFF)?;
+    #[cfg(not(feature = "text-encodings"))]
+    register_stubs(conn, stubs::TEXT_ENCODINGS_OFF)?;
     #[cfg(not(feature = "delaunay"))]
     register_stubs(conn, stubs::DELAUNAY_OFF)?;
     #[cfg(not(feature = "gml"))]
@@ -1639,6 +1643,76 @@ fn register_threed(conn: &Connection) -> rusqlite::Result<()> {
     register_rtree_minmax(conn, "ST_M", threed::st_m)?;
     register_rtree_minmax(conn, "ST_ZMin", threed::st_zmin)?;
     register_rtree_minmax(conn, "ST_ZMax", threed::st_zmax)?;
+    Ok(())
+}
+
+/// KML and SVG output (see `functions::kml`, `functions::svg`).
+#[cfg(feature = "text-encodings")]
+fn register_text_encodings(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::{kml, svg};
+
+    conn.create_scalar_function("ST_AsKML", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_AsKML")? else {
+            return Ok(None);
+        };
+        kml::st_as_kml(g, None, None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsKML", 2, FLAGS, |ctx| {
+        let (Some(g), Some(digits)) = (
+            blob_or_null(ctx, 0, "ST_AsKML")?,
+            int_or_null(ctx, 1, "ST_AsKML")?,
+        ) else {
+            return Ok(None);
+        };
+        kml::st_as_kml(g, Some(digits as i64), None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsKML", 3, FLAGS, |ctx| {
+        let (Some(g), Some(digits), Some(prefix)) = (
+            blob_or_null(ctx, 0, "ST_AsKML")?,
+            int_or_null(ctx, 1, "ST_AsKML")?,
+            text_or_null(ctx, 2, "ST_AsKML")?,
+        ) else {
+            return Ok(None);
+        };
+        kml::st_as_kml(g, Some(digits as i64), Some(prefix))
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsSVG", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_AsSVG")? else {
+            return Ok(None);
+        };
+        svg::st_as_svg(g, None, None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsSVG", 2, FLAGS, |ctx| {
+        let (Some(g), Some(rel)) = (
+            blob_or_null(ctx, 0, "ST_AsSVG")?,
+            int_or_null(ctx, 1, "ST_AsSVG")?,
+        ) else {
+            return Ok(None);
+        };
+        svg::st_as_svg(g, Some(rel as i64), None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsSVG", 3, FLAGS, |ctx| {
+        let (Some(g), Some(rel), Some(digits)) = (
+            blob_or_null(ctx, 0, "ST_AsSVG")?,
+            int_or_null(ctx, 1, "ST_AsSVG")?,
+            int_or_null(ctx, 2, "ST_AsSVG")?,
+        ) else {
+            return Ok(None);
+        };
+        svg::st_as_svg(g, Some(rel as i64), Some(digits as i64))
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
     Ok(())
 }
 

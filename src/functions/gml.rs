@@ -16,6 +16,7 @@ use geo_types::{
 use quick_xml::events::Event;
 
 use crate::error::{Error, Result};
+use crate::functions::num;
 use crate::geom::{self, Geom};
 
 const FUNC_OUT: &str = "ST_AsGML";
@@ -176,16 +177,6 @@ fn write_coords(out: &mut String, coords: &[Coord<f64>], version: i64, digits: u
         out.push_str(&format!("{} {}", num(c.x, digits), num(c.y, digits)));
     }
     out.push_str(&format!("</gml:{tag}>"));
-}
-
-/// Trailing zeros trimmed, as PostGIS prints them.
-fn num(v: f64, digits: usize) -> String {
-    let s = format!("{v:.digits$}");
-    if s.contains('.') {
-        s.trim_end_matches('0').trim_end_matches('.').to_string()
-    } else {
-        s
-    }
 }
 
 /// `ST_GeomFromGML(text [, srid])` — GML 2 or 3.

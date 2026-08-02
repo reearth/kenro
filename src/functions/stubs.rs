@@ -156,6 +156,20 @@ pub static DELAUNAY_OFF: &[Stub] = &[
     },
 ];
 
+/// Registered when `text-encodings` is off. Both are pure string formatting;
+/// the feature exists because `ST_AsKML` reprojects to WGS84 and so pulls
+/// `transform` in with it.
+pub static TEXT_ENCODINGS_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_AsKML",
+        hint: "kenro was built without the `text-encodings` cargo feature.",
+    },
+    Stub {
+        name: "ST_AsSVG",
+        hint: "kenro was built without the `text-encodings` cargo feature.",
+    },
+];
+
 /// Registered when `gml` is off (+13 KB of wasm when on, for quick-xml).
 pub static GML_OFF: &[Stub] = &[
     Stub {

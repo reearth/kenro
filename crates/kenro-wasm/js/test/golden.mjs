@@ -1147,6 +1147,34 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_AsGML(3, ST_GeomFromText('POINT(1.123456789 2)', 4326), 3)",
     check: (v) => v.includes("1.123 2"),
   },
+  // --- KML / SVG (functions::kml, functions::svg) ---
+  // KML is WGS84 by definition and reprojects rather than labelling, so the
+  // input needs a real SRID.
+  "ST_AsKML/1": {
+    sql: "SELECT ST_AsKML(ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v === "<Point><coordinates>1,2</coordinates></Point>",
+  },
+  "ST_AsKML/2": {
+    sql: "SELECT ST_AsKML(ST_GeomFromText('POINT(1.23456789 2.3456789)', 4326), 3)",
+    check: (v) => v === "<Point><coordinates>1.235,2.346</coordinates></Point>",
+  },
+  "ST_AsKML/3": {
+    sql: "SELECT ST_AsKML(ST_GeomFromText('POINT(1 2)', 4326), 15, 'kml')",
+    check: (v) => v === "<kml:Point><kml:coordinates>1,2</kml:coordinates></kml:Point>",
+  },
+  // SVG negates Y; rel=1 swaps cx/cy for x/y as well as the path commands.
+  "ST_AsSVG/1": {
+    sql: "SELECT ST_AsSVG(ST_GeomFromText('POINT(1 2)'))",
+    check: (v) => v === 'cx="1" cy="-2"',
+  },
+  "ST_AsSVG/2": {
+    sql: "SELECT ST_AsSVG(ST_GeomFromText('POINT(1 2)'), 1)",
+    check: (v) => v === 'x="1" y="-2"',
+  },
+  "ST_AsSVG/3": {
+    sql: "SELECT ST_AsSVG(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'), 0, 15)",
+    check: (v) => v === "M 0 0 L 4 0 4 -4 0 -4 Z",
+  },
   "ST_GeomFromGML/1": {
     sql: "SELECT ST_AsText(ST_GeomFromGML('<gml:Point><gml:pos>1 2</gml:pos></gml:Point>'))",
     check: (v) => v === "POINT(1 2)",

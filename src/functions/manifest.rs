@@ -359,6 +359,37 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Text,
         Some("gml")
     ),
+    // KML and SVG output (functions::kml, functions::svg).
+    entry!("ST_AsKML", "stAsKml", [Blob], Text, Some("text-encodings")),
+    entry!(
+        "ST_AsKML",
+        "stAsKmlDigits",
+        [Blob, Int],
+        Text,
+        Some("text-encodings")
+    ),
+    entry!(
+        "ST_AsKML",
+        "stAsKmlPrefix",
+        [Blob, Int, Text],
+        Text,
+        Some("text-encodings")
+    ),
+    entry!("ST_AsSVG", "stAsSvg", [Blob], Text, Some("text-encodings")),
+    entry!(
+        "ST_AsSVG",
+        "stAsSvgRel",
+        [Blob, Int],
+        Text,
+        Some("text-encodings")
+    ),
+    entry!(
+        "ST_AsSVG",
+        "stAsSvgDigits",
+        [Blob, Int, Int],
+        Text,
+        Some("text-encodings")
+    ),
     entry!("ST_GeomFromGML", "stGeomFromGml", [Text], Blob, Some("gml")),
     entry!(
         "ST_GeomFromGML",
@@ -1041,6 +1072,10 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("concave-hull") => cfg!(feature = "concave-hull"),
         Some("delaunay") => cfg!(feature = "delaunay"),
         Some("gml") => cfg!(feature = "gml"),
+        Some("text-encodings") => cfg!(feature = "text-encodings"),
+        // An unrecognized name disables the function everywhere at once,
+        // which is the safe direction but easy to do by accident — see
+        // `every_feature_name_is_known` for the guard that makes a typo loud.
         Some(_) => false,
     })
 }
@@ -1068,6 +1103,8 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_LineMerge", &[1, 2]),
     ("ST_Split", &[2]),
     ("ST_AsGML", &[1, 2, 3]),
+    ("ST_AsKML", &[1, 2, 3]),
+    ("ST_AsSVG", &[1, 2, 3]),
     ("ST_GeomFromGML", &[1, 2]),
     ("ST_GMLToSQL", &[1]),
     ("ST_Union", &[1, 2]),
@@ -1106,9 +1143,29 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("concave-hull") => cfg!(feature = "concave-hull"),
         Some("delaunay") => cfg!(feature = "delaunay"),
         Some("gml") => cfg!(feature = "gml"),
+        Some("text-encodings") => cfg!(feature = "text-encodings"),
+        // An unrecognized name disables the function everywhere at once,
+        // which is the safe direction but easy to do by accident — see
+        // `every_feature_name_is_known` for the guard that makes a typo loud.
         Some(_) => false,
     })
 }
+
+/// Feature names `active_functions` knows how to resolve. Kept next to the
+/// match it mirrors, and checked against it by `every_feature_name_is_known`.
+#[cfg(test)]
+const KNOWN_FEATURES: &[&str] = &[
+    "transform",
+    "h3",
+    "geojson",
+    "overlay",
+    "mvt",
+    "spheroid",
+    "concave-hull",
+    "delaunay",
+    "gml",
+    "text-encodings",
+];
 
 /// The stub entries active under the current feature set: the permanent
 /// catalog plus feature-off fallbacks.
@@ -1128,6 +1185,9 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "gml") {
         stubs.extend(super::stubs::GML_OFF.iter());
+    }
+    if !cfg!(feature = "text-encodings") {
+        stubs.extend(super::stubs::TEXT_ENCODINGS_OFF.iter());
     }
     if !cfg!(feature = "h3") {
         stubs.extend(super::stubs::H3_OFF.iter());
@@ -1179,6 +1239,32 @@ mod tests {
         let len = pairs.len();
         pairs.dedup();
         assert_eq!(pairs.len(), len);
+    }
+
+    /// A feature name `active_functions` does not recognize falls into its
+    /// `Some(_) => false` arm and silently switches the function off in every
+    /// build, including `full`. That is invisible unless the binding layer
+    /// happens to keep registering it, so check the names directly.
+    #[test]
+    fn every_feature_name_is_known() {
+        for e in FUNCTIONS {
+            if let Some(f) = e.feature {
+                assert!(
+                    KNOWN_FEATURES.contains(&f),
+                    "{}: unknown feature {f:?} — add it to active_functions and KNOWN_FEATURES",
+                    e.sql_name
+                );
+            }
+        }
+        for e in AGGREGATES {
+            if let Some(f) = e.feature {
+                assert!(
+                    KNOWN_FEATURES.contains(&f),
+                    "{}: unknown feature {f:?}",
+                    e.sql_name
+                );
+            }
+        }
     }
 
     #[test]

@@ -1817,6 +1817,72 @@ pub extern "C" fn k_stAsGmlVersion(version: i32, geom_p: *const u8, geom_l: u32)
     text(gml::st_as_gml(s(geom_p, geom_l), version as i64, None))
 }
 
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsKml(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(kenro::functions::kml::st_as_kml(
+        s(geom_p, geom_l),
+        None,
+        None,
+    ))
+}
+
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsKmlDigits(geom_p: *const u8, geom_l: u32, digits: i32) -> i32 {
+    text(kenro::functions::kml::st_as_kml(
+        s(geom_p, geom_l),
+        Some(digits as i64),
+        None,
+    ))
+}
+
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsKmlPrefix(
+    geom_p: *const u8,
+    geom_l: u32,
+    digits: i32,
+    prefix_p: *const u8,
+    prefix_l: u32,
+) -> i32 {
+    text(kenro::functions::kml::st_as_kml(
+        s(geom_p, geom_l),
+        Some(digits as i64),
+        Some(try_str!(prefix_p, prefix_l)),
+    ))
+}
+
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsSvg(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(kenro::functions::svg::st_as_svg(
+        s(geom_p, geom_l),
+        None,
+        None,
+    ))
+}
+
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsSvgRel(geom_p: *const u8, geom_l: u32, rel: i32) -> i32 {
+    text(kenro::functions::svg::st_as_svg(
+        s(geom_p, geom_l),
+        Some(rel as i64),
+        None,
+    ))
+}
+
+#[cfg(feature = "text-encodings")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsSvgDigits(geom_p: *const u8, geom_l: u32, rel: i32, digits: i32) -> i32 {
+    text(kenro::functions::svg::st_as_svg(
+        s(geom_p, geom_l),
+        Some(rel as i64),
+        Some(digits as i64),
+    ))
+}
+
 #[cfg(feature = "gml")]
 #[unsafe(no_mangle)]
 pub extern "C" fn k_stAsGmlDigits(

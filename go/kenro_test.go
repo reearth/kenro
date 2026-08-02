@@ -172,6 +172,8 @@ var smokeCases = []smokeCase{
 	{"ST_CoordDim", `ST_CoordDim(ST_GeomFromText('POINT(1 2)'))`, int64(2)},
 	{"ST_DFullyWithin", `ST_DFullyWithin(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)'), 3)`, int64(1)},
 	{"ST_DelaunayTriangles", `ST_NumGeometries(ST_DelaunayTriangles(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))`, int64(2)},
+	{"ST_AsKML", `ST_AsKML(ST_GeomFromText('POINT(1 2)', 4326))`, "<Point><coordinates>1,2</coordinates></Point>"},
+	{"ST_AsSVG", `ST_AsSVG(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))`, "M 0 0 L 4 0 4 -4 0 -4 Z"},
 	{"ST_TriangulatePolygon", `ST_Area(ST_TriangulatePolygon(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))')))`, 96.0},
 	{"ST_IsSimple", `ST_IsSimple(ST_GeomFromText('LINESTRING(0 0,10 10,0 10,10 0)'))`, int64(0)},
 	{"ST_LineMerge", `ST_AsText(ST_LineMerge(ST_GeomFromText('MULTILINESTRING((0 0,1 1),(1 1,2 2))')))`, "LINESTRING(0 0,1 1,2 2)"},

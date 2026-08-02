@@ -54,6 +54,7 @@ full = [
     "delaunay",
     "crs-full",
     "gml",
+    "text-encodings",
 ]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
@@ -61,11 +62,15 @@ h3 = ["dep:h3o"]
 geojson = ["dep:geojson"]
 # Overlay engine: ST_Intersection/Difference/SymDifference/Union/Buffer and
 # the ST_Union aggregate (pulls i_overlay's mesh — the largest single
-# contributor to wasm size).
-# ST_Split reaches i_overlay's slice directly because geo does not re-export
-# it; the version must stay pinned to whatever geo depends on, or cargo links
-# two copies of the engine.
+# contributor to wasm size). ST_Split reaches i_overlay's slice directly
+# because geo does not re-export it; the version must stay pinned to whatever
+# geo depends on, or cargo links two copies of the engine.
 overlay = ["dep:i_overlay"]
+# ST_AsKML / ST_AsSVG. No XML library: the only non-numeric text is the
+# caller's namespace prefix, which is validated rather than escaped. KML is
+# defined in WGS84 and PostGIS reprojects to it rather than labelling the
+# SRID, so this pulls `transform`.
+text-encodings = ["transform"]
 # Ellipsoidal measures: ST_DistanceSpheroid / ST_LengthSpheroid, which pull
 # geographiclib (~17 KB of wasm). The spherical ST_DistanceSphere stays in the
 # default set — it costs nothing extra and answers "how many metres apart" for

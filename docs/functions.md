@@ -7,7 +7,7 @@ mod_spatialite 5.1 session, July–August 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
 Functions marked with the `overlay`, `spheroid`, `concave-hull`,
-`delaunay` or `gml` feature need a `full` build (default builds register them as stubs naming the feature); everything
+`delaunay`, `gml` or `text-encodings` feature need a `full` build (default builds register them as stubs naming the feature); everything
 else, including MVT, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
@@ -342,6 +342,19 @@ does neither, and a pull parser is all that is left.
 | `ST_AsGML([version, ] geom [, maxdecimaldigits])` | TEXT | ✅ | ❌ | ✅ | Byte-identical to PostGIS for the shapes kenro supports, golden-tested — including GML 3's habit of writing a `Curve` with segments where a `LineString` would do, and `MultiCurve`/`MultiSurface` for the multis. Version defaults to 2 and precision to 15, as in PostGIS. The `options`, `nprefix` and `id` arguments are not implemented: always the `gml:` prefix, never an id |
 | `ST_GeomFromGML(text [, srid])` / `ST_GMLToSQL` | geometry | ✅ | ❌ | ✅ | Structural, not schema-driven: elements are matched by **local name**, so any namespace prefix works and unknown elements are ignored — which is what lets a CityGML fragment be read without carrying the schema. `srsName` is read from either `EPSG:6697` or the `urn:ogc:def:crs:EPSG::6697` form. `srsDimension="3"` sets the coordinate stride, and the Z is dropped like everywhere else in kenro |
 
+## KML and SVG output
+
+Both are `text-encodings`. Neither uses an XML library — the only text that
+is not a number is `ST_AsKML`'s namespace prefix, and that is validated as an
+XML name rather than escaped, so a prefix that would break the document is an
+error instead of a literally-named element. The feature exists because of the
+first row's reprojection, not because of a parser.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_AsKML(geom [, maxdecimaldigits [, nprefix]])` | TEXT | ✅ | ❌ | ⚠️ named `AsKml` | **Reprojects to WGS84**, and errors on SRID 0 — KML is defined in lon/lat and PostGIS transforms rather than labelling, unlike `ST_AsGML` next door. The reprojection is kenro's gridless one ([accuracy](accuracy.md)). Rings keep their closing vertex; all three multi types become `MultiGeometry`; an empty geometry gives an empty string; a GeometryCollection is an error, as in PostGIS. ⚠️ 3D input is an error where PostGIS writes a third ordinate — `ST_Force2D` first |
+| `ST_AsSVG(geom [, rel [, maxdecimaldigits]])` | TEXT | ✅ | ❌ | ⚠️ named `AsSvg` | A path fragment, not a document. **Y is negated** (SVG's axis points down), so `POINT(1 2)` is `cx="1" cy="-2"`. `rel = 1` switches to relative commands (`l`, `z`) **and renames the point attributes to `x`/`y`** — an undocumented PostGIS behaviour kenro matches. Rings drop their closing vertex in favour of `Z`. Relative deltas are taken on full-precision coordinates and rounded after. ⚠️ 3D input is an error |
+
 ## Surface collections: POLYHEDRALSURFACE, TIN, TRIANGLE
 
 kenro **reads** surface collections but does not compute with them. `geo_types`
@@ -450,10 +463,10 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   (WKT/WKB/GeoJSON/GeoPackage blobs), not files; reading shapefiles,
   spreadsheets or writing whole GeoPackages is GDAL/ogr2ogr territory
   (DuckDB's `ST_Read`, SpatiaLite's VirtualShape/VirtualXL).
-- **Other text encodings** — no KML/SVG/X3D output (SpatiaLite's
-  `AsKml`/`AsSvg`) and no XML machinery beyond geometry: no XmlBLOB (`XB_*`),
-  no SLD/SE styling, no WFS, and no schema validation. GML *is* supported
-  (see above); the rest of the XML surface is not.
+- **XML machinery beyond geometry** — no XmlBLOB (`XB_*`), no SLD/SE
+  styling, no WFS, and no schema validation (what libxml2 buys SpatiaLite).
+  kenro encodes and decodes *geometry* as text — GML, KML and SVG are all
+  supported; the surrounding document machinery is not. No X3D output.
 - **SQLite virtual tables** — no VirtualKNN-style modules; kenro registers
   scalar and aggregate functions only, and spatial indexing goes through
   the standard GeoPackage R-tree instead of a custom index.

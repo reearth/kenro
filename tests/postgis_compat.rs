@@ -1779,3 +1779,76 @@ fn constrained_triangulation_covers_the_polygon_and_not_its_holes() {
         Some("ST_MultiPolygon")
     );
 }
+
+/// KML and SVG output, byte for byte through SQL. Both were read off
+/// PostGIS 3.5 before being written down.
+#[test]
+#[cfg(feature = "text-encodings")]
+fn kml_and_svg_output_matches_postgis() {
+    let conn = conn();
+    // SVG negates Y, and `rel` swaps the point attributes as well as the
+    // path commands — the detail worth pinning at the SQL layer too.
+    assert_eq!(
+        text(&conn, "SELECT ST_AsSVG(ST_GeomFromText('POINT(1 2)'))").as_deref(),
+        Some(r#"cx="1" cy="-2""#)
+    );
+    assert_eq!(
+        text(&conn, "SELECT ST_AsSVG(ST_GeomFromText('POINT(1 2)'), 1)").as_deref(),
+        Some(r#"x="1" y="-2""#)
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsSVG(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))"
+        )
+        .as_deref(),
+        Some("M 0 0 L 4 0 4 -4 0 -4 Z")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsSVG(ST_GeomFromText('LINESTRING(0.123456 0.7654321,1.111111 1.999999)'), 1, 2)"
+        )
+        .as_deref(),
+        Some("M 0.12 -0.77 l 0.99 -1.23")
+    );
+
+    // KML keeps the ring's closing vertex and uses outerBoundaryIs.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsKML(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))', 4326))"
+        )
+        .as_deref(),
+        Some(
+            "<Polygon><outerBoundaryIs><LinearRing><coordinates>0,0 4,0 4,4 0,4 0,0\
+             </coordinates></LinearRing></outerBoundaryIs></Polygon>"
+        )
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsKML(ST_GeomFromText('POINT(1 2)', 4326), 15, 'kml')"
+        )
+        .as_deref(),
+        Some("<kml:Point><kml:coordinates>1,2</kml:coordinates></kml:Point>")
+    );
+    // KML is WGS84 by definition: PostGIS reprojects rather than labelling,
+    // and refuses SRID 0 outright. Both behaviours are kept.
+    let reprojected = text(
+        &conn,
+        "SELECT ST_AsKML(ST_GeomFromText('POINT(1 2)', 3857))",
+    )
+    .unwrap_or_default();
+    assert!(
+        reprojected.starts_with("<Point><coordinates>0.0000089"),
+        "{reprojected}"
+    );
+    let err = conn
+        .query_row("SELECT ST_AsKML(ST_GeomFromText('POINT(1 2)'))", [], |r| {
+            r.get::<_, String>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("SRID"), "{err}");
+}

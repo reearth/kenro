@@ -11,17 +11,17 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~203 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~205 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
-- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured and flattened rather than silently lost — all first-class citizens
+- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured and flattened rather than silently lost — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
-- **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` in pure Rust, with the differences vs GEOS quantified by golden tests
+- **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` / `ST_Split` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree maintenance triggers require, plus the helper the (since-withdrawn) geometry-type triggers call, because files carrying them are still out there
 - **CRS transform** — pure-Rust [proj4rs]: WGS84, Web Mercator and every UTM zone built in, the full EPSG registry behind a feature flag, with [measured accuracy](docs/accuracy.md)
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 560 KB (216 KB wire), and the everything-included tier is 2.0 MB (637 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond GML, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
+- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 560 KB (216 KB wire), and the everything-included tier is 2.1 MB (640 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -87,7 +87,7 @@ cross-compilation, …). JavaScript hosts — browser and Cloudflare — are
 
 Browser SQLite builds can't load native extensions, but they all accept
 JS-level user-defined functions — so kenro's SQLite-free core compiles to
-wasm — **560–2098 KB (216–637 KB wire) depending on the feature tier**
+wasm — **560–2105 KB (216–640 KB wire) depending on the feature tier**
 ([sizes](docs/wasm.md#size)) — with one adapter per host:
 
 ```js
@@ -252,18 +252,21 @@ GeoPackage triggers, measures/processing/affine, CRS transform, H3,
 GeoJSON, and MVT vector tiles (tile clipping uses dedicated rectangle
 algorithms, so MVT costs almost nothing).
 
-**`full`** adds the four features excluded from the default for size:
+**`full`** adds the features excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
-`ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest
-single contributor to binary size) and `spheroid`
+`ST_Buffer`/`ST_MakeValid`/`ST_Split` — pulls the [i_overlay] mesh, the
+largest single contributor to binary size) and `spheroid`
 (`ST_DistanceSpheroid`/`ST_LengthSpheroid` — pulls geographiclib for a 0.1%
 refinement over the always-available spherical `ST_DistanceSphere`), plus
 `concave-hull` (+41 KB) and `delaunay` (+81 KB, pulling [spade]) — the two
-functions whose algorithms cost more than any other single entry — and
+functions whose algorithms cost more than any other single entry —
+`gml` (GML 2/3 I/O, +13 KB for quick-xml), `text-encodings`
+(`ST_AsKML`/`ST_AsSVG`; no XML library, but KML reprojects to WGS84 and so
+needs `transform`), and
 `crs-full`, the EPSG registry (+155 KB gzipped). With overlay present, `ST_AsMVTGeom`
 also upgrades to PostGIS-grade validity repair (invalid input and
-snap-induced self-intersections are made valid before tiling). In wasm terms: standard 754 KB
-(296 KB gzip) vs full 2098 KB (637 KB gzip, the EPSG registry being most of
+snap-induced self-intersections are made valid before tiling). In wasm terms: standard 755 KB
+(296 KB gzip) vs full 2105 KB (640 KB gzip, the EPSG registry being most of
 the difference); `--no-default-features` gives a 560 KB (216 KB gzip)
 minimal build.
 
