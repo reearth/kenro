@@ -217,19 +217,33 @@ into the image, load it like on any Linux host. A Node example (the
 pattern is identical for Python/Go/Ruby images):
 
 ```dockerfile
+# syntax=docker/dockerfile:1
 FROM node:22-slim
 WORKDIR /app
-ADD https://github.com/reearth/kenro/releases/latest/download/kenro-ext-x86_64-unknown-linux-gnu.tar.gz /tmp/kenro.tar.gz
+ADD --checksum=sha256:PASTE_FROM_SHA256SUMS \
+    https://github.com/reearth/kenro/releases/download/v0.1.0/kenro-ext-x86_64-unknown-linux-gnu.tar.gz \
+    /tmp/kenro.tar.gz
 RUN tar xzf /tmp/kenro.tar.gz -C /app libkenro_ext.so && rm /tmp/kenro.tar.gz
 COPY . .
 RUN npm ci --omit=dev
 CMD ["node", "server.js"]   # server.js: db.loadExtension("./libkenro_ext.so")
 ```
 
+Take the hash from the `SHA256SUMS` file on the release page. BuildKit
+verifies the download against it and — because the checksum is part of the
+cache key — stops re-fetching the asset on every build. `sha256:` is the
+only algorithm accepted, and the `# syntax` line is what makes the flag
+available (Docker Engine 23.0+ runs BuildKit by default).
+
+`ADD` does not unpack a *remote* archive, hence the explicit `tar xzf`.
+
+To track releases instead of pinning one, drop `--checksum` and use
+`releases/latest/download/…` — the two go together: a pinned hash against a
+moving URL breaks on the next release.
+
 Match the asset to the image architecture (`aarch64-unknown-linux-gnu`
-for arm64 images). Pin a version by replacing `latest/download/…` with
-`download/vX.Y.Z/…`. If you prefer hermetic builds, a `rust:1` build
-stage running `cargo build -p kenro-ext --release` works too.
+for arm64 images). If you prefer hermetic builds, a `rust:1` build stage
+running `cargo build -p kenro-ext --release` works too.
 
 ## AWS Lambda
 
