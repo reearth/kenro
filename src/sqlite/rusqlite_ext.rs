@@ -216,6 +216,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         register_geom2_to_blob(conn, "ST_Intersection", overlay::st_intersection)?;
         register_geom2_to_blob(conn, "ST_Difference", overlay::st_difference)?;
         register_geom2_to_blob(conn, "ST_SymDifference", overlay::st_sym_difference)?;
+        // PostGIS accepts both spellings; so does kenro.
+        register_geom2_to_blob(conn, "ST_SymmetricDifference", overlay::st_sym_difference)?;
         register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
         register_geom_to_blob(conn, "ST_MakeValid", overlay::st_make_valid)?;
         conn.create_scalar_function("ST_Buffer", 2, FLAGS, |ctx| {
@@ -470,6 +472,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_h3(conn)?;
     register_geojson(conn)?;
     register_accessors(conn)?;
+    register_compat(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -752,6 +755,127 @@ fn register_stub(conn: &Connection, stub: &'static stubs::Stub) -> rusqlite::Res
 fn register_stubs(conn: &Connection, list: &'static [stubs::Stub]) -> rusqlite::Result<()> {
     for stub in list {
         register_stub(conn, stub)?;
+    }
+    Ok(())
+}
+
+/// PostGIS name compatibility (see `functions::compat`): alternative
+/// spellings for functions already registered above, plus the EWKT/EWKB pair
+/// and the typed constructors.
+fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::compat::{self, Expect};
+
+    // Same code, PostGIS's spelling.
+    register_rtree_minmax(conn, "ST_XMin", rtree::st_min_x)?;
+    register_rtree_minmax(conn, "ST_XMax", rtree::st_max_x)?;
+    register_rtree_minmax(conn, "ST_YMin", rtree::st_min_y)?;
+    register_rtree_minmax(conn, "ST_YMax", rtree::st_max_y)?;
+    register_geom_to_real(conn, "ST_Area2D", crate::functions::accessors::st_area)?;
+    register_geom_to_real(
+        conn,
+        "ST_Perimeter2D",
+        crate::functions::accessors::st_perimeter,
+    )?;
+    register_geom_to_real(conn, "ST_Length2D", crate::functions::accessors::st_length)?;
+    conn.create_scalar_function("ST_GeometryFromText", 1, FLAGS, |ctx| {
+        let Some(wkt) = text_or_null(ctx, 0, "ST_GeometryFromText")? else {
+            return Ok(None);
+        };
+        blob(io::st_geom_from_text(wkt, None))
+    })?;
+    conn.create_scalar_function("ST_GeometryFromText", 2, FLAGS, |ctx| {
+        let (Some(wkt), Some(srid)) = (
+            text_or_null(ctx, 0, "ST_GeometryFromText")?,
+            int_or_null(ctx, 1, "ST_GeometryFromText")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_geom_from_text(wkt, Some(srid)))
+    })?;
+    conn.create_scalar_function("ST_GeomFromEWKB", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_GeomFromEWKB")? else {
+            return Ok(None);
+        };
+        blob(io::st_geom_from_wkb(b, None))
+    })?;
+
+    // New code, all of it small.
+    register_geom_to_blob(conn, "ST_Force2D", compat::st_force_2d)?;
+    conn.create_scalar_function("ST_AsEWKT", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_AsEWKT")? else {
+            return Ok(None);
+        };
+        compat::st_as_ewkt(b)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsHexEWKB", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_AsHexEWKB")? else {
+            return Ok(None);
+        };
+        compat::st_as_hex_ewkb(b)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    register_geom_to_blob(conn, "ST_AsEWKB", compat::st_as_ewkb)?;
+    conn.create_scalar_function("ST_GeomFromEWKT", 1, FLAGS, |ctx| {
+        let Some(t) = text_or_null(ctx, 0, "ST_GeomFromEWKT")? else {
+            return Ok(None);
+        };
+        blob(compat::st_geom_from_ewkt(t))
+    })?;
+
+    for (name, expect) in [
+        ("ST_PointFromText", Expect::Point),
+        ("ST_LineFromText", Expect::LineString),
+        ("ST_LineStringFromText", Expect::LineString),
+        ("ST_PolyFromText", Expect::Polygon),
+        ("ST_PolygonFromText", Expect::Polygon),
+        ("ST_MPointFromText", Expect::MultiPoint),
+        ("ST_MLineFromText", Expect::MultiLineString),
+        ("ST_MPolyFromText", Expect::MultiPolygon),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(t) = text_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            compat::from_text_typed(t, None, expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(t), Some(srid)) = (text_or_null(ctx, 0, name)?, int_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            compat::from_text_typed(t, Some(srid), expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+    }
+
+    for (name, expect) in [
+        ("ST_PointFromWKB", Expect::Point),
+        ("ST_LineFromWKB", Expect::LineString),
+        ("ST_PolyFromWKB", Expect::Polygon),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(b) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            compat::from_wkb_typed(b, None, expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(b), Some(srid)) = (blob_or_null(ctx, 0, name)?, int_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            compat::from_wkb_typed(b, Some(srid), expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
     }
     Ok(())
 }

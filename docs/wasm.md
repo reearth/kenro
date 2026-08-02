@@ -28,9 +28,9 @@ naming the missing feature:
 
 | tier | cargo flags | adds | raw | gzipped (wire) |
 |---|---|---|---|---|
-| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors | 412 KB | 167 KB |
-| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 617 KB | 251 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, and `ST_AsMVTGeom` gains PostGIS-grade validity repair (i_overlay's mesh is the single largest contributor) | 946 KB | 353 KB |
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 419 KB | 168 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 619 KB | 250 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, and `ST_AsMVTGeom` gains PostGIS-grade validity repair (i_overlay's mesh is the single largest contributor) | 965 KB | 359 KB |
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
 (~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at
@@ -223,10 +223,23 @@ Cell ids are `y * 2**zoom + x` — a safe integer below zoom 26, so a plain
 `INTEGER` column indexes them. Web Mercator's y grows southward, and
 latitudes beyond ±85.05° are clamped rather than allowed to go infinite.
 
-Pick `zoom` so that a typical query window covers a handful of cells and a
+`zoom` is a per-dataset knob — city-scale parcels and a global coastline want
+different values, so tune it per table rather than picking one for the whole
+app. Pick it so that a typical query window covers a handful of cells and a
 typical feature fits in one: too coarse and every query scans, too fine and
 `maxCells` sends everything to `OVERSIZED`. `stats.refined` in the example's
 query response is how you tell.
+
+This `zoom` has nothing to do with the z of the tiles you serve. It only sets
+the granularity of the index, and `ST_AsMVTGeom`/`ST_AsMVT` never look at it —
+they take the z/x/y you hand them. Serving z14 is no reason to index at zoom
+14; pick the index zoom from your query windows, the serving z from your map.
+
+Pass the same `zoom` and `maxCells` to `cellsForFeature` and `cellsForQuery`.
+The two sides compute cell ids independently, so a mismatch means the query's
+cells never meet the feature's, and rows go missing with no error. If you move
+off the defaults, keep them in one constant per table and import it on both
+sides.
 
 ## Cloudflare Workers, D1 and Durable Objects
 

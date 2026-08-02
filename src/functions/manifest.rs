@@ -105,6 +105,138 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_MinY", "stMinY", [Blob], OptReal, None),
     entry!("ST_MaxY", "stMaxY", [Blob], OptReal, None),
     entry!("ST_IsEmpty", "stIsEmpty", [Blob], Bool, None),
+    // PostGIS spellings for the same code. Aliases reuse the wasm export, so
+    // they cost nothing beyond a registration.
+    entry!("ST_XMin", "stMinX", [Blob], OptReal, None),
+    entry!("ST_XMax", "stMaxX", [Blob], OptReal, None),
+    entry!("ST_YMin", "stMinY", [Blob], OptReal, None),
+    entry!("ST_YMax", "stMaxY", [Blob], OptReal, None),
+    entry!("ST_GeometryFromText", "stGeomFromText", [Text], Blob, None),
+    entry!(
+        "ST_GeometryFromText",
+        "stGeomFromTextSrid",
+        [Text, Int],
+        Blob,
+        None
+    ),
+    entry!("ST_GeomFromEWKB", "stGeomFromWkb", [Blob], Blob, None),
+    entry!("ST_Area2D", "stArea", [Blob], Real, None),
+    entry!("ST_Perimeter2D", "stPerimeter", [Blob], Real, None),
+    entry!("ST_Length2D", "stLength", [Blob], Real, None),
+    // EWKT/EWKB and the flattening that lets 3D input reach an encoder.
+    entry!("ST_Force2D", "stForce2d", [Blob], Blob, None),
+    entry!("ST_AsEWKT", "stAsEwkt", [Blob], Text, None),
+    entry!("ST_GeomFromEWKT", "stGeomFromEwkt", [Text], Blob, None),
+    entry!("ST_AsEWKB", "stAsEwkb", [Blob], Blob, None),
+    entry!("ST_AsHexEWKB", "stAsHexEwkb", [Blob], Text, None),
+    // Typed constructors: NULL (not an error) when the input parses but is
+    // another type, as PostGIS does.
+    entry!("ST_PointFromText", "stPointFromText", [Text], OptBlob, None),
+    entry!(
+        "ST_PointFromText",
+        "stPointFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_LineFromText", "stLineFromText", [Text], OptBlob, None),
+    entry!(
+        "ST_LineFromText",
+        "stLineFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_PolyFromText", "stPolyFromText", [Text], OptBlob, None),
+    entry!(
+        "ST_PolyFromText",
+        "stPolyFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MPointFromText",
+        "stMPointFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MPointFromText",
+        "stMPointFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_MLineFromText", "stMLineFromText", [Text], OptBlob, None),
+    entry!(
+        "ST_MLineFromText",
+        "stMLineFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_MPolyFromText", "stMPolyFromText", [Text], OptBlob, None),
+    entry!(
+        "ST_MPolyFromText",
+        "stMPolyFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_PolygonFromText",
+        "stPolyFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_PolygonFromText",
+        "stPolyFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_LineStringFromText",
+        "stLineFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_LineStringFromText",
+        "stLineFromTextSrid",
+        [Text, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_PointFromWKB", "stPointFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_PointFromWKB",
+        "stPointFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_LineFromWKB", "stLineFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_LineFromWKB",
+        "stLineFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_PolyFromWKB",
+        "stPolyFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     // CRS transform.
     entry!(
         "ST_Transform",
@@ -232,6 +364,13 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!(
         "ST_Difference",
         "stDifference",
+        [Blob, Blob],
+        Blob,
+        Some("overlay")
+    ),
+    entry!(
+        "ST_SymmetricDifference",
+        "stSymDifference",
         [Blob, Blob],
         Blob,
         Some("overlay")
@@ -420,6 +559,7 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Intersection", &[2]),
     ("ST_Difference", &[2]),
     ("ST_SymDifference", &[2]),
+    ("ST_SymmetricDifference", &[2]),
     ("ST_Union", &[1, 2]),
     ("ST_Buffer", &[2, 3]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
@@ -483,12 +623,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn export_names_are_unique() {
-        let mut exports: Vec<_> = FUNCTIONS.iter().map(|e| e.export).collect();
-        exports.sort_unstable();
-        let len = exports.len();
-        exports.dedup();
-        assert_eq!(exports.len(), len);
+    fn each_export_implements_one_signature() {
+        // Exports are deliberately shared by alias spellings — `ST_XMin` is
+        // `ST_MinX`'s export, which is why an alias costs no wasm at all. What
+        // must never happen is one export serving two different signatures,
+        // which would mean a copy-paste error in an entry.
+        let mut by_export: Vec<(&str, usize, Kind)> = FUNCTIONS
+            .iter()
+            .map(|e| (e.export, e.args.len(), e.ret))
+            .collect();
+        by_export.sort_unstable_by_key(|(export, arity, _)| (*export, *arity));
+        by_export.dedup();
+        for pair in by_export.windows(2) {
+            assert_ne!(
+                pair[0].0, pair[1].0,
+                "export {} is used for two different signatures",
+                pair[0].0
+            );
+        }
     }
 
     #[test]

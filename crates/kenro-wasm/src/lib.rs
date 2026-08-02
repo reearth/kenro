@@ -10,7 +10,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use kenro::functions::{accessors, io, manifest, predicates, rtree};
+use kenro::functions::{accessors, compat, io, manifest, predicates, rtree};
 use kenro::geom;
 
 /// kenro::Error → JS exception. The `kenro: `-prefixed message is preserved
@@ -179,6 +179,128 @@ pub fn st_as_binary(geom: &[u8]) -> R<Vec<u8>> {
 pub fn st_as_gpb(geom: &[u8]) -> R<Vec<u8>> {
     io::st_as_gpb(geom).map_err(err)
 }
+
+// ---- PostGIS compatibility (functions::compat) ----
+// Alias spellings (ST_XMin …) reuse the exports above: the manifest maps the
+// SQL name, so they add no wasm at all. Only these need code.
+
+#[wasm_bindgen(js_name = stForce2d)]
+pub fn st_force_2d(geom: &[u8]) -> R<Vec<u8>> {
+    compat::st_force_2d(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsEwkt)]
+pub fn st_as_ewkt(geom: &[u8]) -> R<String> {
+    compat::st_as_ewkt(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeomFromEwkt)]
+pub fn st_geom_from_ewkt(text: &str) -> R<Vec<u8>> {
+    compat::st_geom_from_ewkt(text).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsEwkb)]
+pub fn st_as_ewkb(geom: &[u8]) -> R<Vec<u8>> {
+    compat::st_as_ewkb(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAsHexEwkb)]
+pub fn st_as_hex_ewkb(geom: &[u8]) -> R<String> {
+    compat::st_as_hex_ewkb(geom).map_err(err)
+}
+
+macro_rules! typed_ctor {
+    ($fn_text:ident, $export_text:literal, $fn_text_srid:ident, $export_text_srid:literal, $expect:ident) => {
+        #[wasm_bindgen(js_name = $export_text)]
+        pub fn $fn_text(wkt: &str) -> R<Option<Vec<u8>>> {
+            compat::from_text_typed(wkt, None, compat::Expect::$expect).map_err(err)
+        }
+
+        #[wasm_bindgen(js_name = $export_text_srid)]
+        pub fn $fn_text_srid(wkt: &str, srid: i32) -> R<Option<Vec<u8>>> {
+            compat::from_text_typed(wkt, Some(srid), compat::Expect::$expect).map_err(err)
+        }
+    };
+}
+
+typed_ctor!(
+    st_point_from_text,
+    "stPointFromText",
+    st_point_from_text_srid,
+    "stPointFromTextSrid",
+    Point
+);
+typed_ctor!(
+    st_line_from_text,
+    "stLineFromText",
+    st_line_from_text_srid,
+    "stLineFromTextSrid",
+    LineString
+);
+typed_ctor!(
+    st_poly_from_text,
+    "stPolyFromText",
+    st_poly_from_text_srid,
+    "stPolyFromTextSrid",
+    Polygon
+);
+typed_ctor!(
+    st_mpoint_from_text,
+    "stMPointFromText",
+    st_mpoint_from_text_srid,
+    "stMPointFromTextSrid",
+    MultiPoint
+);
+typed_ctor!(
+    st_mline_from_text,
+    "stMLineFromText",
+    st_mline_from_text_srid,
+    "stMLineFromTextSrid",
+    MultiLineString
+);
+typed_ctor!(
+    st_mpoly_from_text,
+    "stMPolyFromText",
+    st_mpoly_from_text_srid,
+    "stMPolyFromTextSrid",
+    MultiPolygon
+);
+
+macro_rules! typed_ctor_wkb {
+    ($fn_wkb:ident, $export_wkb:literal, $fn_wkb_srid:ident, $export_wkb_srid:literal, $expect:ident) => {
+        #[wasm_bindgen(js_name = $export_wkb)]
+        pub fn $fn_wkb(wkb: &[u8]) -> R<Option<Vec<u8>>> {
+            compat::from_wkb_typed(wkb, None, compat::Expect::$expect).map_err(err)
+        }
+
+        #[wasm_bindgen(js_name = $export_wkb_srid)]
+        pub fn $fn_wkb_srid(wkb: &[u8], srid: i32) -> R<Option<Vec<u8>>> {
+            compat::from_wkb_typed(wkb, Some(srid), compat::Expect::$expect).map_err(err)
+        }
+    };
+}
+
+typed_ctor_wkb!(
+    st_point_from_wkb,
+    "stPointFromWkb",
+    st_point_from_wkb_srid,
+    "stPointFromWkbSrid",
+    Point
+);
+typed_ctor_wkb!(
+    st_line_from_wkb,
+    "stLineFromWkb",
+    st_line_from_wkb_srid,
+    "stLineFromWkbSrid",
+    LineString
+);
+typed_ctor_wkb!(
+    st_poly_from_wkb,
+    "stPolyFromWkb",
+    st_poly_from_wkb_srid,
+    "stPolyFromWkbSrid",
+    Polygon
+);
 
 // ---- SRID ----
 
@@ -877,6 +999,29 @@ mod tests {
             "stAsMvtGeomExtent",
             "stAsMvtGeomBuffer",
             "stAsMvtGeomClip",
+            "stForce2d",
+            "stAsEwkt",
+            "stGeomFromEwkt",
+            "stAsEwkb",
+            "stAsHexEwkb",
+            "stPointFromText",
+            "stPointFromTextSrid",
+            "stLineFromText",
+            "stLineFromTextSrid",
+            "stPolyFromText",
+            "stPolyFromTextSrid",
+            "stMPointFromText",
+            "stMPointFromTextSrid",
+            "stMLineFromText",
+            "stMLineFromTextSrid",
+            "stMPolyFromText",
+            "stMPolyFromTextSrid",
+            "stPointFromWkb",
+            "stPointFromWkbSrid",
+            "stLineFromWkb",
+            "stLineFromWkbSrid",
+            "stPolyFromWkb",
+            "stPolyFromWkbSrid",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

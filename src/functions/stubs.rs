@@ -68,6 +68,10 @@ pub const OVERLAY_OFF: &[Stub] = &[
         hint: "kenro was built without the `overlay` cargo feature.",
     },
     Stub {
+        name: "ST_SymmetricDifference",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
         name: "ST_Union",
         hint: "kenro was built without the `overlay` cargo feature.",
     },

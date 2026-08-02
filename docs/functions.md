@@ -117,6 +117,32 @@ GeometryCollection values; for areal dissolve use the ST_Union aggregate,
 otherwise collect rows on the application side.
 ```
 
+## PostGIS spellings and typed constructors
+
+PostGIS reaches several of these functions by another name, and SQL written
+against it should keep working. Aliases share the implementation — and the
+wasm export — so they cost a registration and nothing else.
+
+| Alias | Same as | Note |
+|---|---|---|
+| `ST_XMin` / `ST_XMax` / `ST_YMin` / `ST_YMax` | `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | kenro's primary names are the GeoPackage trigger spellings (Annex F.3), required verbatim for index maintenance |
+| `ST_GeometryFromText(wkt [, srid])` | `ST_GeomFromText` | |
+| `ST_GeomFromEWKB(bytes)` | `ST_GeomFromWKB` | kenro's WKB reader already accepts EWKB |
+| `ST_SymmetricDifference(a, b)` | `ST_SymDifference` | `overlay` feature |
+| `ST_Area2D` / `ST_Perimeter2D` / `ST_Length2D` | `ST_Area` / `ST_Perimeter` / `ST_Length` | kenro is 2D throughout, so these are the same function |
+
+New in this group:
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_Force2D(geom)` | geometry | ✅ | ✅ | ❌ | Drops Z/M. kenro decodes 3D input but refuses to *encode* it rather than silently writing 2D — this is the explicit opt-in, and the only way a 3D GeoPackage column reaches `ST_AsText`/`ST_AsGeoJSON` |
+| `ST_AsEWKT(geom)` | TEXT | ✅ | ❌ | ✅ | `SRID=n;` prefix, omitted when the SRID is 0 (PostGIS behavior, verified live) |
+| `ST_GeomFromEWKT(text)` | geometry | ✅ | ❌ | ✅ | Accepts the prefix or plain WKT |
+| `ST_AsEWKB(geom)` | BLOB | ✅ | ❌ | ✅ | ISO WKB with PostGIS's `0x20000000` SRID flag; plain WKB when the SRID is 0 |
+| `ST_AsHexEWKB(geom)` | TEXT | ✅ | ❌ | ✅ | Upper-case hex of the above; byte-identical to PostGIS 3.5 (golden-tested) |
+| `ST_PointFromText` / `ST_LineFromText` / `ST_LineStringFromText` / `ST_PolyFromText` / `ST_PolygonFromText` / `ST_MPointFromText` / `ST_MLineFromText` / `ST_MPolyFromText` `(wkt [, srid])` | geometry / NULL | ✅ | ⚠️ partial | ✅ | Parse, then **NULL when the geometry is another type** — an error would be the intuitive choice, but PostGIS returns NULL and so does kenro |
+| `ST_PointFromWKB` / `ST_LineFromWKB` / `ST_PolyFromWKB` `(bytes [, srid])` | geometry / NULL | ✅ | ❌ | ✅ | Same contract over WKB/EWKB/GeoPackage input |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.

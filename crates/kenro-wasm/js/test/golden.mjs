@@ -301,6 +301,10 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_Area(ST_Difference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
     check: (v) => Math.abs(Number(v) - 75) < 1e-9,
   },
+  "ST_SymmetricDifference/2": {
+    sql: "SELECT ST_Area(ST_SymmetricDifference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
+    check: (v) => Math.abs(Number(v) - 150) < 1e-9,
+  },
   "ST_SymDifference/2": {
     sql: "SELECT ST_Area(ST_SymDifference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))",
     check: (v) => Math.abs(Number(v) - 150) < 1e-9,
@@ -507,6 +511,158 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_AsText(ST_Simplify(ST_GeomFromText('LINESTRING(0 0,1 0.01,2 0)'), 0.1))",
     check: (v) => v === "LINESTRING(0 0,2 0)",
   },
+
+  // --- PostGIS compatibility (functions::compat) ---
+  "ST_XMin/1": {
+    sql: "SELECT ST_XMin(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_XMax/1": {
+    sql: "SELECT ST_XMax(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_YMin/1": {
+    sql: "SELECT ST_YMin(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_YMax/1": {
+    sql: "SELECT ST_YMax(ST_GeomFromText('LINESTRING(1 2,3 4)'))",
+    check: (v) => Number(v) === 4,
+  },
+  "ST_Area2D/1": {
+    sql: "SELECT ST_Area2D(ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))'))",
+    check: (v) => Number(v) === 4,
+  },
+  "ST_Perimeter2D/1": {
+    sql: "SELECT ST_Perimeter2D(ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))'))",
+    check: (v) => Number(v) === 8,
+  },
+  "ST_Length2D/1": {
+    sql: "SELECT ST_Length2D(ST_GeomFromText('LINESTRING(0 0,3 4)'))",
+    check: (v) => Number(v) === 5,
+  },
+  "ST_GeometryFromText/1": {
+    sql: "SELECT ST_AsText(ST_GeometryFromText('POINT(1 2)'))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_GeometryFromText/2": {
+    sql: "SELECT ST_SRID(ST_GeometryFromText('POINT(1 2)', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_GeomFromEWKB/1": {
+    sql: "SELECT ST_AsText(ST_GeomFromEWKB(ST_AsEWKB(ST_GeomFromText('POINT(1 2)', 4326))))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_Force2D/1": {
+    sql: "SELECT ST_AsText(ST_Force2D(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_AsEWKT/1": {
+    sql: "SELECT ST_AsEWKT(ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v === "SRID=4326;POINT(1 2)",
+  },
+  "ST_GeomFromEWKT/1": {
+    sql: "SELECT ST_AsEWKT(ST_GeomFromEWKT('SRID=3857;POINT(1 2)'))",
+    check: (v) => v === "SRID=3857;POINT(1 2)",
+  },
+  "ST_AsEWKB/1": {
+    sql: "SELECT ST_SRID(ST_GeomFromEWKB(ST_AsEWKB(ST_GeomFromText('POINT(1 2)', 4326))))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_AsHexEWKB/1": {
+    // Byte-identical to PostGIS 3.5's output for the same input.
+    sql: "SELECT ST_AsHexEWKB(ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v === "0101000020E6100000000000000000F03F0000000000000040",
+  },
+  "ST_PointFromText/1": {
+    sql: "SELECT ST_AsText(ST_PointFromText('POINT(1 2)'))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_PointFromText/2": {
+    sql: "SELECT ST_SRID(ST_PointFromText('POINT(1 2)', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_LineFromText/1": {
+    sql: "SELECT ST_AsText(ST_LineFromText('LINESTRING(0 0,1 1)'))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_LineFromText/2": {
+    sql: "SELECT ST_SRID(ST_LineFromText('LINESTRING(0 0,1 1)', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_LineStringFromText/1": {
+    sql: "SELECT ST_AsText(ST_LineStringFromText('LINESTRING(0 0,1 1)'))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_LineStringFromText/2": {
+    sql: "SELECT ST_SRID(ST_LineStringFromText('LINESTRING(0 0,1 1)', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_PolyFromText/1": {
+    sql: "SELECT ST_AsText(ST_PolyFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+    check: (v) => v === "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+  },
+  "ST_PolyFromText/2": {
+    sql: "SELECT ST_SRID(ST_PolyFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_PolygonFromText/1": {
+    sql: "SELECT ST_AsText(ST_PolygonFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))",
+    check: (v) => v === "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+  },
+  "ST_PolygonFromText/2": {
+    sql: "SELECT ST_SRID(ST_PolygonFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MPointFromText/1": {
+    sql: "SELECT ST_AsText(ST_MPointFromText('MULTIPOINT((1 2),(3 4))'))",
+    check: (v) => v === "MULTIPOINT((1 2),(3 4))",
+  },
+  "ST_MPointFromText/2": {
+    sql: "SELECT ST_SRID(ST_MPointFromText('MULTIPOINT((1 2),(3 4))', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MLineFromText/1": {
+    sql: "SELECT ST_AsText(ST_MLineFromText('MULTILINESTRING((0 0,1 1))'))",
+    check: (v) => v === "MULTILINESTRING((0 0,1 1))",
+  },
+  "ST_MLineFromText/2": {
+    sql: "SELECT ST_SRID(ST_MLineFromText('MULTILINESTRING((0 0,1 1))', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MPolyFromText/1": {
+    sql: "SELECT ST_AsText(ST_MPolyFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))",
+    check: (v) => v === "MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))",
+  },
+  "ST_MPolyFromText/2": {
+    sql: "SELECT ST_SRID(ST_MPolyFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))', 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_PointFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_PointFromWKB(ST_AsBinary(ST_GeomFromText('POINT(1 2)'))))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_PointFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_PointFromWKB(ST_AsBinary(ST_GeomFromText('POINT(1 2)')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_LineFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_LineFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)'))))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_LineFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_LineFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_PolyFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_PolyFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))))",
+    check: (v) => v === "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+  },
+  "ST_PolyFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_PolyFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+
 };
 
 /**
