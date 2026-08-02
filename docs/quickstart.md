@@ -61,8 +61,9 @@ Notes that apply everywhere:
 - Renamed copies load fine (e.g. `libkenro.so`): the binary exports
   `sqlite3_extension_init`, `sqlite3_kenroext_init` and
   `sqlite3_kenro_init`.
-- The prebuilt extension ships the **full** function set including
-  overlay/buffer/MVT (`kenro-ext`'s default features).
+- The prebuilt extension ships **every** function: `kenro-ext`'s default
+  features already include the overlay engine and MVT, so nothing registers
+  as a stub.
 
 ## Rust (rusqlite)
 
@@ -71,7 +72,9 @@ No extension binary needed — kenro registers directly on the connection:
 ```toml
 [dependencies]
 kenro = { version = "0.1", features = ["rusqlite"] }
-# add "full" for overlay/buffer/MVT: features = ["rusqlite", "full"]
+# MVT, transform, H3 and GeoJSON are already in the default set; "full" adds
+# the overlay engine on top (ST_Intersection/Union/Difference/SymDifference/
+# ST_Buffer/ST_MakeValid): features = ["rusqlite", "full"]
 ```
 
 ```rust

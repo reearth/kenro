@@ -12,7 +12,9 @@ publish = false # until kenro itself is on crates.io
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# Lite by default (browser size); `full` adds overlay/buffer/MVT.
+# Lite by default (browser size) — transform, H3, GeoJSON and MVT are all in
+# it; `full` adds only the overlay engine (ST_Buffer/ST_MakeValid/…), whose
+# i_overlay mesh is the single largest contributor to wasm size.
 default = ["transform", "h3", "geojson", "mvt"]
 full = ["transform", "h3", "geojson", "mvt", "overlay"]
 transform = ["kenro/transform"]

@@ -40,7 +40,8 @@ exclude = [".github/"]
 [features]
 # The default set covers most use cases (I/O, predicates, GeoPackage
 # triggers, measures/processing, transform, H3, GeoJSON) while keeping the
-# build small; `full` adds the overlay engine and MVT on top.
+# build small; `full` adds the overlay engine on top (MVT is already in the
+# default set — see the `mvt` feature's note below).
 default = ["transform", "h3", "geojson", "mvt"]
 full = ["transform", "h3", "geojson", "mvt", "overlay"]
 rusqlite = ["dep:rusqlite"]
