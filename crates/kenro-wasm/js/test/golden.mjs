@@ -1078,6 +1078,37 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 1,
   },
 
+
+  // --- 3D pass-through (functions::threed) ---
+  // A 3D geometry cannot be built from WKT (kenro's reader is 2D) and cannot
+  // pass through ST_GeomFromWKB either (that re-encodes, and the encoders
+  // refuse 3D). A raw WKB blob is exactly how a GDAL-written GeoPackage
+  // column reaches these functions, so that is what the smoke uses.
+  "ST_HasZ/1": {
+    sql: "SELECT ST_HasZ(x'01e9030000000000000000f03f00000000000000400000000000000840')",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_HasM/1": {
+    sql: "SELECT ST_HasM(x'01e9030000000000000000f03f00000000000000400000000000000840')",
+    check: (v) => Number(v) === 0,
+  },
+  "ST_Z/1": {
+    sql: "SELECT ST_Z(x'01e9030000000000000000f03f00000000000000400000000000000840')",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_M/1": {
+    sql: "SELECT ST_M(x'01e9030000000000000000f03f00000000000000400000000000000840') IS NULL",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_ZMin/1": {
+    sql: "SELECT ST_ZMin(x'01ea03000002000000000000000000000000000000000000000000000000002440000000000000f03f000000000000f03f0000000000003e40')",
+    check: (v) => Number(v) === 10,
+  },
+  "ST_ZMax/1": {
+    sql: "SELECT ST_ZMax(x'01ea03000002000000000000000000000000000000000000000000000000002440000000000000f03f000000000000f03f0000000000003e40')",
+    check: (v) => Number(v) === 30,
+  },
+
 };
 
 /**

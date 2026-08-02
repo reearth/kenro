@@ -347,6 +347,14 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Dimension", "stDimension", [Blob], Int, None),
     entry!("ST_CoordDim", "stCoordDim", [Blob], Int, None),
     entry!("ST_NDims", "stCoordDim", [Blob], Int, None),
+    // 3D pass-through (functions::threed): kenro computes in 2D but reads
+    // and reports the ordinates the stored geometry actually has.
+    entry!("ST_HasZ", "stHasZ", [Blob], Bool, None),
+    entry!("ST_HasM", "stHasM", [Blob], Bool, None),
+    entry!("ST_Z", "stZ", [Blob], OptReal, None),
+    entry!("ST_M", "stM", [Blob], OptReal, None),
+    entry!("ST_ZMin", "stZMin", [Blob], OptReal, None),
+    entry!("ST_ZMax", "stZMax", [Blob], OptReal, None),
     entry!("ST_IsValidReason", "stIsValidReason", [Blob], Text, None),
     // Ring orientation.
     entry!("ST_ForcePolygonCW", "stForcePolygonCw", [Blob], Blob, None),

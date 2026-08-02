@@ -53,7 +53,7 @@ use kenro::functions::hull;
 use kenro::functions::overlay;
 use kenro::functions::{
     accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, misc,
-    predicates, processing, rtree,
+    predicates, processing, rtree, threed,
 };
 
 // ---------------------------------------------------------------- status
@@ -1736,6 +1736,38 @@ pub extern "C" fn k_stMPolyFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i
         Some(srid),
         compat::Expect::MultiPolygon,
     ))
+}
+
+// ---- 3D pass-through ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stHasZ(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(threed::st_has_z(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stHasM(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(threed::st_has_m(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stZ(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_real(threed::st_z(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stM(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_real(threed::st_m(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stZMin(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_real(threed::st_zmin(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stZMax(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_real(threed::st_zmax(s(geom_p, geom_l)))
 }
 
 // =============================================================== manifest

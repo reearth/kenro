@@ -1233,3 +1233,109 @@ fn the_tail_is_null_strict() {
         assert!(v.is_none(), "{sql} was not NULL-strict");
     }
 }
+
+// ---- 3D pass-through (functions::threed) ----
+
+/// ISO WKB for a 3D geometry. kenro's WKT reader is 2D and `ST_GeomFromWKB`
+/// re-encodes (so it refuses 3D), which leaves a raw blob — exactly how a
+/// GDAL- or QGIS-written GeoPackage column arrives.
+fn wkb_point_z() -> Vec<u8> {
+    let mut v = vec![0x01];
+    v.extend_from_slice(&1001u32.to_le_bytes());
+    for value in [1.0f64, 2.0, 3.0] {
+        v.extend_from_slice(&value.to_le_bytes());
+    }
+    v
+}
+
+#[test]
+fn three_d_input_is_reported_and_readable() {
+    let conn = conn();
+    let z = wkb_point_z();
+    // PostGIS 3.5 on POINT Z(1 2 3): HasZ true, NDims/CoordDim 3, Z 3.
+    assert_eq!(
+        conn.query_row("SELECT ST_HasZ(?1)", [&z], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        conn.query_row("SELECT ST_HasM(?1)", [&z], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    for func in ["ST_NDims", "ST_CoordDim"] {
+        assert_eq!(
+            conn.query_row(&format!("SELECT {func}(?1)"), [&z], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            3,
+            "{func}"
+        );
+    }
+    assert_eq!(
+        conn.query_row("SELECT ST_Z(?1)", [&z], |r| r.get::<_, f64>(0))
+            .unwrap(),
+        3.0
+    );
+    // A 2D geometry: NDims 2, ST_Z NULL, but ST_ZMax 0 — PostGIS's split,
+    // verified live.
+    assert_eq!(
+        int(&conn, "SELECT ST_NDims(ST_GeomFromText('POINT(1 2)'))"),
+        Some(2)
+    );
+    assert_eq!(
+        conn.query_row("SELECT ST_Z(ST_GeomFromText('POINT(1 2)'))", [], |r| r
+            .get::<_, Option<
+            f64,
+        >>(
+            0
+        ))
+        .unwrap(),
+        None
+    );
+    assert_eq!(
+        real(
+            &conn,
+            "SELECT ST_ZMax(ST_GeomFromText('LINESTRING(0 0,1 1)'))"
+        ),
+        0.0
+    );
+}
+
+#[test]
+fn a_3d_column_survives_storage_and_still_indexes() {
+    let conn = conn();
+    conn.execute_batch("CREATE TABLE b (g BLOB)").unwrap();
+    conn.execute(
+        "INSERT INTO b VALUES (ST_SetSRID(?1, 6697))",
+        [&wkb_point_z()],
+    )
+    .unwrap();
+
+    // Stored, relabelled — and still 3D with its Z intact.
+    let (srid, dims, z): (i64, i64, f64) = conn
+        .query_row("SELECT ST_SRID(g), ST_NDims(g), ST_Z(g) FROM b", [], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })
+        .unwrap();
+    assert_eq!((srid, dims, z), (6697, 3, 3.0));
+
+    // The planar half keeps working on it: R-tree columns and a predicate.
+    let (minx, hit): (f64, i64) = conn
+        .query_row(
+            "SELECT ST_MinX(g), ST_Intersects(g, ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))')) FROM b",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((minx, hit), (1.0, 1));
+
+    // And an encoder still refuses to flatten it silently.
+    assert!(
+        conn.query_row("SELECT ST_AsText(g) FROM b", [], |r| r.get::<_, String>(0))
+            .is_err()
+    );
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_Force2D(g)) FROM b").as_deref(),
+        Some("POINT(1 2)")
+    );
+}

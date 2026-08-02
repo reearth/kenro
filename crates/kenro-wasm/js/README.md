@@ -6,11 +6,11 @@ SQLite host: the official [@sqlite.org/sqlite-wasm] build, [sql.js], and
 [wa-sqlite]. On hosts whose SQLite takes no UDFs at all — **Cloudflare D1
 and Durable Objects** — the same functions run standalone, from JS.
 
-kenro is a spatial SQL engine in pure Rust (~187 functions: the DE-9IM
+kenro is a spatial SQL engine in pure Rust (~193 functions: the DE-9IM
 predicate family, overlay/repair/buffer, CRS transform, H3, GeoJSON, MVT
 vector tiles, spatial aggregates), golden-tested against PostGIS. This
 package is its wasm build plus one small adapter per host. The bundled
-wasm is the **full** feature tier (~588 KB gzipped, the EPSG registry
+wasm is the **full** feature tier (~590 KB gzipped, the EPSG registry
 included); smaller tiers are
 attached to the [GitHub Releases].
 

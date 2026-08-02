@@ -288,6 +288,30 @@ written. Aliases share their original's implementation and wasm export.
 | `ST_MemSize(geom)` | INTEGER | ✅ | ❌ | ✅ | ⚠️ the length of the GeoPackage blob kenro would store — the number that means something for a SQLite column, not PostGIS's in-memory size |
 | `ST_Normalize(geom)` | geometry | ✅ | ❌ | ❌ | Rings oriented, parts ordered by bounding box. ⚠️ PostGIS orders by its own internal comparison, so the two agree on orientation but not always on part order |
 
+## 3D pass-through
+
+kenro computes in 2D — `geo_types` has no room for Z, so decoding drops it
+and every encoder refuses a geometry that had one rather than silently
+writing 2D. These functions let a 3D column be *stored, indexed, filtered and
+read* anyway, which is what a CityGML-style workflow needs even when the
+analysis itself is planar.
+
+The route in is the practical one: a GeoPackage written by GDAL or QGIS.
+`ST_GeomFromGPB` and `ST_SetSRID` copy the WKB payload byte-for-byte, so the
+Z survives; `ST_GeomFromWKB` does **not**, because it re-encodes.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_HasZ(geom)` / `ST_HasM(geom)` | INTEGER | ✅ | ✅ | ✅ | Read from the encoding, not from kenro's (always 2D) decoded value |
+| `ST_NDims(geom)` / `ST_CoordDim(geom)` | INTEGER | ✅ | ✅ | ✅ | 2, 3 or 4 — honestly. These used to answer a flat 2 |
+| `ST_Z(point)` / `ST_M(point)` | REAL / NULL | ✅ | ✅ | ✅ | NULL when the vertex has no such ordinate |
+| `ST_ZMin(geom)` / `ST_ZMax(geom)` | REAL / NULL | ✅ | ❌ | ✅ | ⚠️ a 2D geometry answers **0**, not NULL — PostGIS derives these from a bbox whose Z slot is zero, and `WHERE ST_ZMax(g) > 100` should behave the same on both. NULL only for an empty geometry |
+
+Everything else stays planar on 3D input: the R-tree columns, every
+predicate, every measure. What is *not* here is 3D geometry — no
+`ST_3DDistance`, no volumes, no `POLYHEDRALSURFACE` — which would need a
+geometry model kenro does not have.
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
@@ -367,7 +391,9 @@ The cross-cutting divergences:
   blob works, and `ST_AsText` prints `POINT EMPTY` like PostGIS.
 - **3D/M geometries** are accepted as *input* to predicates and R-tree
   functions (2D result, same as PostGIS); output and constructor functions
-  raise an error rather than silently dropping Z/M.
+  raise an error rather than silently dropping Z/M. The ordinates are
+  readable and reportable — see [3D pass-through](#3d-pass-through) — and
+  `ST_Force2D` is the explicit way to flatten.
 - **GeometryCollection** operands error in all predicates (PostGIS accepts
   them in `ST_Intersects` only).
 - **SRID leniency**: a geometry with a known SRID can meet one with unknown

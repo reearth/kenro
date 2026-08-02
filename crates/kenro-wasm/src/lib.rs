@@ -11,7 +11,7 @@
 use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
-    accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree,
+    accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree, threed,
 };
 use kenro::geom;
 
@@ -459,7 +459,37 @@ pub fn st_dimension(geom: &[u8]) -> R<i32> {
 
 #[wasm_bindgen(js_name = stCoordDim)]
 pub fn st_coord_dim(geom: &[u8]) -> R<i32> {
-    accessors::st_coord_dim(geom).map(|v| v as i32).map_err(err)
+    threed::st_coord_dim(geom).map(|v| v as i32).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stHasZ)]
+pub fn st_has_z(geom: &[u8]) -> R<bool> {
+    threed::st_has_z(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stHasM)]
+pub fn st_has_m(geom: &[u8]) -> R<bool> {
+    threed::st_has_m(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stZ)]
+pub fn st_z(geom: &[u8]) -> R<Option<f64>> {
+    threed::st_z(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stM)]
+pub fn st_m(geom: &[u8]) -> R<Option<f64>> {
+    threed::st_m(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stZMin)]
+pub fn st_zmin(geom: &[u8]) -> R<Option<f64>> {
+    threed::st_zmin(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stZMax)]
+pub fn st_zmax(geom: &[u8]) -> R<Option<f64>> {
+    threed::st_zmax(geom).map_err(err)
 }
 
 #[wasm_bindgen(js_name = stIsValidReason)]
@@ -1559,6 +1589,12 @@ mod tests {
             "stSummary",
             "stMemSize",
             "stNormalize",
+            "stHasZ",
+            "stHasM",
+            "stZ",
+            "stM",
+            "stZMin",
+            "stZMax",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

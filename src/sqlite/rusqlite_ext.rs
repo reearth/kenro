@@ -489,6 +489,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_extra(conn)?;
     register_hull(conn)?;
     register_misc(conn)?;
+    register_threed(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -1096,8 +1097,13 @@ fn register_geodesic_and_linear(conn: &Connection) -> rusqlite::Result<()> {
             "ST_Dimension",
             accessors::st_dimension as fn(&[u8]) -> crate::error::Result<i64>,
         ),
-        ("ST_CoordDim", accessors::st_coord_dim),
-        ("ST_NDims", accessors::st_coord_dim),
+        // Dimensionality comes from the encoding, not from the decoded
+        // (always-2D) value — see functions::threed.
+        (
+            "ST_CoordDim",
+            crate::functions::threed::st_coord_dim as fn(&[u8]) -> crate::error::Result<i64>,
+        ),
+        ("ST_NDims", crate::functions::threed::st_coord_dim),
     ] {
         conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
             let Some(b) = blob_or_null(ctx, 0, name)? else {
@@ -1586,6 +1592,19 @@ fn register_misc(conn: &Connection) -> rusqlite::Result<()> {
             .map_err(sql_err)
     })?;
     register_geom_to_blob(conn, "ST_Normalize", misc::st_normalize)?;
+    Ok(())
+}
+
+/// 3D pass-through (see `functions::threed`).
+fn register_threed(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::threed;
+
+    register_predicate_1(conn, "ST_HasZ", threed::st_has_z)?;
+    register_predicate_1(conn, "ST_HasM", threed::st_has_m)?;
+    register_rtree_minmax(conn, "ST_Z", threed::st_z)?;
+    register_rtree_minmax(conn, "ST_M", threed::st_m)?;
+    register_rtree_minmax(conn, "ST_ZMin", threed::st_zmin)?;
+    register_rtree_minmax(conn, "ST_ZMax", threed::st_zmax)?;
     Ok(())
 }
 
