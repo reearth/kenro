@@ -663,6 +663,89 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 4326,
   },
 
+
+  // --- structural accessors and editing (functions::edit) ---
+  "ST_ExteriorRing/1": {
+    sql: "SELECT ST_AsText(ST_ExteriorRing(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))')))",
+    check: (v) => v === "LINESTRING(0 0,4 0,4 4,0 4,0 0)",
+  },
+  "ST_InteriorRingN/2": {
+    sql: "SELECT ST_AsText(ST_InteriorRingN(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))'), 1))",
+    check: (v) => v === "LINESTRING(1 1,2 1,2 2,1 2,1 1)",
+  },
+  "ST_NumInteriorRings/1": {
+    sql: "SELECT ST_NumInteriorRings(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_NumInteriorRing/1": {
+    sql: "SELECT ST_NumInteriorRing(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_NRings/1": {
+    sql: "SELECT ST_NRings(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))'))",
+    check: (v) => Number(v) === 2,
+  },
+  "ST_Boundary/1": {
+    sql: "SELECT ST_AsText(ST_Boundary(ST_GeomFromText('LINESTRING(0 0,1 1,2 0)')))",
+    check: (v) => v === "MULTIPOINT((0 0),(2 0))",
+  },
+  "ST_IsClosed/1": {
+    sql: "SELECT ST_IsClosed(ST_GeomFromText('LINESTRING(0 0,1 1,1 0,0 0)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_IsRing/1": {
+    sql: "SELECT ST_IsRing(ST_GeomFromText('LINESTRING(0 0,1 1,1 0,0 0)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_AddPoint/2": {
+    sql: "SELECT ST_AsText(ST_AddPoint(ST_GeomFromText('LINESTRING(0 0,1 1)'), ST_GeomFromText('POINT(2 2)')))",
+    check: (v) => v === "LINESTRING(0 0,1 1,2 2)",
+  },
+  "ST_AddPoint/3": {
+    sql: "SELECT ST_AsText(ST_AddPoint(ST_GeomFromText('LINESTRING(0 0,1 1)'), ST_GeomFromText('POINT(9 9)'), 0))",
+    check: (v) => v === "LINESTRING(9 9,0 0,1 1)",
+  },
+  "ST_SetPoint/3": {
+    sql: "SELECT ST_AsText(ST_SetPoint(ST_GeomFromText('LINESTRING(0 0,1 1)'), 0, ST_GeomFromText('POINT(9 9)')))",
+    check: (v) => v === "LINESTRING(9 9,1 1)",
+  },
+  "ST_RemovePoint/2": {
+    sql: "SELECT ST_AsText(ST_RemovePoint(ST_GeomFromText('LINESTRING(0 0,1 1,2 2)'), 0))",
+    check: (v) => v === "LINESTRING(1 1,2 2)",
+  },
+  "ST_MakeLine/2": {
+    sql: "SELECT ST_AsText(ST_MakeLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(1 1)')))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_MakePolygon/1": {
+    sql: "SELECT ST_AsText(ST_MakePolygon(ST_GeomFromText('LINESTRING(0 0,1 0,1 1,0 0)')))",
+    check: (v) => v === "POLYGON((0 0,1 0,1 1,0 0))",
+  },
+  "ST_Multi/1": {
+    sql: "SELECT ST_AsText(ST_Multi(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => v === "MULTIPOINT((1 2))",
+  },
+  "ST_SnapToGrid/2": {
+    sql: "SELECT ST_AsText(ST_SnapToGrid(ST_GeomFromText('POINT(1.23 4.57)'), 0.5))",
+    check: (v) => v === "POINT(1 4.5)",
+  },
+  "ST_SnapToGrid/3": {
+    sql: "SELECT ST_AsText(ST_SnapToGrid(ST_GeomFromText('POINT(1.23 4.57)'), 0.5, 1.0))",
+    check: (v) => v === "POINT(1 5)",
+  },
+  "ST_FlipCoordinates/1": {
+    sql: "SELECT ST_AsText(ST_FlipCoordinates(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => v === "POINT(2 1)",
+  },
+  "ST_ShiftLongitude/1": {
+    sql: "SELECT ST_AsText(ST_ShiftLongitude(ST_GeomFromText('POINT(-10 5)')))",
+    check: (v) => v === "POINT(350 5)",
+  },
+  "ST_Expand/2": {
+    sql: "SELECT ST_AsText(ST_Expand(ST_GeomFromText('POINT(1 1)'), 2))",
+    check: (v) => v === "POLYGON((-1 -1,-1 3,3 3,3 -1,-1 -1))",
+  },
+
 };
 
 /**

@@ -265,3 +265,235 @@ fn compat_functions_are_null_strict_like_everything_else() {
         assert!(v.is_none(), "{sql} was not NULL-strict");
     }
 }
+
+// ---- Structural accessors and editing (functions::edit) ----
+
+fn int(conn: &Connection, sql: &str) -> Option<i64> {
+    conn.query_row(sql, [], |r| r.get::<_, Option<i64>>(0))
+        .unwrap()
+}
+
+#[test]
+fn ring_accessors_use_postgis_indexing_and_null_rules() {
+    let conn = conn();
+    let holed = "ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))')";
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_ExteriorRing({holed}))")
+        )
+        .as_deref(),
+        Some("LINESTRING(0 0,4 0,4 4,0 4,0 0)")
+    );
+    // Rings are 1-based; out of range is NULL, not an error.
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_InteriorRingN({holed}, 1))")
+        )
+        .as_deref(),
+        Some("LINESTRING(1 1,2 1,2 2,1 2,1 1)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_InteriorRingN({holed}, 2))")
+        ),
+        None
+    );
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_NumInteriorRings({holed})")),
+        Some(1)
+    );
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_NumInteriorRing({holed})")),
+        Some(1)
+    );
+    assert_eq!(int(&conn, &format!("SELECT ST_NRings({holed})")), Some(2));
+    // Wrong type → NULL (PostGIS 3.5, verified live).
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_NumInteriorRings(ST_GeomFromText('POINT(0 0)'))"
+        ),
+        None
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_ExteriorRing(ST_GeomFromText('LINESTRING(0 0,1 1)')))"
+        ),
+        None
+    );
+}
+
+#[test]
+fn boundary_matches_postgis_including_the_empty_cases() {
+    let conn = conn();
+    for (input, expected) in [
+        (
+            "POLYGON((0 0,4 0,4 4,0 4,0 0))",
+            "LINESTRING(0 0,4 0,4 4,0 4,0 0)",
+        ),
+        (
+            "POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))",
+            "MULTILINESTRING((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))",
+        ),
+        ("LINESTRING(0 0,1 1,2 0)", "MULTIPOINT((0 0),(2 0))"),
+        ("LINESTRING(0 0,1 1,1 0,0 0)", "MULTIPOINT EMPTY"),
+        ("POINT(1 1)", "POINT EMPTY"),
+    ] {
+        assert_eq!(
+            text(
+                &conn,
+                &format!("SELECT ST_AsText(ST_Boundary(ST_GeomFromText('{input}')))")
+            )
+            .as_deref(),
+            Some(expected),
+            "ST_Boundary({input})"
+        );
+    }
+}
+
+#[test]
+fn is_ring_raises_on_non_linear_input_like_postgis() {
+    let conn = conn();
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_IsRing(ST_GeomFromText('LINESTRING(0 0,1 1,1 0,0 0)'))"
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_IsClosed(ST_GeomFromText('LINESTRING(0 0,1 1)'))"
+        ),
+        Some(0)
+    );
+    // The one function in this group that errors rather than returning NULL.
+    let err = conn
+        .query_row("SELECT ST_IsRing(ST_GeomFromText('POINT(0 0)'))", [], |r| {
+            r.get::<_, Option<i64>>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("linear feature"), "{err}");
+}
+
+#[test]
+fn vertex_surgery_through_sql() {
+    let conn = conn();
+    let line = "ST_GeomFromText('LINESTRING(0 0,1 1)')";
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_AddPoint({line}, ST_GeomFromText('POINT(2 2)')))")
+        )
+        .as_deref(),
+        Some("LINESTRING(0 0,1 1,2 2)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_AddPoint({line}, ST_GeomFromText('POINT(9 9)'), 0))")
+        )
+        .as_deref(),
+        Some("LINESTRING(9 9,0 0,1 1)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_AsText(ST_SetPoint({line}, 0, ST_GeomFromText('POINT(9 9)')))")
+        )
+        .as_deref(),
+        Some("LINESTRING(9 9,1 1)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_RemovePoint(ST_GeomFromText('LINESTRING(0 0,1 1,2 2)'), 0))"
+        )
+        .as_deref(),
+        Some("LINESTRING(1 1,2 2)")
+    );
+}
+
+#[test]
+fn constructors_and_coordinate_ops_through_sql() {
+    let conn = conn();
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_MakeLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(1 1)')))"
+        )
+        .as_deref(),
+        Some("LINESTRING(0 0,1 1)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_MakePolygon(ST_GeomFromText('LINESTRING(0 0,1 0,1 1,0 0)')))"
+        )
+        .as_deref(),
+        Some("POLYGON((0 0,1 0,1 1,0 0))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Multi(ST_GeomFromText('POINT(1 2)')))"
+        )
+        .as_deref(),
+        Some("MULTIPOINT((1 2))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_SnapToGrid(ST_GeomFromText('POINT(1.23 4.57)'), 0.5))"
+        )
+        .as_deref(),
+        Some("POINT(1 4.5)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_FlipCoordinates(ST_GeomFromText('POINT(1 2)')))"
+        )
+        .as_deref(),
+        Some("POINT(2 1)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Expand(ST_GeomFromText('POINT(1 1)'), 2))"
+        )
+        .as_deref(),
+        Some("POLYGON((-1 -1,-1 3,3 3,3 -1,-1 -1))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_ShiftLongitude(ST_GeomFromText('POINT(-10 5)')))"
+        )
+        .as_deref(),
+        Some("POINT(350 5)")
+    );
+}
+
+#[test]
+fn edit_functions_are_null_strict() {
+    let conn = conn();
+    for sql in [
+        "SELECT ST_ExteriorRing(NULL)",
+        "SELECT ST_InteriorRingN(NULL, 1)",
+        "SELECT ST_Boundary(NULL)",
+        "SELECT ST_IsClosed(NULL)",
+        "SELECT ST_AddPoint(NULL, NULL)",
+        "SELECT ST_SnapToGrid(NULL, 1.0)",
+        "SELECT ST_Expand(NULL, 1.0)",
+    ] {
+        let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+        assert!(v.is_none(), "{sql} was not NULL-strict");
+    }
+}

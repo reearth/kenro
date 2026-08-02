@@ -28,9 +28,9 @@ naming the missing feature:
 
 | tier | cargo flags | adds | raw | gzipped (wire) |
 |---|---|---|---|---|
-| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 419 KB | 168 KB |
-| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 619 KB | 250 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, and `ST_AsMVTGeom` gains PostGIS-grade validity repair (i_overlay's mesh is the single largest contributor) | 965 KB | 359 KB |
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 440 KB | 175 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 640 KB | 257 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`, and `ST_AsMVTGeom` gains PostGIS-grade validity repair (i_overlay's mesh is the single largest contributor) | 986 KB | 365 KB |
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
 (~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at

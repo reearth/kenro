@@ -473,6 +473,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_geojson(conn)?;
     register_accessors(conn)?;
     register_compat(conn)?;
+    register_edit(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -878,6 +879,151 @@ fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
         })?;
     }
     Ok(())
+}
+
+/// Structural accessors and geometry editing (see `functions::edit`).
+fn register_edit(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::edit;
+
+    register_geom_to_opt_blob(conn, "ST_ExteriorRing", edit::st_exterior_ring)?;
+    register_geom_to_blob(conn, "ST_Boundary", edit::st_boundary)?;
+    register_geom_to_blob(conn, "ST_MakePolygon", edit::st_make_polygon)?;
+    register_geom_to_blob(conn, "ST_Multi", edit::st_multi)?;
+    register_geom_to_blob(conn, "ST_FlipCoordinates", edit::st_flip_coordinates)?;
+    register_geom_to_blob(conn, "ST_ShiftLongitude", edit::st_shift_longitude)?;
+    register_predicate_1(conn, "ST_IsClosed", edit::st_is_closed)?;
+    register_predicate_1(conn, "ST_IsRing", edit::st_is_ring)?;
+
+    conn.create_scalar_function("ST_InteriorRingN", 2, FLAGS, |ctx| {
+        let (Some(b), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_InteriorRingN")?,
+            i64_or_null(ctx, 1, "ST_InteriorRingN")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_interior_ring_n(b, n)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    for name in ["ST_NumInteriorRings", "ST_NumInteriorRing"] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(b) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            edit::st_num_interior_rings(b)
+                .map(|v| v.map(Value::Integer))
+                .map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_NRings", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_NRings")? else {
+            return Ok(None);
+        };
+        edit::st_nrings(b)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AddPoint", 2, FLAGS, |ctx| {
+        let (Some(l), Some(p)) = (
+            blob_or_null(ctx, 0, "ST_AddPoint")?,
+            blob_or_null(ctx, 1, "ST_AddPoint")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_add_point(l, p, None)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AddPoint", 3, FLAGS, |ctx| {
+        let (Some(l), Some(p), Some(at)) = (
+            blob_or_null(ctx, 0, "ST_AddPoint")?,
+            blob_or_null(ctx, 1, "ST_AddPoint")?,
+            i64_or_null(ctx, 2, "ST_AddPoint")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_add_point(l, p, Some(at))
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_SetPoint", 3, FLAGS, |ctx| {
+        let (Some(l), Some(n), Some(p)) = (
+            blob_or_null(ctx, 0, "ST_SetPoint")?,
+            i64_or_null(ctx, 1, "ST_SetPoint")?,
+            blob_or_null(ctx, 2, "ST_SetPoint")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_set_point(l, n, p)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_RemovePoint", 2, FLAGS, |ctx| {
+        let (Some(l), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_RemovePoint")?,
+            i64_or_null(ctx, 1, "ST_RemovePoint")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_remove_point(l, n)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_MakeLine", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_MakeLine")?,
+            blob_or_null(ctx, 1, "ST_MakeLine")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_make_line(a, b))
+    })?;
+    conn.create_scalar_function("ST_SnapToGrid", 2, FLAGS, |ctx| {
+        let (Some(b), Some(size)) = (
+            blob_or_null(ctx, 0, "ST_SnapToGrid")?,
+            real_or_null(ctx, 1, "ST_SnapToGrid")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_snap_to_grid(b, size, size))
+    })?;
+    conn.create_scalar_function("ST_SnapToGrid", 3, FLAGS, |ctx| {
+        let (Some(b), Some(sx), Some(sy)) = (
+            blob_or_null(ctx, 0, "ST_SnapToGrid")?,
+            real_or_null(ctx, 1, "ST_SnapToGrid")?,
+            real_or_null(ctx, 2, "ST_SnapToGrid")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_snap_to_grid(b, sx, sy))
+    })?;
+    conn.create_scalar_function("ST_Expand", 2, FLAGS, |ctx| {
+        let (Some(b), Some(units)) = (
+            blob_or_null(ctx, 0, "ST_Expand")?,
+            real_or_null(ctx, 1, "ST_Expand")?,
+        ) else {
+            return Ok(None);
+        };
+        edit::st_expand(b, units)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    Ok(())
+}
+
+/// One-argument boolean predicate (ST_IsClosed, ST_IsRing).
+fn register_predicate_1(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8]) -> crate::error::Result<bool>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, name)? else {
+            return Ok(None);
+        };
+        f(b).map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })
 }
 
 fn register_predicate(

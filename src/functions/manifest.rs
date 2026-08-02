@@ -22,6 +22,11 @@ pub enum Kind {
     Bool,
     OptReal,
     OptI64,
+    /// Nullable small integer (`Option<i64>` → SQL NULL) that does *not*
+    /// need a 64-bit path — ring counts and the like. Kept apart from
+    /// `OptI64` so the "only h3 crosses 64 bits" invariant stays checkable,
+    /// and so sql.js (no int64) can register these normally. Return-only.
+    OptInt,
     /// Nullable geometry return (`Option<Vec<u8>>` → SQL NULL). Return-only.
     OptBlob,
     /// TEXT accepted as-is; INTEGER n normalized to `quad_segs=n` by the
@@ -229,6 +234,75 @@ pub const FUNCTIONS: &[FnEntry] = &[
         OptBlob,
         None
     ),
+    // Structural accessors and geometry editing (functions::edit).
+    entry!("ST_ExteriorRing", "stExteriorRing", [Blob], OptBlob, None),
+    entry!(
+        "ST_InteriorRingN",
+        "stInteriorRingN",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_NumInteriorRings",
+        "stNumInteriorRings",
+        [Blob],
+        OptInt,
+        None
+    ),
+    entry!(
+        "ST_NumInteriorRing",
+        "stNumInteriorRings",
+        [Blob],
+        OptInt,
+        None
+    ),
+    entry!("ST_NRings", "stNRings", [Blob], Int, None),
+    entry!("ST_Boundary", "stBoundary", [Blob], Blob, None),
+    entry!("ST_IsClosed", "stIsClosed", [Blob], Bool, None),
+    entry!("ST_IsRing", "stIsRing", [Blob], Bool, None),
+    entry!("ST_AddPoint", "stAddPoint", [Blob, Blob], OptBlob, None),
+    entry!(
+        "ST_AddPoint",
+        "stAddPointAt",
+        [Blob, Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_SetPoint",
+        "stSetPoint",
+        [Blob, Int, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_RemovePoint",
+        "stRemovePoint",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!("ST_MakeLine", "stMakeLine", [Blob, Blob], Blob, None),
+    entry!("ST_MakePolygon", "stMakePolygon", [Blob], Blob, None),
+    entry!("ST_Multi", "stMulti", [Blob], Blob, None),
+    entry!("ST_SnapToGrid", "stSnapToGrid", [Blob, Real], Blob, None),
+    entry!(
+        "ST_SnapToGrid",
+        "stSnapToGridXy",
+        [Blob, Real, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_FlipCoordinates",
+        "stFlipCoordinates",
+        [Blob],
+        Blob,
+        None
+    ),
+    entry!("ST_ShiftLongitude", "stShiftLongitude", [Blob], Blob, None),
+    entry!("ST_Expand", "stExpand", [Blob, Real], OptBlob, None),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -486,7 +560,7 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Envelope", "stEnvelope", [Blob], Blob, None),
     entry!("ST_X", "stX", [Blob], OptReal, None),
     entry!("ST_Y", "stY", [Blob], OptReal, None),
-    entry!("ST_NumPoints", "stNumPoints", [Blob], OptI64, None),
+    entry!("ST_NumPoints", "stNumPoints", [Blob], OptInt, None),
     entry!("ST_IsValid", "stIsValid", [Blob], Bool, None),
     entry!("ST_Simplify", "stSimplify", [Blob, Real], Blob, None),
 ];
@@ -659,7 +733,7 @@ mod tests {
     fn i64_functions_are_exactly_the_h3_family() {
         let uses_i64: Vec<_> = FUNCTIONS
             .iter()
-            .filter(|e| e.args.contains(&Kind::I64) || matches!(e.ret, Kind::I64))
+            .filter(|e| e.args.contains(&Kind::I64) || matches!(e.ret, Kind::I64 | Kind::OptI64))
             .map(|e| e.sql_name)
             .collect();
         assert_eq!(

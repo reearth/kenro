@@ -10,7 +10,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use kenro::functions::{accessors, compat, io, manifest, predicates, rtree};
+use kenro::functions::{accessors, compat, edit, io, manifest, predicates, rtree};
 use kenro::geom;
 
 /// kenro::Error → JS exception. The `kenro: `-prefixed message is preserved
@@ -301,6 +301,103 @@ typed_ctor_wkb!(
     "stPolyFromWkbSrid",
     Polygon
 );
+
+// ---- Structural accessors and editing (functions::edit) ----
+
+#[wasm_bindgen(js_name = stExteriorRing)]
+pub fn st_exterior_ring(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    edit::st_exterior_ring(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stInteriorRingN)]
+pub fn st_interior_ring_n(geom: &[u8], n: i32) -> R<Option<Vec<u8>>> {
+    edit::st_interior_ring_n(geom, n as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stNumInteriorRings)]
+pub fn st_num_interior_rings(geom: &[u8]) -> R<Option<i64>> {
+    edit::st_num_interior_rings(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stNRings)]
+pub fn st_nrings(geom: &[u8]) -> R<i64> {
+    edit::st_nrings(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stBoundary)]
+pub fn st_boundary(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_boundary(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stIsClosed)]
+pub fn st_is_closed(geom: &[u8]) -> R<bool> {
+    edit::st_is_closed(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stIsRing)]
+pub fn st_is_ring(geom: &[u8]) -> R<bool> {
+    edit::st_is_ring(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAddPoint)]
+pub fn st_add_point(line: &[u8], point: &[u8]) -> R<Option<Vec<u8>>> {
+    edit::st_add_point(line, point, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAddPointAt)]
+pub fn st_add_point_at(line: &[u8], point: &[u8], position: i32) -> R<Option<Vec<u8>>> {
+    edit::st_add_point(line, point, Some(position as i64)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSetPoint)]
+pub fn st_set_point(line: &[u8], index: i32, point: &[u8]) -> R<Option<Vec<u8>>> {
+    edit::st_set_point(line, index as i64, point).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRemovePoint)]
+pub fn st_remove_point(line: &[u8], index: i32) -> R<Option<Vec<u8>>> {
+    edit::st_remove_point(line, index as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMakeLine)]
+pub fn st_make_line(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
+    edit::st_make_line(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMakePolygon)]
+pub fn st_make_polygon(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_make_polygon(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMulti)]
+pub fn st_multi(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_multi(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSnapToGrid)]
+pub fn st_snap_to_grid(geom: &[u8], size: f64) -> R<Vec<u8>> {
+    edit::st_snap_to_grid(geom, size, size).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSnapToGridXy)]
+pub fn st_snap_to_grid_xy(geom: &[u8], size_x: f64, size_y: f64) -> R<Vec<u8>> {
+    edit::st_snap_to_grid(geom, size_x, size_y).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stFlipCoordinates)]
+pub fn st_flip_coordinates(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_flip_coordinates(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stShiftLongitude)]
+pub fn st_shift_longitude(geom: &[u8]) -> R<Vec<u8>> {
+    edit::st_shift_longitude(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stExpand)]
+pub fn st_expand(geom: &[u8], units: f64) -> R<Option<Vec<u8>>> {
+    edit::st_expand(geom, units).map_err(err)
+}
 
 // ---- SRID ----
 
@@ -858,6 +955,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::Bool => "bool",
         Kind::OptReal => "opt_real",
         Kind::OptI64 => "opt_i64",
+        Kind::OptInt => "opt_int",
         Kind::OptBlob => "opt_blob",
         Kind::TextOrInt => "text_or_int",
     }
@@ -1022,6 +1120,25 @@ mod tests {
             "stLineFromWkbSrid",
             "stPolyFromWkb",
             "stPolyFromWkbSrid",
+            "stExteriorRing",
+            "stInteriorRingN",
+            "stNumInteriorRings",
+            "stNRings",
+            "stBoundary",
+            "stIsClosed",
+            "stIsRing",
+            "stAddPoint",
+            "stAddPointAt",
+            "stSetPoint",
+            "stRemovePoint",
+            "stMakeLine",
+            "stMakePolygon",
+            "stMulti",
+            "stSnapToGrid",
+            "stSnapToGridXy",
+            "stFlipCoordinates",
+            "stShiftLongitude",
+            "stExpand",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

@@ -23,7 +23,7 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_GeomFromWKB(wkb [, srid])` | geometry | ✅ | ⚠️ no srid arg | ✅ | Accepts ISO WKB and EWKB; an explicit srid overrides an embedded one (PostGIS behavior) |
 | `ST_GeomFromGPB(gpb)` | geometry | ❌ | ❌ | ⚠️ named `GeomFromGPB` | kenro-only: validates + normalizes a GeoPackage blob. DuckDB imports gpkg **files** via GDAL `ST_Read`; PostGIS needs ogr2ogr |
 | `ST_GeomFromGeoJSON(text)` | geometry | ✅ keeps Z | ✅ | ⚠️ named `GeomFromGeoJSON` | SRID 4326 per RFC 7946 (PostGIS ≥ 3.0); kenro is 2D-only and errors on 3D rather than dropping Z |
-| `ST_AsText(geom)` | TEXT | ✅ | ✅ | ✅ | kenro's formatting is byte-identical to PostGIS (golden-tested) |
+| `ST_AsText(geom)` | TEXT | ✅ | ✅ | ✅ | Byte-identical to PostGIS across the golden suite. One rendering difference exists for values that are not exactly representable: kenro writes the shortest string that round-trips the double, PostGIS trims to 15 significant digits — so a coordinate of `1.2000000000000002` prints in full here and as `1.2` there. The doubles are the same |
 | `ST_AsBinary(geom)` | BLOB | ✅ | ❌ named `ST_AsWKB` | ✅ | ISO WKB, little-endian, SRID dropped (as in PostGIS); PostGIS conversely has no `ST_AsWKB` |
 | `ST_AsGPB(geom)` | BLOB | ❌ | ❌ | ⚠️ named `AsGPB` | kenro-only: storage-grade GeoPackage blob (envelope included) — use for writing gpkg columns |
 | `ST_AsGeoJSON(geom [, maxdecimaldigits])` | TEXT | ✅ | ✅ JSON fragment | ⚠️ named `AsGeoJSON` | Default 9 digits; kenro's output is byte-identical to PostGIS (golden-tested) |
@@ -142,6 +142,38 @@ New in this group:
 | `ST_AsHexEWKB(geom)` | TEXT | ✅ | ❌ | ✅ | Upper-case hex of the above; byte-identical to PostGIS 3.5 (golden-tested) |
 | `ST_PointFromText` / `ST_LineFromText` / `ST_LineStringFromText` / `ST_PolyFromText` / `ST_PolygonFromText` / `ST_MPointFromText` / `ST_MLineFromText` / `ST_MPolyFromText` `(wkt [, srid])` | geometry / NULL | ✅ | ⚠️ partial | ✅ | Parse, then **NULL when the geometry is another type** — an error would be the intuitive choice, but PostGIS returns NULL and so does kenro |
 | `ST_PointFromWKB` / `ST_LineFromWKB` / `ST_PolyFromWKB` `(bytes [, srid])` | geometry / NULL | ✅ | ❌ | ✅ | Same contract over WKB/EWKB/GeoPackage input |
+
+## Structural accessors and editing
+
+Rings, boundaries, vertex surgery and coordinate-space tweaks. No new
+dependencies — but several PostGIS conventions here are easy to guess wrong,
+so each was read off a live PostGIS 3.5 and is golden-tested:
+
+- **ring indexes are 1-based, vertex indexes 0-based** (`ST_InteriorRingN(g, 1)`
+  but `ST_SetPoint(g, 0, p)`)
+- a wrong-type argument gives **NULL, not an error** — except `ST_IsRing`,
+  which raises
+- `ST_Boundary` of a point is `POINT EMPTY`; of a closed line, `MULTIPOINT EMPTY`
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_ExteriorRing(polygon)` | geometry / NULL | ✅ | ✅ | ✅ | NULL for any non-polygon |
+| `ST_InteriorRingN(polygon, n)` | geometry / NULL | ✅ | ✅ | ✅ | 1-based; NULL when out of range |
+| `ST_NumInteriorRings(polygon)` / `ST_NumInteriorRing` | INTEGER / NULL | ✅ | ✅ | ✅ | Both spellings, as in PostGIS |
+| `ST_NRings(geom)` | INTEGER | ✅ | ❌ | ✅ | Exterior + interior, summed over a multipolygon |
+| `ST_Boundary(geom)` | geometry | ✅ | ❌ | ✅ | Polygon → its rings; open line → `MULTIPOINT` of the endpoints; the mod-2 rule applies to a multilinestring |
+| `ST_IsClosed(geom)` | INTEGER | ✅ | ✅ | ✅ | Areal input is closed by definition |
+| `ST_IsRing(line)` | INTEGER | ✅ | ❌ | ✅ | Closed *and* simple. **Raises** on non-linear input — PostGIS's wording, kept |
+| `ST_AddPoint(line, point [, position])` | geometry / NULL | ✅ | ❌ | ✅ | 0-based; default (or -1) appends |
+| `ST_SetPoint(line, index, point)` | geometry / NULL | ✅ | ❌ | ✅ | 0-based |
+| `ST_RemovePoint(line, index)` | geometry / NULL | ✅ | ❌ | ✅ | 0-based |
+| `ST_MakeLine(a, b)` | geometry | ✅ | ✅ | ✅ | Two-geometry form; points and lines concatenate. The aggregate form is not implemented |
+| `ST_MakePolygon(line)` | geometry | ✅ | ❌ | ✅ | Shell must be closed; the with-holes arity is not implemented |
+| `ST_Multi(geom)` | geometry | ✅ | ❌ | ✅ | Already-multi input passes through |
+| `ST_SnapToGrid(geom, size)` / `(geom, sizex, sizey)` | geometry | ✅ | ❌ | ✅ | Grid anchored at the origin; size 0 leaves that axis alone. The origin-offset arities are not implemented |
+| `ST_FlipCoordinates(geom)` | geometry | ✅ | ✅ | ✅ | The lat/lon-order fix |
+| `ST_ShiftLongitude(geom)` | geometry | ✅ | ❌ | ✅ | x from [-180,180) into [0,360) |
+| `ST_Expand(geom, units)` | geometry / NULL | ✅ | ❌ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for |
 
 ## Deliberately out of scope
 
