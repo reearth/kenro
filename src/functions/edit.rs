@@ -430,7 +430,11 @@ pub fn st_expand(bytes: &[u8], units: f64) -> Result<Option<Vec<u8>>> {
 }
 
 /// Apply `f` to every coordinate in place, without pulling geo's MapCoords
-/// (which would clone the whole geometry).
+/// (which would clone the whole geometry). Shared with `functions::extra`.
+pub(crate) fn map_coords_pub(g: &mut Geometry<f64>, f: &mut impl FnMut(Coord<f64>) -> Coord<f64>) {
+    map_coords(g, f)
+}
+
 fn map_coords(g: &mut Geometry<f64>, f: &mut impl FnMut(Coord<f64>) -> Coord<f64>) {
     match g {
         Geometry::Point(p) => p.0 = f(p.0),

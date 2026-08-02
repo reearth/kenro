@@ -225,6 +225,29 @@ naming the feature.
 | `ST_ClipByBox2D(geom, box)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ takes **any geometry** and uses its envelope (PostGIS takes a `box2d`) — pass `ST_MakeEnvelope(...)`. Unlike PostGIS, which documents that it may return an invalid geometry, this goes through the overlay engine, so the result is valid |
 | `ST_Subdivide(geom, max_vertices)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ PostGIS returns **one row per part**; kenro has no set-returning functions, so this returns a MULTIPOLYGON — walk it with `ST_NumGeometries` / `ST_GeometryN`. Splits along the longer axis; `max_vertices` must be ≥ 5 |
 
+## Predicates, transforms and accessors reachable without a dependency
+
+The tail of the PostGIS surface kenro can implement with what it already
+carries — several of these exist *because* an earlier group landed
+(`ST_DFullyWithin` is `ST_MaxDistance` with a comparison; `ST_ContainsProperly`
+is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_ContainsProperly(a, b)` | INTEGER | ✅ | ❌ | ✅ | b in a's interior, touching neither boundary nor exterior — a polygon does not properly contain its own corner |
+| `ST_DFullyWithin(a, b, d)` | INTEGER | ✅ | ❌ | ✅ | *Every* part within `d`, i.e. the maximum distance is at most `d` |
+| `ST_RelateMatch(matrix, pattern)` | INTEGER | ✅ | ❌ | ✅ | The DE-9IM pattern language: `T` non-empty, `F` empty, `*` anything, `0`/`1`/`2` exact |
+| `ST_Affine(geom, a, b, d, e, xoff, yoff)` | geometry | ✅ | ❌ | ✅ | `x' = a·x + b·y + xoff`, `y' = d·x + e·y + yoff`. The 3D 12-argument form is not implemented |
+| `ST_TransScale(geom, dx, dy, xfactor, yfactor)` | geometry | ✅ | ❌ | ✅ | Translate **then** scale — PostGIS's order, which is easy to invert |
+| `ST_ReducePrecision(geom, gridsize)` | geometry | ✅ | ❌ | ❌ | ⚠️ rounds only; PostGIS also repairs the result. Follow with `ST_MakeValid` if you need that |
+| `ST_Angle(p1, p2, p3 [, p4])` | REAL / NULL | ✅ | ❌ | ❌ | ⚠️ **clockwise**, in [0, 2π) — `ST_Angle((0 0),(1 0),(0 0),(0 1))` is 270°, not 90°. POINT arguments only; the linestring form is not implemented |
+| `ST_LineInterpolatePoints(line, fraction)` | geometry / NULL | ✅ | ❌ | ✅ | A point at every multiple of `fraction`, the far end included |
+| `ST_Points(geom)` | geometry | ✅ | ✅ | ❌ | Every vertex as a MULTIPOINT, duplicates and all — a ring's closing vertex appears twice, as in PostGIS |
+| `ST_BoundingDiagonal(geom)` | geometry / NULL | ✅ | ❌ | ❌ | The bounding box's lower-left → upper-right line |
+| `ST_OrderingEquals(a, b)` | INTEGER | ✅ | ❌ | ✅ | Same geometry *and* same vertex order, unlike the topological `ST_Equals` |
+| `ST_GeoHash(geom [, maxchars])` | TEXT / NULL | ✅ | ❌ | ✅ | 20 characters by default. An extended geometry keeps only the prefix its bbox corners agree on (PostGIS's behavior); non-lon/lat input is an error |
+| `ST_Extent(geom)` **aggregate** | geometry / NULL | ✅ | ✅ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for. NULL rows are skipped; an all-NULL group is NULL |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
@@ -242,6 +265,18 @@ naming the feature.
 - **Simplicity testing** — no `ST_IsSimple`: `geo`'s validation reports
   ring self-intersection for polygons (which is how `ST_IsRing` works) but
   has no general self-intersection test for a linestring.
+- **Hulls and triangulation beyond the convex hull** — no `ST_ConcaveHull`
+  (measured at **+41 KB** of wasm, more than the whole editing group) and no
+  `ST_DelaunayTriangles`/`ST_TriangulatePolygon` (**+81 KB**, pulling
+  `spade`). Both are implementable the day the size budget says yes.
+- **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
+  side option, which is also why `ST_Buffer` rejects `side=`.
+- **Record-returning functions** — no `ST_IsValidDetail`,
+  `ST_MaximumInscribedCircle`: SQLite has no record type. Where only one
+  field is wanted, kenro exposes it (`ST_MinimumBoundingRadius`,
+  `ST_IsValidReason`).
+- **Clustering aggregates** — no `ST_ClusterWithin`/`ST_ClusterIntersecting`:
+  they return an array of geometry collections, and kenro has neither.
 - **File-format conversion** — kenro operates on geometry *values*
   (WKT/WKB/GeoJSON/GeoPackage blobs), not files; reading shapefiles,
   spreadsheets or writing whole GeoPackages is GDAL/ogr2ogr territory

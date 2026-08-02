@@ -29,6 +29,8 @@ pub enum Kind {
     OptInt,
     /// Nullable geometry return (`Option<Vec<u8>>` → SQL NULL). Return-only.
     OptBlob,
+    /// Nullable text return (`Option<String>` → SQL NULL). Return-only.
+    OptText,
     /// TEXT accepted as-is; INTEGER n normalized to `quad_segs=n` by the
     /// binding layer (ST_Buffer's third argument). Argument-only.
     TextOrInt,
@@ -432,6 +434,75 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Blob,
         Some("overlay")
     ),
+    // The rest of the reachable PostGIS surface (functions::extra).
+    entry!(
+        "ST_ContainsProperly",
+        "stContainsProperly",
+        [Blob, Blob],
+        Bool,
+        None
+    ),
+    entry!(
+        "ST_DFullyWithin",
+        "stDfullyWithin",
+        [Blob, Blob, Real],
+        Bool,
+        None
+    ),
+    entry!("ST_RelateMatch", "stRelateMatch", [Text, Text], Bool, None),
+    entry!(
+        "ST_Affine",
+        "stAffine",
+        [Blob, Real, Real, Real, Real, Real, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_TransScale",
+        "stTransScale",
+        [Blob, Real, Real, Real, Real],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_ReducePrecision",
+        "stReducePrecision",
+        [Blob, Real],
+        Blob,
+        None
+    ),
+    entry!("ST_Angle", "stAngle3", [Blob, Blob, Blob], OptReal, None),
+    entry!(
+        "ST_Angle",
+        "stAngle4",
+        [Blob, Blob, Blob, Blob],
+        OptReal,
+        None
+    ),
+    entry!(
+        "ST_LineInterpolatePoints",
+        "stLineInterpolatePoints",
+        [Blob, Real],
+        OptBlob,
+        None
+    ),
+    entry!("ST_Points", "stPoints", [Blob], Blob, None),
+    entry!(
+        "ST_BoundingDiagonal",
+        "stBoundingDiagonal",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_OrderingEquals",
+        "stOrderingEquals",
+        [Blob, Blob],
+        Bool,
+        None
+    ),
+    entry!("ST_GeoHash", "stGeohash", [Blob], OptText, None),
+    entry!("ST_GeoHash", "stGeohashChars", [Blob, Int], OptText, None),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -714,6 +785,12 @@ pub const AGGREGATES: &[AggEntry] = &[
     },
     // ST_AsMVT's signature deliberately diverges from PostGIS (SQLite has no
     // record type): (geom [, name [, extent [, props_json]]]).
+    AggEntry {
+        sql_name: "ST_Extent",
+        ctor_export: "ExtentAgg",
+        args: &[Kind::Blob],
+        feature: None,
+    },
     AggEntry {
         sql_name: "ST_AsMVT",
         ctor_export: "MvtAgg",

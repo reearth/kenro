@@ -8,6 +8,7 @@ pub mod affine;
 pub(crate) mod classify;
 pub mod compat;
 pub mod edit;
+pub mod extra;
 pub mod geodesic;
 #[cfg(feature = "geojson")]
 pub mod geojson;

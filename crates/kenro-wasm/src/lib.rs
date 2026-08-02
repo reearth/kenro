@@ -11,7 +11,7 @@
 use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
-    accessors, compat, edit, geodesic, io, linear, manifest, predicates, rtree,
+    accessors, compat, edit, extra, geodesic, io, linear, manifest, predicates, rtree,
 };
 use kenro::geom;
 
@@ -524,6 +524,112 @@ pub fn st_clip_by_box_2d(geom: &[u8], box_geom: &[u8]) -> R<Vec<u8>> {
 #[wasm_bindgen(js_name = stSubdivide)]
 pub fn st_subdivide(geom: &[u8], max_vertices: i32) -> R<Vec<u8>> {
     kenro::functions::overlay::st_subdivide(geom, max_vertices as i64).map_err(err)
+}
+
+// ---- The rest of the reachable surface (functions::extra) ----
+
+#[wasm_bindgen(js_name = stContainsProperly)]
+pub fn st_contains_properly(a: &[u8], b: &[u8]) -> R<bool> {
+    extra::st_contains_properly(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stDfullyWithin)]
+pub fn st_d_fully_within(a: &[u8], b: &[u8], d: f64) -> R<bool> {
+    extra::st_d_fully_within(a, b, d).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stRelateMatch)]
+pub fn st_relate_match(matrix: &str, pattern: &str) -> R<bool> {
+    extra::st_relate_match(matrix, pattern).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAffine)]
+pub fn st_affine(geom: &[u8], a: f64, b: f64, d: f64, e: f64, xoff: f64, yoff: f64) -> R<Vec<u8>> {
+    extra::st_affine(geom, a, b, d, e, xoff, yoff).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stTransScale)]
+pub fn st_trans_scale(geom: &[u8], dx: f64, dy: f64, x_factor: f64, y_factor: f64) -> R<Vec<u8>> {
+    extra::st_trans_scale(geom, dx, dy, x_factor, y_factor).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stReducePrecision)]
+pub fn st_reduce_precision(geom: &[u8], gridsize: f64) -> R<Vec<u8>> {
+    extra::st_reduce_precision(geom, gridsize).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAngle3)]
+pub fn st_angle_3(p1: &[u8], p2: &[u8], p3: &[u8]) -> R<Option<f64>> {
+    extra::st_angle_3(p1, p2, p3).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stAngle4)]
+pub fn st_angle_4(p1: &[u8], p2: &[u8], p3: &[u8], p4: &[u8]) -> R<Option<f64>> {
+    extra::st_angle_4(p1, p2, p3, p4).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineInterpolatePoints)]
+pub fn st_line_interpolate_points(geom: &[u8], fraction: f64) -> R<Option<Vec<u8>>> {
+    extra::st_line_interpolate_points(geom, fraction).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPoints)]
+pub fn st_points(geom: &[u8]) -> R<Vec<u8>> {
+    extra::st_points(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stBoundingDiagonal)]
+pub fn st_bounding_diagonal(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    extra::st_bounding_diagonal(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stOrderingEquals)]
+pub fn st_ordering_equals(a: &[u8], b: &[u8]) -> R<bool> {
+    extra::st_ordering_equals(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeohash)]
+pub fn st_geohash(geom: &[u8]) -> R<Option<String>> {
+    extra::st_geohash(geom, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeohashChars)]
+pub fn st_geohash_chars(geom: &[u8], maxchars: i32) -> R<Option<String>> {
+    extra::st_geohash(geom, Some(maxchars as i64)).map_err(err)
+}
+
+/// `ST_Extent` accumulator — the bounding box of every stepped row.
+#[wasm_bindgen]
+pub struct ExtentAgg {
+    inner: Option<extra::ExtentAggregate>,
+}
+
+#[wasm_bindgen]
+impl ExtentAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> ExtentAgg {
+        ExtentAgg {
+            inner: Some(extra::ExtentAggregate::new()),
+        }
+    }
+
+    pub fn step(&mut self, geom: &[u8]) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: ST_Extent accumulator already finished"))?
+            .step(geom)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows aggregated).
+    pub fn finish(&mut self) -> Result<Option<Vec<u8>>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: ST_Extent accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
 }
 
 // ---- SRID ----
@@ -1083,6 +1189,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::OptReal => "opt_real",
         Kind::OptI64 => "opt_i64",
         Kind::OptInt => "opt_int",
+        Kind::OptText => "opt_text",
         Kind::OptBlob => "opt_blob",
         Kind::TextOrInt => "text_or_int",
     }
@@ -1289,6 +1396,20 @@ mod tests {
             "stUnaryUnion",
             "stClipByBox2d",
             "stSubdivide",
+            "stContainsProperly",
+            "stDfullyWithin",
+            "stRelateMatch",
+            "stAffine",
+            "stTransScale",
+            "stReducePrecision",
+            "stAngle3",
+            "stAngle4",
+            "stLineInterpolatePoints",
+            "stPoints",
+            "stBoundingDiagonal",
+            "stOrderingEquals",
+            "stGeohash",
+            "stGeohashChars",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(
@@ -1297,7 +1418,7 @@ mod tests {
                 entry.export
             );
         }
-        let known_aggregates = ["UnionAgg", "MvtAgg"];
+        let known_aggregates = ["UnionAgg", "MvtAgg", "ExtentAgg"];
         for entry in kenro::functions::manifest::active_aggregates() {
             assert!(
                 known_aggregates.contains(&entry.ctor_export),

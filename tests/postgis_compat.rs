@@ -809,3 +809,178 @@ fn phase4_functions_are_null_strict() {
         assert!(v.is_none(), "{sql} was not NULL-strict");
     }
 }
+
+// ---- The rest of the reachable surface (functions::extra) ----
+
+#[test]
+fn extra_predicates_and_transforms_match_postgis() {
+    let conn = conn();
+    let poly = "ST_GeomFromText('POLYGON((0 0,3 0,3 3,0 3,0 0))')";
+    // PostGIS 3.5: interior point true, corner false.
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_ContainsProperly({poly}, ST_GeomFromText('POINT(1 1)'))")
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_ContainsProperly({poly}, ST_GeomFromText('POINT(0 0)'))")
+        ),
+        Some(0)
+    );
+    // PostGIS 3.5: true at 3, false at 2.
+    let (p, l) = (
+        "ST_GeomFromText('POINT(0 0)')",
+        "ST_GeomFromText('LINESTRING(2 -1,2 1)')",
+    );
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_DFullyWithin({p}, {l}, 3)")),
+        Some(1)
+    );
+    assert_eq!(
+        int(&conn, &format!("SELECT ST_DFullyWithin({p}, {l}, 2)")),
+        Some(0)
+    );
+    assert_eq!(
+        int(&conn, "SELECT ST_RelateMatch('101202FFF', 'TTTTTTFFF')"),
+        Some(1)
+    );
+    // PostGIS 3.5: ST_Affine(LINESTRING(1 2,3 4),2,0,0,2,10,20)
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Affine(ST_GeomFromText('LINESTRING(1 2,3 4)'), 2,0,0,2,10,20))"
+        )
+        .as_deref(),
+        Some("LINESTRING(12 24,16 28)")
+    );
+    // PostGIS 3.5: translate first, then scale.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_TransScale(ST_GeomFromText('POINT(1 2)'), 1, 2, 3, 4))"
+        )
+        .as_deref(),
+        Some("POINT(6 16)")
+    );
+}
+
+#[test]
+fn angles_are_clockwise_and_vertex_accessors_match_postgis() {
+    let conn = conn();
+    // PostGIS 3.5: 270 degrees, not 90 — the angle is measured clockwise.
+    let degrees = real(
+        &conn,
+        "SELECT ST_Angle(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(1 0)'), ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(0 1)')) * 180.0 / 3.14159265358979",
+    );
+    assert!((degrees - 270.0).abs() < 1e-6, "{degrees}");
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_LineInterpolatePoints(ST_GeomFromText('LINESTRING(0 0,10 0)'), 0.25))"
+        )
+        .as_deref(),
+        Some("MULTIPOINT((2.5 0),(5 0),(7.5 0),(10 0))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Points(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 0))')))"
+        )
+        .as_deref(),
+        Some("MULTIPOINT((0 0),(1 0),(1 1),(0 0))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_BoundingDiagonal(ST_GeomFromText('LINESTRING(1 2,5 9)')))"
+        )
+        .as_deref(),
+        Some("LINESTRING(1 2,5 9)")
+    );
+    // Ordering, unlike ST_Equals, is not topological.
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_OrderingEquals(ST_GeomFromText('LINESTRING(0 0,1 1)'), ST_GeomFromText('LINESTRING(1 1,0 0)'))"
+        ),
+        Some(0)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_Equals(ST_GeomFromText('LINESTRING(0 0,1 1)'), ST_GeomFromText('LINESTRING(1 1,0 0)'))"
+        ),
+        Some(1)
+    );
+}
+
+#[test]
+fn geohash_matches_postgis_through_sql() {
+    let conn = conn();
+    // PostGIS 3.5: 'xn76fzq7jfn42q30gmb9', and 'xn76f' at 5 characters.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_GeoHash(ST_GeomFromText('POINT(139.7 35.68)', 4326))"
+        )
+        .as_deref(),
+        Some("xn76fzq7jfn42q30gmb9")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_GeoHash(ST_GeomFromText('POINT(139.7 35.68)', 4326), 5)"
+        )
+        .as_deref(),
+        Some("xn76f")
+    );
+}
+
+#[test]
+fn extent_aggregates_the_bounding_box_over_rows() {
+    let conn = conn();
+    conn.execute_batch(
+        "CREATE TABLE p (g BLOB);
+         INSERT INTO p VALUES (ST_GeomFromText('POINT(1 2)')), (ST_GeomFromText('POINT(5 0)')), (NULL);",
+    )
+    .unwrap();
+    // PostGIS 3.5: BOX(1 0,5 2). kenro returns the same box as a POLYGON,
+    // and skips the NULL row.
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_Extent(g)) FROM p").as_deref(),
+        Some("POLYGON((1 0,1 2,5 2,5 0,1 0))")
+    );
+    // An all-NULL group is NULL, not an empty polygon.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Extent(g)) FROM p WHERE g IS NULL"
+        ),
+        None
+    );
+}
+
+#[test]
+fn extra_functions_are_null_strict() {
+    let conn = conn();
+    for sql in [
+        "SELECT ST_ContainsProperly(NULL, NULL)",
+        "SELECT ST_DFullyWithin(NULL, NULL, 1.0)",
+        "SELECT ST_RelateMatch(NULL, NULL)",
+        "SELECT ST_Affine(NULL, 1,0,0,1,0,0)",
+        "SELECT ST_TransScale(NULL, 1,1,1,1)",
+        "SELECT ST_ReducePrecision(NULL, 0.1)",
+        "SELECT ST_Angle(NULL, NULL, NULL)",
+        "SELECT ST_LineInterpolatePoints(NULL, 0.5)",
+        "SELECT ST_Points(NULL)",
+        "SELECT ST_BoundingDiagonal(NULL)",
+        "SELECT ST_GeoHash(NULL)",
+    ] {
+        let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+        assert!(v.is_none(), "{sql} was not NULL-strict");
+    }
+}

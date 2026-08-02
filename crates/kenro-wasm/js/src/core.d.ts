@@ -15,7 +15,8 @@ export type RetKind =
   | "opt_blob"
   | "opt_real"
   | "opt_i64"
-  | "opt_int";
+  | "opt_int"
+  | "opt_text";
 
 /** A SQL value as the host adapters exchange it. */
 export type SqlValue = null | Uint8Array | string | number | bigint;

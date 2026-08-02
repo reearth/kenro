@@ -856,6 +856,65 @@ export const SMOKE_SQL = {
     check: (v) => Math.abs(Number(v) - 100) < 1e-9,
   },
 
+
+  // --- the rest of the reachable surface (functions::extra) ---
+  "ST_ContainsProperly/2": {
+    sql: "SELECT ST_ContainsProperly(ST_GeomFromText('POLYGON((0 0,3 0,3 3,0 3,0 0))'), ST_GeomFromText('POINT(1 1)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_DFullyWithin/3": {
+    sql: "SELECT ST_DFullyWithin(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)'), 3)",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_RelateMatch/2": {
+    sql: "SELECT ST_RelateMatch('101202FFF', 'TTTTTTFFF')",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Affine/7": {
+    sql: "SELECT ST_AsText(ST_Affine(ST_GeomFromText('LINESTRING(1 2,3 4)'), 2,0,0,2,10,20))",
+    check: (v) => v === "LINESTRING(12 24,16 28)",
+  },
+  "ST_TransScale/5": {
+    sql: "SELECT ST_AsText(ST_TransScale(ST_GeomFromText('POINT(1 2)'), 1, 2, 3, 4))",
+    check: (v) => v === "POINT(6 16)",
+  },
+  "ST_ReducePrecision/2": {
+    sql: "SELECT ST_X(ST_ReducePrecision(ST_GeomFromText('POINT(1.234 5.678)'), 0.1))",
+    check: (v) => Math.abs(Number(v) - 1.2) < 1e-9,
+  },
+  "ST_Angle/3": {
+    sql: "SELECT ST_Angle(ST_GeomFromText('POINT(1 0)'), ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(0 1)'))",
+    check: (v) => Math.abs(Number(v) - (3 * Math.PI) / 2) < 1e-9,
+  },
+  "ST_Angle/4": {
+    sql: "SELECT ST_Angle(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(1 0)'), ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(0 1)'))",
+    check: (v) => Math.abs(Number(v) - (3 * Math.PI) / 2) < 1e-9,
+  },
+  "ST_LineInterpolatePoints/2": {
+    sql: "SELECT ST_AsText(ST_LineInterpolatePoints(ST_GeomFromText('LINESTRING(0 0,10 0)'), 0.25))",
+    check: (v) => v === "MULTIPOINT((2.5 0),(5 0),(7.5 0),(10 0))",
+  },
+  "ST_Points/1": {
+    sql: "SELECT ST_AsText(ST_Points(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 0))')))",
+    check: (v) => v === "MULTIPOINT((0 0),(1 0),(1 1),(0 0))",
+  },
+  "ST_BoundingDiagonal/1": {
+    sql: "SELECT ST_AsText(ST_BoundingDiagonal(ST_GeomFromText('LINESTRING(1 2,5 9)')))",
+    check: (v) => v === "LINESTRING(1 2,5 9)",
+  },
+  "ST_OrderingEquals/2": {
+    sql: "SELECT ST_OrderingEquals(ST_GeomFromText('LINESTRING(0 0,1 1)'), ST_GeomFromText('LINESTRING(1 1,0 0)'))",
+    check: (v) => Number(v) === 0,
+  },
+  "ST_GeoHash/1": {
+    sql: "SELECT ST_GeoHash(ST_GeomFromText('POINT(139.7 35.68)', 4326))",
+    check: (v) => v === "xn76fzq7jfn42q30gmb9",
+  },
+  "ST_GeoHash/2": {
+    sql: "SELECT ST_GeoHash(ST_GeomFromText('POINT(139.7 35.68)', 4326), 5)",
+    check: (v) => v === "xn76f",
+  },
+
 };
 
 /**

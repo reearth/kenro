@@ -486,6 +486,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_compat(conn)?;
     register_edit(conn)?;
     register_geodesic_and_linear(conn)?;
+    register_extra(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -1203,6 +1204,163 @@ fn register_geom2_to_real(
         };
         f(a, b).map(|v| Some(Value::Real(v))).map_err(sql_err)
     })
+}
+
+/// The remainder of the reachable PostGIS surface (see `functions::extra`),
+/// including the `ST_Extent` aggregate.
+fn register_extra(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::extra;
+
+    register_predicate(conn, "ST_ContainsProperly", extra::st_contains_properly)?;
+    register_predicate(conn, "ST_OrderingEquals", extra::st_ordering_equals)?;
+    register_geom_to_blob(conn, "ST_Points", extra::st_points)?;
+    register_geom_to_opt_blob(conn, "ST_BoundingDiagonal", extra::st_bounding_diagonal)?;
+
+    conn.create_scalar_function("ST_DFullyWithin", 3, FLAGS, |ctx| {
+        let (Some(a), Some(b), Some(d)) = (
+            blob_or_null(ctx, 0, "ST_DFullyWithin")?,
+            blob_or_null(ctx, 1, "ST_DFullyWithin")?,
+            real_or_null(ctx, 2, "ST_DFullyWithin")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_d_fully_within(a, b, d)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_RelateMatch", 2, FLAGS, |ctx| {
+        let (Some(m), Some(p)) = (
+            text_or_null(ctx, 0, "ST_RelateMatch")?,
+            text_or_null(ctx, 1, "ST_RelateMatch")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_relate_match(m, p)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_Affine", 7, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_Affine")? else {
+            return Ok(None);
+        };
+        let mut args = [0.0f64; 6];
+        for (i, slot) in args.iter_mut().enumerate() {
+            let Some(v) = real_or_null(ctx, i + 1, "ST_Affine")? else {
+                return Ok(None);
+            };
+            *slot = v;
+        }
+        blob(extra::st_affine(
+            g, args[0], args[1], args[2], args[3], args[4], args[5],
+        ))
+    })?;
+    conn.create_scalar_function("ST_TransScale", 5, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_TransScale")? else {
+            return Ok(None);
+        };
+        let mut args = [0.0f64; 4];
+        for (i, slot) in args.iter_mut().enumerate() {
+            let Some(v) = real_or_null(ctx, i + 1, "ST_TransScale")? else {
+                return Ok(None);
+            };
+            *slot = v;
+        }
+        blob(extra::st_trans_scale(g, args[0], args[1], args[2], args[3]))
+    })?;
+    conn.create_scalar_function("ST_ReducePrecision", 2, FLAGS, |ctx| {
+        let (Some(g), Some(grid)) = (
+            blob_or_null(ctx, 0, "ST_ReducePrecision")?,
+            real_or_null(ctx, 1, "ST_ReducePrecision")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(extra::st_reduce_precision(g, grid))
+    })?;
+    conn.create_scalar_function("ST_Angle", 3, FLAGS, |ctx| {
+        let (Some(a), Some(b), Some(c)) = (
+            blob_or_null(ctx, 0, "ST_Angle")?,
+            blob_or_null(ctx, 1, "ST_Angle")?,
+            blob_or_null(ctx, 2, "ST_Angle")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_angle_3(a, b, c)
+            .map(|v| v.map(Value::Real))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_Angle", 4, FLAGS, |ctx| {
+        let (Some(a), Some(b), Some(c), Some(d)) = (
+            blob_or_null(ctx, 0, "ST_Angle")?,
+            blob_or_null(ctx, 1, "ST_Angle")?,
+            blob_or_null(ctx, 2, "ST_Angle")?,
+            blob_or_null(ctx, 3, "ST_Angle")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_angle_4(a, b, c, d)
+            .map(|v| v.map(Value::Real))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_LineInterpolatePoints", 2, FLAGS, |ctx| {
+        let (Some(g), Some(f)) = (
+            blob_or_null(ctx, 0, "ST_LineInterpolatePoints")?,
+            real_or_null(ctx, 1, "ST_LineInterpolatePoints")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_line_interpolate_points(g, f)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeoHash", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_GeoHash")? else {
+            return Ok(None);
+        };
+        extra::st_geohash(g, None)
+            .map(|v| v.map(Value::Text))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeoHash", 2, FLAGS, |ctx| {
+        let (Some(g), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_GeoHash")?,
+            i64_or_null(ctx, 1, "ST_GeoHash")?,
+        ) else {
+            return Ok(None);
+        };
+        extra::st_geohash(g, Some(n))
+            .map(|v| v.map(Value::Text))
+            .map_err(sql_err)
+    })?;
+
+    // ST_Extent(geom): NULL rows skipped, an all-NULL group yields NULL.
+    struct ExtentAgg;
+    impl rusqlite::functions::Aggregate<extra::ExtentAggregate, Option<Value>> for ExtentAgg {
+        fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<extra::ExtentAggregate> {
+            Ok(extra::ExtentAggregate::new())
+        }
+        fn step(
+            &self,
+            ctx: &mut Context<'_>,
+            acc: &mut extra::ExtentAggregate,
+        ) -> rusqlite::Result<()> {
+            match blob_or_null(ctx, 0, "ST_Extent")? {
+                None => Ok(()),
+                Some(b) => acc.step(b).map_err(sql_err),
+            }
+        }
+        fn finalize(
+            &self,
+            _: &mut Context<'_>,
+            acc: Option<extra::ExtentAggregate>,
+        ) -> rusqlite::Result<Option<Value>> {
+            match acc {
+                None => Ok(None),
+                Some(agg) => agg.finish().map(|o| o.map(Value::Blob)).map_err(sql_err),
+            }
+        }
+    }
+    conn.create_aggregate_function("ST_Extent", 1, FLAGS, ExtentAgg)?;
+    Ok(())
 }
 
 fn register_predicate(

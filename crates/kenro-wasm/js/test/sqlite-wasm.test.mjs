@@ -72,6 +72,32 @@ test("gpkg rtree triggers run under trusted_schema=off", () => {
   }
 });
 
+test("ST_Extent aggregate folds the bounding box, skipping NULL rows", () => {
+  const db = openDb();
+  try {
+    db.exec(`
+      CREATE TABLE pts (grp TEXT, geom BLOB);
+      INSERT INTO pts VALUES
+        ('a', ST_GeomFromText('POINT(1 2)')),
+        ('a', ST_GeomFromText('POINT(5 0)')),
+        ('a', NULL),
+        ('b', NULL);
+    `);
+    const rows = [];
+    db.exec({
+      sql: "SELECT grp, ST_AsText(ST_Extent(geom)) FROM pts GROUP BY grp ORDER BY grp",
+      rowMode: "array",
+      callback: (row) => rows.push(row),
+    });
+    // PostGIS gives BOX(1 0,5 2); kenro returns the same box as a polygon.
+    assert.deepEqual(rows[0], ["a", "POLYGON((1 0,1 2,5 2,5 0,1 0))"]);
+    // An all-NULL group is NULL, not an empty polygon.
+    assert.deepEqual(rows[1], ["b", null]);
+  } finally {
+    db.close();
+  }
+});
+
 test("ST_Union aggregate dissolves per group", () => {
   const db = openDb();
   try {
