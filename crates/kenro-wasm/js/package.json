@@ -67,6 +67,8 @@
   "scripts": {
     "prepack": "node -e \"fs.rmSync(\\\"pkg/.gitignore\\\",{force:true});fs.rmSync(\\\"pkg/README.md\\\",{force:true})\"",
     "test": "node --test && npm run test:types",
+    "bench": "node examples/index-comparison.mjs",
+    "bench:check": "node examples/index-comparison.mjs --check",
     "test:types": "tsc -p tsconfig.json"
   },
   "devDependencies": {

@@ -301,6 +301,33 @@ cells never meet the feature's, and rows go missing with no error. If you move
 off the defaults, keep them in one constant per table and import it on both
 sides.
 
+### Which one
+
+Candidate rows per window over 50,000 buildings, 500 line features and 20 large
+polygons — fewer is better, bold is the best index for that row:
+
+| window | true hits | `tiles` z10 | `tiles` z12 | `tiles` z14 | `quadtree` |
+|---|---|---|---|---|---|
+| 0.005° | 14 | 10,417 | 826 | **106** | 485 |
+| 0.05° | 325 | 13,241 | 1,905 | **616** | 1,085 |
+| 0.25° | 5,114 | 21,997 | **8,636** | 50,520 | 10,754 |
+| 1° | 12,022 | **25,868** | 50,520 | 50,520 | 30,233 |
+
+Every fixed zoom wins around what it was tuned for and then falls off a cliff:
+past `maxCells` the cover stops being enumerable, `cellsForQuery` returns
+`null`, and the query scans all 50,520 rows. The quadtree is never the fastest
+column and never the cliff either — it degrades smoothly over three orders of
+magnitude of window size with no zoom to choose, and stores one row per feature
+(50,520 against z14's 61,050, since a feature spanning four tiles needs four
+rows in the fixed grid).
+
+So: `tiles` if your windows are all about one size and you will tune for it,
+`quadtree` if they are not. A map that zooms is the obvious second case.
+
+`node examples/index-comparison.mjs` in `crates/kenro-wasm/js` reproduces the
+table; CI runs it with `--check`, which fails if either index moves away from
+these numbers without the docs following.
+
 ## Cloudflare Workers, D1 and Durable Objects
 
 Workers cannot load native extensions, and neither **D1** nor **Durable

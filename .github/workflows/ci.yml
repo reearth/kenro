@@ -104,9 +104,14 @@ jobs:
         run: |
           npm ci
           npm test
-      # The Cloudflare example is the only place `Prepared` and
-      # `kenro-wasm/tiles` are exercised against a real host: workerd, real
-      # SQLite (D1 and Durable Object), the freshly built wasm.
+      # The index comparison in docs/wasm.md is generated, not hand-written;
+      # this fails if either index drifts away from the documented numbers.
+      - name: Spatial index comparison (docs regression gate)
+        working-directory: crates/kenro-wasm/js
+        run: npm run bench:check
+      # The Cloudflare example is the only place `Prepared` and the spatial
+      # indexes are exercised against a real host: workerd, real SQLite (D1
+      # and Durable Object), the freshly built wasm.
       - name: Cloudflare example (workerd)
         working-directory: crates/kenro-wasm/cloudflare
         run: |

@@ -79,10 +79,10 @@ window (fewer is better):
 
 | window | true hits | `tiles` z10 | `tiles` z12 | `tiles` z14 | `quadtree` |
 |---|---|---|---|---|---|
-| 0.005° | 16 | 10,088 | 860 | **110** | 475 |
-| 0.05° | 333 | 12,334 | 1,854 | **620** | 1,076 |
-| 0.25° | 5,411 | 21,607 | **9,081** | 50,520 | 11,416 |
-| 1° | 14,182 | **27,908** | 50,520 | 50,520 | 32,150 |
+| 0.005° | 14 | 10,417 | 826 | **106** | 485 |
+| 0.05° | 325 | 13,241 | 1,905 | **616** | 1,085 |
+| 0.25° | 5,114 | 21,997 | **8,636** | 50,520 | 10,754 |
+| 1° | 12,022 | **25,868** | 50,520 | 50,520 | 30,233 |
 
 Every fixed zoom wins in a band around what it was tuned for, then falls off a
 cliff: past `maxCells` the cover stops being enumerable and the query scans the
@@ -90,7 +90,8 @@ whole table. The quadtree is never the fastest column and never the cliff
 either — it degrades smoothly across four orders of magnitude of window size,
 with no zoom to choose. It also stores exactly one row per feature (50,520)
 where z14 stores 61,050, because a feature spanning four tiles needs four rows
-in the fixed grid and one cell here.
+in the fixed grid and one cell here. `node examples/index-comparison.mjs` in
+`crates/kenro-wasm/js` reproduces this table.
 
 Pick `kenro-wasm/tiles` if your windows are all about one size and you are
 willing to tune for it. Pick `kenro-wasm/quadtree` if they are not — a map that
