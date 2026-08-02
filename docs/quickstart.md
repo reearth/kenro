@@ -16,10 +16,11 @@ Pick the row that matches your platform, then jump to its section:
 | `sqlite3` CLI | loadable extension | [sqlite3 CLI](#sqlite3-cli) |
 | Docker / Cloud Run / Fly.io / ECS | loadable extension in a container | [Containers](#containers-cloud-run-flyio-ecs-) |
 | AWS Lambda | loadable extension (layer or container) | [AWS Lambda](#aws-lambda) |
-| Cloudflare Workers | kenro-wasm | [Cloudflare Workers](#cloudflare-workers) |
+| Cloudflare Workers / D1 / Durable Objects | kenro-wasm (no UDFs there — see below) | [Cloudflare](#cloudflare-workers-d1-and-durable-objects) |
 | Browser | kenro-wasm | [docs/wasm.md](wasm.md) |
 
-Everything below assumes the extension binary exists — grab it first:
+The two wasm rows need no extension binary; everything else below assumes it
+exists — grab it first:
 
 ## Getting the loadable extension
 
@@ -273,7 +274,7 @@ def handler(event, context):
 (The Lambda-managed Python runtimes ship a `sqlite3` module with extension
 loading enabled.)
 
-## Cloudflare Workers
+## Cloudflare Workers, D1 and Durable Objects
 
 Workers cannot load native extensions, and neither **D1** nor **Durable
 Object SQLite** supports user-defined functions (the supported extension set
@@ -291,6 +292,8 @@ queries. Three patterns that do work:
   JS on the survivors. A complete Worker doing this on both D1 and Durable
   Object SQLite, with tests that run in workerd, lives in
   [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).
+  The pieces it uses — the `Prepared` handle and `kenro-wasm/tiles` — are
+  documented in [docs/wasm.md](wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
 - **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite]
   over bytes fetched from R2/KV (read-only analytics on a shipped
   `.gpkg`/`.sqlite`), and `registerKenro` as usual — the same adapters

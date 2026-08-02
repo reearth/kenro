@@ -97,6 +97,12 @@ Then take what you need from this directory — `src/spatial.mjs` is the whole
 plan in ~150 lines, `src/spatial-do.mjs` and `src/spatial-d1.mjs` are the two
 plumbings — and adapt the schema to your data.
 
+The two pieces this leans on are part of the package and documented in
+[docs/wasm.md](../../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles):
+`Prepared` (a geometry decoded once, with predicates, output and
+reprojection chained off it) and `kenro-wasm/tiles` (the R-tree stand-in).
+Both ship TypeScript types.
+
 ## Running this example from the repo
 
 The example builds the wasm from the working tree instead of installing the

@@ -61,7 +61,7 @@
     "LICENSE-APACHE"
   ],
   "scripts": {
-    "prepack": "node -e \"fs.rmSync('pkg/.gitignore',{force:true})\"",
+    "prepack": "node -e \"fs.rmSync(\\\"pkg/.gitignore\\\",{force:true});fs.rmSync(\\\"pkg/README.md\\\",{force:true})\"",
     "test": "node --test && npm run test:types",
     "test:types": "tsc -p tsconfig.json"
   },

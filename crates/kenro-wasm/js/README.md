@@ -1,9 +1,10 @@
 # kenro-wasm
 
-**SpatiaLite-style spatial SQL for SQLite in the browser** —
+**SpatiaLite-style spatial SQL for SQLite in JavaScript** —
 PostGIS-compatible `ST_` functions registered as JS-level UDFs on any wasm
 SQLite host: the official [@sqlite.org/sqlite-wasm] build, [sql.js], and
-[wa-sqlite].
+[wa-sqlite]. On hosts whose SQLite takes no UDFs at all — **Cloudflare D1
+and Durable Objects** — the same functions run standalone, from JS.
 
 kenro is a spatial SQL engine in pure Rust (~80 functions: the DE-9IM
 predicate family, overlay/repair/buffer, CRS transform, H3, GeoJSON, MVT
@@ -45,6 +46,39 @@ functions error loudly; no R-tree module) and measured sizes:
 [docs/wasm.md]. The full function table with PostGIS/DuckDB comparison:
 [docs/functions.md].
 
+## Cloudflare Workers, D1 and Durable Objects
+
+Neither D1 nor Durable Object SQLite supports user-defined functions or an
+R-tree, so `ST_Intersects(...)` can never appear in their SQL. The split
+that does work: kenro derives a bounding box and tile cells at *write* time
+for plain SQL to index, then runs the exact predicate in JS on the
+survivors.
+
+```js
+import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";  // Workers hand you the Module
+import * as kenro from "kenro-wasm";
+import { cellsForQuery } from "kenro-wasm/tiles";
+
+kenro.initSync({ module: wasmModule });                      // once per isolate
+
+using win = kenro.Prepared.fromText(wkt, 4326);              // decode once per scan
+const hits = rows.filter((r) => {
+  using g = kenro.Prepared.fromBlob(r.geom);
+  return g.stIntersects(win);
+});
+```
+
+Three subpaths carry this, all typed:
+
+| | |
+|---|---|
+| `kenro-wasm` → `Prepared` | a geometry decoded once, then predicates, GeoJSON/WKT output and reprojection chained off it |
+| `kenro-wasm/tiles` | bounding box → Web Mercator tile ids: the B-tree-indexable stand-in for the missing R-tree (sql.js lacks one too) |
+| `kenro-wasm/prepared` | handle lifetimes where `using` isn't available |
+
+A complete Worker on both backends, with tests that run in workerd:
+[the Cloudflare example]. API reference: [docs/wasm.md].
+
 ## License
 
 MIT OR Apache-2.0, at your option.
@@ -55,3 +89,4 @@ MIT OR Apache-2.0, at your option.
 [GitHub Releases]: https://github.com/reearth/kenro/releases
 [docs/wasm.md]: https://github.com/reearth/kenro/blob/main/docs/wasm.md
 [docs/functions.md]: https://github.com/reearth/kenro/blob/main/docs/functions.md
+[the Cloudflare example]: https://github.com/reearth/kenro/blob/main/crates/kenro-wasm/cloudflare/README.md

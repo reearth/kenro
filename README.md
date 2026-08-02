@@ -7,9 +7,9 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/reearth/kenro/go.svg)](https://pkg.go.dev/github.com/reearth/kenro/go)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
-**SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in pure Go with no cgo (modernc.org/sqlite + wazero), in containers and serverless (Cloud Run / Lambda / Workers), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
+**SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in pure Go with no cgo (modernc.org/sqlite + wazero), in containers and serverless (Cloud Run / Lambda / Cloudflare Workers, D1 and Durable Objects), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
-If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, or *GeoPackage in pure Rust*: this is that crate.
+If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
 **kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~80 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
@@ -56,7 +56,9 @@ Inserts, updates and deletes through SQL keep the spatial index in sync via the 
 kenro ships as a standard SQLite loadable extension — one prebuilt binary
 per OS on the [releases page](https://github.com/reearth/kenro/releases)
 (Linux x86_64/arm64, macOS universal, Windows), loadable from any language
-whose SQLite driver exposes extension loading:
+whose SQLite driver exposes extension loading. (Not applicable in the
+browser, on Cloudflare, or with pure-Go SQLite — see the three quickstarts
+below.)
 
 ```sh
 curl -fsSL https://github.com/reearth/kenro/releases/latest/download/kenro-ext-x86_64-unknown-linux-gnu.tar.gz | tar xz
@@ -106,6 +108,26 @@ measured sizes, and per-host limitations are in [docs/wasm.md](docs/wasm.md).
 **Live demo: <https://reearth.github.io/kenro/>** — drag a GeoPackage in
 and query it with spatial SQL, entirely client-side (source in
 `crates/kenro-wasm/demo/`).
+
+## Quickstart (Cloudflare — Workers, D1, Durable Objects)
+
+Workers can't load a native extension, and **neither D1 nor Durable Object
+SQLite accepts user-defined functions** — no `ST_` call can appear in their
+SQL, and there is no R-tree module either. What works is a split: kenro
+derives the bounding box and a tile cell at *write* time so plain SQL can
+index them, then runs the exact predicate in JS on the survivors.
+
+```js
+import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";  // Workers hand you the Module
+import * as kenro from "kenro-wasm";
+import { cellsForQuery } from "kenro-wasm/tiles";            // the R-tree stand-in
+
+kenro.initSync({ module: wasmModule });                      // once per isolate
+```
+
+A complete Worker doing this on both D1 and Durable Objects — schema,
+migrations, and tests that run in workerd — is in
+[`crates/kenro-wasm/cloudflare/`](crates/kenro-wasm/cloudflare/README.md).
 
 ## Quickstart (pure Go — no cgo)
 

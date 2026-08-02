@@ -1,4 +1,4 @@
-# kenro in the browser (kenro-wasm)
+# kenro in JavaScript — browser and edge (kenro-wasm)
 
 Browser SQLite builds are Emscripten C builds that cannot load a native
 extension — but they all expose JS-level user-defined-function registration.
@@ -8,6 +8,14 @@ that wires the exports in as SQL functions. The function catalog is a single
 machine-readable manifest shared with the rusqlite binding
 (`kenro::functions::manifest`, consistency-tested in CI), so the hosts
 cannot drift.
+
+Two ways to use this package, and which one you get is decided by your host,
+not by preference:
+
+| your SQLite | what you do | start at |
+|---|---|---|
+| accepts JS user-defined functions (`@sqlite.org/sqlite-wasm`, sql.js, wa-sqlite) | register kenro and write ordinary spatial SQL | [Usage](#usage) |
+| does not (**Cloudflare D1, Durable Objects**) | index in SQL on columns kenro computes at write time, run the predicates in JS | [Without SQLite](#without-sqlite-prepared-and-kenro-wasmtiles), then the [Cloudflare example](../crates/kenro-wasm/cloudflare/README.md) |
 
 ## Size
 
