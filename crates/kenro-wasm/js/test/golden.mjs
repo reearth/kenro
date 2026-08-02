@@ -829,6 +829,33 @@ export const SMOKE_SQL = {
     check: (v) => Math.abs(Number(v) - 2.23606797749979) < 1e-9,
   },
 
+
+  // --- smallest enclosing circle and overlay-powered areal operations ---
+  "ST_MinimumBoundingRadius/1": {
+    sql: "SELECT ST_MinimumBoundingRadius(ST_GeomFromText('LINESTRING(0 0,4 0)'))",
+    check: (v) => Math.abs(Number(v) - 2) < 1e-9,
+  },
+  "ST_MinimumBoundingCircle/1": {
+    sql: "SELECT ST_Covers(ST_MinimumBoundingCircle(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))')), ST_GeomFromText('POINT(4 4)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_MinimumBoundingCircle/2": {
+    sql: "SELECT ST_NPoints(ST_MinimumBoundingCircle(ST_GeomFromText('LINESTRING(0 0,4 0)'), 2))",
+    check: (v) => Number(v) === 9,
+  },
+  "ST_UnaryUnion/1": {
+    sql: "SELECT ST_Area(ST_UnaryUnion(ST_GeomFromText('MULTIPOLYGON(((0 0,2 0,2 2,0 2,0 0)),((1 1,3 1,3 3,1 3,1 1)))')))",
+    check: (v) => Math.abs(Number(v) - 7) < 1e-9,
+  },
+  "ST_ClipByBox2D/2": {
+    sql: "SELECT ST_Area(ST_ClipByBox2D(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_MakeEnvelope(2,2,5,5)))",
+    check: (v) => Math.abs(Number(v) - 9) < 1e-9,
+  },
+  "ST_Subdivide/2": {
+    sql: "SELECT ST_Area(ST_Subdivide(ST_Segmentize(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), 2), 8))",
+    check: (v) => Math.abs(Number(v) - 100) < 1e-9,
+  },
+
 };
 
 /**

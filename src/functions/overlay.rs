@@ -507,6 +507,181 @@ pub fn st_buffer(bytes: &[u8], distance: f64, options_text: Option<&str>) -> Res
     encode(normalize_polygons(buffered), geom.srid, FUNC)
 }
 
+/// `ST_UnaryUnion(geom)` — dissolve a geometry against itself, merging the
+/// overlapping parts of a multipolygon into one areal result.
+///
+/// PostGIS's use for this is exactly kenro's: repair a "multipolygon" whose
+/// members overlap into a clean one. Non-areal input passes through
+/// unchanged, as in PostGIS.
+pub fn st_unary_union(bytes: &[u8]) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_UnaryUnion";
+    let g = geom::decode_auto(bytes)?;
+    let dissolved = match &g.geometry {
+        Geometry::Polygon(p) => normalize_polygons(MultiPolygon::new(vec![p.clone()])),
+        // geo::unary_union is the dissolve — a pairwise union against an
+        // empty operand leaves overlapping members untouched.
+        Geometry::MultiPolygon(mp) => normalize_polygons(geo::unary_union(mp.iter())),
+        other => other.clone(),
+    };
+    geom::encode_canonical_gpb(
+        &Geom {
+            geometry: dissolved,
+            srid: g.srid,
+            has_zm: false,
+        },
+        FUNC,
+    )
+}
+
+/// `ST_ClipByBox2D(geom, box)` — the part of `geom` inside the box, which is
+/// any geometry's envelope (PostGIS takes a `box2d`, which SQLite has no type
+/// for; pass `ST_MakeEnvelope(...)`).
+///
+/// Unlike PostGIS — which documents that it may return an invalid geometry
+/// because it clips without repairing — this goes through the overlay engine,
+/// so the result is valid.
+pub fn st_clip_by_box_2d(bytes: &[u8], box_geom: &[u8]) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_ClipByBox2D";
+    let g = geom::decode_auto(bytes)?;
+    let b = geom::decode_auto(box_geom)?;
+    if g.srid > 0 && b.srid > 0 && g.srid != b.srid {
+        return Err(Error::MixedSrid {
+            func: FUNC,
+            a: g.srid,
+            b: b.srid,
+        });
+    }
+    let Some(env) = geom::envelope(&b.geometry) else {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: "the clip box is empty".into(),
+        });
+    };
+    let rect = envelope_polygon(&env);
+    st_intersection(
+        &geom::encode_canonical_gpb(
+            &Geom {
+                geometry: g.geometry.clone(),
+                srid: g.srid,
+                has_zm: false,
+            },
+            FUNC,
+        )?,
+        &geom::encode_canonical_gpb(
+            &Geom {
+                geometry: Geometry::Polygon(rect),
+                srid: g.srid,
+                has_zm: false,
+            },
+            FUNC,
+        )?,
+    )
+}
+
+fn envelope_polygon(env: &crate::gpb::Envelope) -> Polygon<f64> {
+    use geo_types::coord;
+    Polygon::new(
+        LineString::new(vec![
+            coord! { x: env.min_x, y: env.min_y },
+            coord! { x: env.max_x, y: env.min_y },
+            coord! { x: env.max_x, y: env.max_y },
+            coord! { x: env.min_x, y: env.max_y },
+            coord! { x: env.min_x, y: env.min_y },
+        ]),
+        vec![],
+    )
+}
+
+/// `ST_Subdivide(geom, max_vertices)` — split an areal geometry until no part
+/// has more than `max_vertices` vertices, halving along the longer axis each
+/// time.
+///
+/// ⚠️ PostGIS returns one **row per part**; kenro has no set-returning
+/// functions, so this returns a single MULTIPOLYGON. Use `ST_NumGeometries` /
+/// `ST_GeometryN` to walk it.
+pub fn st_subdivide(bytes: &[u8], max_vertices: i64) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_Subdivide";
+    if max_vertices < 5 {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: "max_vertices must be at least 5 (a rectangle's ring)".into(),
+        });
+    }
+    let g = geom::decode_auto(bytes)?;
+    let mut parts: Vec<Polygon<f64>> = Vec::new();
+    let input: Vec<Polygon<f64>> = match &g.geometry {
+        Geometry::Polygon(p) => vec![p.clone()],
+        Geometry::MultiPolygon(mp) => mp.0.clone(),
+        // Non-areal input is returned unchanged, as PostGIS does for points.
+        other => {
+            return geom::encode_canonical_gpb(
+                &Geom {
+                    geometry: other.clone(),
+                    srid: g.srid,
+                    has_zm: false,
+                },
+                FUNC,
+            );
+        }
+    };
+    for polygon in input {
+        subdivide_into(&polygon, max_vertices as usize, 0, &mut parts);
+    }
+    geom::encode_canonical_gpb(
+        &Geom {
+            geometry: Geometry::MultiPolygon(MultiPolygon::new(parts)),
+            srid: g.srid,
+            has_zm: false,
+        },
+        FUNC,
+    )
+}
+
+/// Depth is bounded so a pathological geometry cannot recurse forever; the
+/// remaining oversized part is emitted as-is rather than looping.
+fn subdivide_into(
+    p: &Polygon<f64>,
+    max_vertices: usize,
+    depth: usize,
+    out: &mut Vec<Polygon<f64>>,
+) {
+    use geo::algorithm::CoordsIter;
+    if p.coords_count() <= max_vertices || depth >= 24 {
+        out.push(p.clone());
+        return;
+    }
+    let Some(env) = geom::envelope(&Geometry::Polygon(p.clone())) else {
+        return;
+    };
+    let (w, h) = (env.max_x - env.min_x, env.max_y - env.min_y);
+    let halves = if w >= h {
+        let mid = env.min_x + w / 2.0;
+        [
+            (env.min_x, env.min_y, mid, env.max_y),
+            (mid, env.min_y, env.max_x, env.max_y),
+        ]
+    } else {
+        let mid = env.min_y + h / 2.0;
+        [
+            (env.min_x, env.min_y, env.max_x, mid),
+            (env.min_x, mid, env.max_x, env.max_y),
+        ]
+    };
+    for (minx, miny, maxx, maxy) in halves {
+        let rect = envelope_polygon(&crate::gpb::Envelope {
+            min_x: minx,
+            min_y: miny,
+            max_x: maxx,
+            max_y: maxy,
+        });
+        let clipped =
+            MultiPolygon::new(vec![p.clone()]).intersection(&MultiPolygon::new(vec![rect]));
+        for part in clipped {
+            subdivide_into(&part, max_vertices, depth + 1, out);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

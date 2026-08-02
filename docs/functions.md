@@ -215,11 +215,33 @@ naming the feature.
 | `ST_LongestLine(a, b)` | geometry / NULL | ✅ | ❌ | ✅ | Always attained at a vertex pair |
 | `ST_MaxDistance(a, b)` | REAL / NULL | ✅ | ❌ | ✅ | The length of `ST_LongestLine` |
 
+## Enclosing circle and areal operations
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_MinimumBoundingRadius(geom)` | REAL / NULL | ✅ | ❌ | ✅ | ⚠️ PostGIS returns a `(center, radius)` record; SQLite has no record type, so kenro returns the radius. The centre is `ST_Centroid(ST_MinimumBoundingCircle(geom))` |
+| `ST_MinimumBoundingCircle(geom [, segs_per_quarter])` | geometry / NULL | ✅ | ❌ | ✅ | Welzl, run deterministically (no shuffle) so SQL is reproducible; 48 segments per quarter by default, as in PostGIS |
+| `ST_UnaryUnion(geom)` | geometry | ✅ | ❌ | ✅ | `overlay` feature. Dissolves a multipolygon's overlapping members into one areal result; non-areal input passes through |
+| `ST_ClipByBox2D(geom, box)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ takes **any geometry** and uses its envelope (PostGIS takes a `box2d`) — pass `ST_MakeEnvelope(...)`. Unlike PostGIS, which documents that it may return an invalid geometry, this goes through the overlay engine, so the result is valid |
+| `ST_Subdivide(geom, max_vertices)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ PostGIS returns **one row per part**; kenro has no set-returning functions, so this returns a MULTIPOLYGON — walk it with `ST_NumGeometries` / `ST_GeometryN`. Splits along the longer axis; `max_vertices` must be ≥ 5 |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
-- **Topology / network analysis** — no `ST_Node`/`ST_Polygonize`, no
-  routing (SpatiaLite's librttopo topology and VirtualRouting).
+- **Topology / network analysis** — no `ST_Node`/`ST_Polygonize`/`ST_Split`/
+  `ST_LineMerge`/`ST_Snap`, no routing (SpatiaLite's librttopo topology and
+  VirtualRouting). These need a noding engine kenro does not carry.
+- **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`, no grid
+  generators (`ST_SquareGrid`, `ST_HexagonGrid`), no `ST_VoronoiPolygons`:
+  they would need SQLite table-valued functions, and kenro registers scalars
+  and aggregates only. Where the shape allows it, kenro returns a MULTI\*
+  instead (see `ST_Subdivide`).
+- **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
+- **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
+  no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
+- **Simplicity testing** — no `ST_IsSimple`: `geo`'s validation reports
+  ring self-intersection for polygons (which is how `ST_IsRing` works) but
+  has no general self-intersection test for a linestring.
 - **File-format conversion** — kenro operates on geometry *values*
   (WKT/WKB/GeoJSON/GeoPackage blobs), not files; reading shapefiles,
   spreadsheets or writing whole GeoPackages is GDAL/ogr2ogr territory

@@ -491,6 +491,41 @@ pub fn st_max_distance(a: &[u8], b: &[u8]) -> R<Option<f64>> {
     linear::st_max_distance(a, b).map_err(err)
 }
 
+// ---- Smallest enclosing circle and overlay-powered areal operations ----
+
+#[wasm_bindgen(js_name = stMinimumBoundingRadius)]
+pub fn st_minimum_bounding_radius(geom: &[u8]) -> R<Option<f64>> {
+    linear::st_minimum_bounding_radius(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMinimumBoundingCircle)]
+pub fn st_minimum_bounding_circle(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    linear::st_minimum_bounding_circle(geom, 48).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMinimumBoundingCircleSegs)]
+pub fn st_minimum_bounding_circle_segs(geom: &[u8], segs: i32) -> R<Option<Vec<u8>>> {
+    linear::st_minimum_bounding_circle(geom, segs as i64).map_err(err)
+}
+
+#[cfg(feature = "overlay")]
+#[wasm_bindgen(js_name = stUnaryUnion)]
+pub fn st_unary_union(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_unary_union(geom).map_err(err)
+}
+
+#[cfg(feature = "overlay")]
+#[wasm_bindgen(js_name = stClipByBox2d)]
+pub fn st_clip_by_box_2d(geom: &[u8], box_geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_clip_by_box_2d(geom, box_geom).map_err(err)
+}
+
+#[cfg(feature = "overlay")]
+#[wasm_bindgen(js_name = stSubdivide)]
+pub fn st_subdivide(geom: &[u8], max_vertices: i32) -> R<Vec<u8>> {
+    kenro::functions::overlay::st_subdivide(geom, max_vertices as i64).map_err(err)
+}
+
 // ---- SRID ----
 
 #[wasm_bindgen(js_name = stSetSrid)]
@@ -1248,6 +1283,12 @@ mod tests {
             "stShortestLine",
             "stLongestLine",
             "stMaxDistance",
+            "stMinimumBoundingRadius",
+            "stMinimumBoundingCircle",
+            "stMinimumBoundingCircleSegs",
+            "stUnaryUnion",
+            "stClipByBox2d",
+            "stSubdivide",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

@@ -708,3 +708,104 @@ fn phase3_functions_are_null_strict() {
         assert!(v.is_none(), "{sql} was not NULL-strict");
     }
 }
+
+// ---- Smallest enclosing circle, and the overlay-powered areal operations ----
+
+#[test]
+fn minimum_bounding_circle_and_radius() {
+    let conn = conn();
+    // PostGIS 3.5: ST_MinimumBoundingRadius(LINESTRING(0 0,4 0)) → radius 2
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_MinimumBoundingRadius(ST_GeomFromText('LINESTRING(0 0,4 0)'))"
+        ) - 2.0)
+            .abs()
+            < 1e-9
+    );
+    // The circle covers the far corner of the square it was built from.
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_Covers(ST_MinimumBoundingCircle(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))')), ST_GeomFromText('POINT(4 4)'))"
+        ),
+        Some(1)
+    );
+    // The segments-per-quarter arity controls the vertex count.
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_NPoints(ST_MinimumBoundingCircle(ST_GeomFromText('LINESTRING(0 0,4 0)'), 2))"
+        ),
+        Some(9) // 4 quarters x 2 segments, plus the closing vertex
+    );
+}
+
+#[test]
+#[cfg(feature = "overlay")]
+fn areal_operations_through_the_overlay_mesh() {
+    let conn = conn();
+    // Two overlapping members dissolve into one polygon, as in PostGIS.
+    let dissolved = text(
+        &conn,
+        "SELECT ST_GeometryType(ST_UnaryUnion(ST_GeomFromText('MULTIPOLYGON(((0 0,2 0,2 2,0 2,0 0)),((1 1,3 1,3 3,1 3,1 1)))')))",
+    );
+    assert_eq!(dissolved.as_deref(), Some("ST_Polygon"));
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_Area(ST_UnaryUnion(ST_GeomFromText('MULTIPOLYGON(((0 0,2 0,2 2,0 2,0 0)),((1 1,3 1,3 3,1 3,1 1)))')))"
+        ) - 7.0)
+            .abs()
+            < 1e-9
+    );
+
+    // PostGIS 3.5: ST_ClipByBox2D(10x10 square, box 2..5) → POLYGON((2 2,2 5,5 5,5 2,2 2))
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_Area(ST_ClipByBox2D(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_MakeEnvelope(2,2,5,5)))"
+        ) - 9.0)
+            .abs()
+            < 1e-9
+    );
+
+    // Subdivision preserves area and respects the vertex budget. A plain
+    // square already fits in 5 vertices — PostGIS leaves it alone too — so
+    // densify it first to have something to split.
+    let dense = "ST_Segmentize(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), 2)";
+    assert!(
+        (real(&conn, &format!("SELECT ST_Area(ST_Subdivide({dense}, 8))")) - 100.0).abs() < 1e-9
+    );
+    assert!(
+        int(
+            &conn,
+            &format!("SELECT ST_NumGeometries(ST_Subdivide({dense}, 8))")
+        )
+        .unwrap()
+            > 1,
+        "a 20-vertex square with a budget of 8 must split"
+    );
+    // A budget too small to hold a rectangle is a loud error.
+    assert!(
+        conn.query_row(
+            "SELECT ST_Subdivide(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), 3)",
+            [],
+            |r| r.get::<_, Vec<u8>>(0)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn phase4_functions_are_null_strict() {
+    let conn = conn();
+    for sql in [
+        "SELECT ST_MinimumBoundingRadius(NULL)",
+        "SELECT ST_MinimumBoundingCircle(NULL)",
+        "SELECT ST_MinimumBoundingCircle(NULL, 8)",
+    ] {
+        let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+        assert!(v.is_none(), "{sql} was not NULL-strict");
+    }
+}

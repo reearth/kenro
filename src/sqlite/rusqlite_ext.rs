@@ -219,6 +219,17 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         // PostGIS accepts both spellings; so does kenro.
         register_geom2_to_blob(conn, "ST_SymmetricDifference", overlay::st_sym_difference)?;
         register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
+        register_geom_to_blob(conn, "ST_UnaryUnion", overlay::st_unary_union)?;
+        register_geom2_to_blob(conn, "ST_ClipByBox2D", overlay::st_clip_by_box_2d)?;
+        conn.create_scalar_function("ST_Subdivide", 2, FLAGS, |ctx| {
+            let (Some(g), Some(max)) = (
+                blob_or_null(ctx, 0, "ST_Subdivide")?,
+                i64_or_null(ctx, 1, "ST_Subdivide")?,
+            ) else {
+                return Ok(None);
+            };
+            blob(overlay::st_subdivide(g, max))
+        })?;
         register_geom_to_blob(conn, "ST_MakeValid", overlay::st_make_valid)?;
         conn.create_scalar_function("ST_Buffer", 2, FLAGS, |ctx| {
             let (Some(b), Some(d)) = (
@@ -1139,6 +1150,33 @@ fn register_geodesic_and_linear(conn: &Connection) -> rusqlite::Result<()> {
             f(a, b).map(|v| v.map(Value::Blob)).map_err(sql_err)
         })?;
     }
+    conn.create_scalar_function("ST_MinimumBoundingRadius", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_MinimumBoundingRadius")? else {
+            return Ok(None);
+        };
+        linear::st_minimum_bounding_radius(b)
+            .map(|v| v.map(Value::Real))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_MinimumBoundingCircle", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_MinimumBoundingCircle")? else {
+            return Ok(None);
+        };
+        linear::st_minimum_bounding_circle(b, 48)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_MinimumBoundingCircle", 2, FLAGS, |ctx| {
+        let (Some(b), Some(segs)) = (
+            blob_or_null(ctx, 0, "ST_MinimumBoundingCircle")?,
+            i64_or_null(ctx, 1, "ST_MinimumBoundingCircle")?,
+        ) else {
+            return Ok(None);
+        };
+        linear::st_minimum_bounding_circle(b, segs)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
     conn.create_scalar_function("ST_MaxDistance", 2, FLAGS, |ctx| {
         let (Some(a), Some(b)) = (
             blob_or_null(ctx, 0, "ST_MaxDistance")?,

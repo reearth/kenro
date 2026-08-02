@@ -388,6 +388,50 @@ pub const FUNCTIONS: &[FnEntry] = &[
         OptReal,
         None
     ),
+    // Smallest enclosing circle — no overlay engine needed.
+    entry!(
+        "ST_MinimumBoundingRadius",
+        "stMinimumBoundingRadius",
+        [Blob],
+        OptReal,
+        None
+    ),
+    entry!(
+        "ST_MinimumBoundingCircle",
+        "stMinimumBoundingCircle",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MinimumBoundingCircle",
+        "stMinimumBoundingCircleSegs",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    // Areal operations that go through the overlay mesh.
+    entry!(
+        "ST_UnaryUnion",
+        "stUnaryUnion",
+        [Blob],
+        Blob,
+        Some("overlay")
+    ),
+    entry!(
+        "ST_ClipByBox2D",
+        "stClipByBox2d",
+        [Blob, Blob],
+        Blob,
+        Some("overlay")
+    ),
+    entry!(
+        "ST_Subdivide",
+        "stSubdivide",
+        [Blob, Int],
+        Blob,
+        Some("overlay")
+    ),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -723,6 +767,9 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_DistanceSpheroid", &[2, 3]),
     ("ST_LengthSpheroid", &[2]),
     ("ST_Length2DSpheroid", &[2]),
+    ("ST_UnaryUnion", &[1]),
+    ("ST_ClipByBox2D", &[2]),
+    ("ST_Subdivide", &[2]),
     ("ST_Union", &[1, 2]),
     ("ST_Buffer", &[2, 3]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),

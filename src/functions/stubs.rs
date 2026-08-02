@@ -76,6 +76,18 @@ pub const OVERLAY_OFF: &[Stub] = &[
         hint: "kenro was built without the `overlay` cargo feature.",
     },
     Stub {
+        name: "ST_UnaryUnion",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_ClipByBox2D",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
+        name: "ST_Subdivide",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
         name: "ST_Buffer",
         hint: "kenro was built without the `overlay` cargo feature.",
     },

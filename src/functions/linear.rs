@@ -264,6 +264,109 @@ fn project_onto(p: Coord<f64>, s: Coord<f64>, e: Coord<f64>) -> Coord<f64> {
     }
 }
 
+/// `ST_MinimumBoundingRadius(geom)` — the radius of the smallest enclosing
+/// circle.
+///
+/// ⚠️ PostGIS returns a `(center, radius)` record; SQLite has no record type,
+/// so kenro returns the radius alone. The centre is
+/// `ST_Centroid(ST_MinimumBoundingCircle(geom))`.
+pub fn st_minimum_bounding_radius(bytes: &[u8]) -> Result<Option<f64>> {
+    let g = geom::decode_auto(bytes)?;
+    Ok(smallest_enclosing_circle(&vertices(&g.geometry)).map(|(_, r)| r))
+}
+
+/// `ST_MinimumBoundingCircle(geom [, segs_per_quarter])` — that circle as a
+/// polygon, 48 segments per quarter by default (PostGIS's default).
+pub fn st_minimum_bounding_circle(bytes: &[u8], segs_per_quarter: i64) -> Result<Option<Vec<u8>>> {
+    const FUNC: &str = "ST_MinimumBoundingCircle";
+    if segs_per_quarter < 1 {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: "segments per quarter must be at least 1".into(),
+        });
+    }
+    let g = geom::decode_auto(bytes)?;
+    let Some((centre, radius)) = smallest_enclosing_circle(&vertices(&g.geometry)) else {
+        return Ok(None);
+    };
+    if radius == 0.0 {
+        return out(Geometry::Point(Point::from(centre)), g.srid, FUNC).map(Some);
+    }
+    let steps = (segs_per_quarter * 4) as usize;
+    let mut ring: Vec<Coord<f64>> = (0..steps)
+        .map(|i| {
+            let theta = (i as f64) / (steps as f64) * std::f64::consts::TAU;
+            Coord {
+                x: centre.x + radius * theta.cos(),
+                y: centre.y + radius * theta.sin(),
+            }
+        })
+        .collect();
+    ring.push(ring[0]);
+    out(
+        Geometry::Polygon(geo_types::Polygon::new(LineString::new(ring), vec![])),
+        g.srid,
+        FUNC,
+    )
+    .map(Some)
+}
+
+/// Welzl's smallest enclosing circle, run incrementally over the input
+/// vertices. Deterministic (no shuffle), which matters for reproducible SQL.
+fn smallest_enclosing_circle(points: &[Coord<f64>]) -> Option<(Coord<f64>, f64)> {
+    let mut circle: Option<(Coord<f64>, f64)> = None;
+    for (i, p) in points.iter().enumerate() {
+        if circle.is_some_and(|c| in_circle(c, *p)) {
+            continue;
+        }
+        // p is on the boundary of the circle enclosing points[..=i].
+        let mut c = (*p, 0.0);
+        for (j, q) in points[..i].iter().enumerate() {
+            if in_circle(c, *q) {
+                continue;
+            }
+            c = circle_from_two(*p, *q);
+            for r in &points[..j] {
+                if !in_circle(c, *r) {
+                    c = circle_from_three(*p, *q, *r).unwrap_or(c);
+                }
+            }
+        }
+        circle = Some(c);
+    }
+    circle
+}
+
+fn in_circle((centre, radius): (Coord<f64>, f64), p: Coord<f64>) -> bool {
+    centre.euclidean_distance_to(&p) <= radius * (1.0 + 1e-12) + 1e-12
+}
+
+fn circle_from_two(a: Coord<f64>, b: Coord<f64>) -> (Coord<f64>, f64) {
+    let centre = Coord {
+        x: (a.x + b.x) / 2.0,
+        y: (a.y + b.y) / 2.0,
+    };
+    (centre, centre.euclidean_distance_to(&a))
+}
+
+/// The circumscribed circle, or `None` when the three points are collinear.
+fn circle_from_three(a: Coord<f64>, b: Coord<f64>, c: Coord<f64>) -> Option<(Coord<f64>, f64)> {
+    let d = 2.0 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+    if d.abs() < 1e-18 {
+        return None;
+    }
+    let (a2, b2, c2) = (
+        a.x * a.x + a.y * a.y,
+        b.x * b.x + b.y * b.y,
+        c.x * c.x + c.y * c.y,
+    );
+    let centre = Coord {
+        x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
+        y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
+    };
+    Some((centre, centre.euclidean_distance_to(&a)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,6 +377,34 @@ mod tests {
     }
     fn wkt(b: &[u8]) -> String {
         st_as_text(b).unwrap()
+    }
+
+    #[test]
+    fn minimum_bounding_circle_matches_postgis() {
+        // PostGIS 3.5: ST_MinimumBoundingRadius(LINESTRING(0 0,4 0)) → radius 2
+        let r = st_minimum_bounding_radius(&g("LINESTRING(0 0,4 0)"))
+            .unwrap()
+            .unwrap();
+        assert!((r - 2.0).abs() < 1e-9, "{r}");
+        // A square of side 4: radius is the half-diagonal.
+        let r = st_minimum_bounding_radius(&g("POLYGON((0 0,4 0,4 4,0 4,0 0))"))
+            .unwrap()
+            .unwrap();
+        assert!((r - 8f64.sqrt()).abs() < 1e-9, "{r}");
+        // A point encloses itself.
+        assert_eq!(
+            st_minimum_bounding_radius(&g("POINT(3 4)")).unwrap(),
+            Some(0.0)
+        );
+        // The circle really covers every vertex.
+        let circle = st_minimum_bounding_circle(&g("POLYGON((0 0,4 0,4 4,0 4,0 0))"), 48)
+            .unwrap()
+            .unwrap();
+        assert!(
+            crate::functions::predicates::st_covers(&circle, &g("POINT(4 4)")).unwrap(),
+            "circle must cover the corner"
+        );
+        assert!(st_minimum_bounding_circle(&g("POINT(0 0)"), 0).is_err());
     }
 
     #[test]
