@@ -397,8 +397,6 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **The `geography` type** — no `ST_GeogFromText` and friends; kenro has one
   geometry type. Measurements on the ellipsoid are `ST_DistanceSphere`,
   `ST_DistanceSpheroid` and `ST_LengthSpheroid` instead.
-- **TIN and polyhedral surfaces** — no `ST_PatchN`/`ST_NumPatches`, and no
-  `POLYHEDRALSURFACE`/`TIN` types.
 - **`ST_QuantizeCoordinates`** — PostGIS's `prec` maps to mantissa bits by an
   internal rule we could not reproduce (its results for `prec` 2 and 3 are
   identical), and a same-named function that rounds differently is worse than
