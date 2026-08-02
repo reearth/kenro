@@ -40,7 +40,7 @@ costs you CPU there and money on D1.
 
 Bounding-box columns alone index badly: `minx <= ? AND maxx >= ? …` gives a
 B-tree only a half-open range to work with, so it degrades to a scan of
-everything left of the window. `src/tiles.mjs` instead tags each feature with
+everything left of the window. `kenro-wasm/tiles` instead tags each feature with
 the Web Mercator tiles its bbox covers at a fixed zoom, in a side table keyed
 on the tile id — a window query becomes an equality lookup, which an index
 serves exactly.
@@ -65,7 +65,41 @@ complete, only performance does. `stats` in every query response reports how
 many rows reached the predicate; if that number tracks the table size, the
 zoom is wrong for the data.
 
-## Run it
+## Using this in your own Worker
+
+Install the package — there is nothing to build:
+
+```sh
+npm install kenro-wasm
+```
+
+```js
+import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";
+import * as kenro from "kenro-wasm";
+import { cellsForFeature, cellsForQuery } from "kenro-wasm/tiles";
+
+let ready = false;
+function init() {
+  if (!ready) { kenro.initSync({ module: wasmModule }); ready = true; }
+  return kenro;
+}
+```
+
+Wrangler hands a Worker the compiled `WebAssembly.Module` as an import, so
+`initSync` is the whole story — no fetch, no top-level await, one call per
+isolate. (wasm-pack's `--target web` output would otherwise fetch its `.wasm`
+relative to `import.meta.url`, which no Worker can do.) The module is well
+inside Worker size limits: 617 KB / 251 KB gzip for the standard tier,
+412 KB / 167 KB minimal.
+
+Then take what you need from this directory — `src/spatial.mjs` is the whole
+plan in ~150 lines, `src/spatial-do.mjs` and `src/spatial-d1.mjs` are the two
+plumbings — and adapt the schema to your data.
+
+## Running this example from the repo
+
+The example builds the wasm from the working tree instead of installing the
+package, so it needs one extra step:
 
 ```sh
 # 1. build the wasm (once)
@@ -77,9 +111,15 @@ npm test        # runs the Worker in workerd, real SQLite, real wasm
 npm run dev     # http://localhost:8787
 ```
 
+`sync-wasm.sh` then copies `../js/pkg` into `vendor/`, because the Workers
+Vitest pool cannot resolve a `.wasm` module from outside the project root.
+None of that applies to a project that installs `kenro-wasm` normally.
+
 `npm test` runs in CI on every push (the `wasm` job, against the wasm built
 in the same job): this example is where `Prepared` and `kenro-wasm/tiles`
 meet a real host, so a regression in either shows up here.
+
+## HTTP API
 
 ```sh
 curl -X POST 'localhost:8787/load' --data-binary @parks.geojson
@@ -104,19 +144,6 @@ wrangler d1 migrations apply kenro-spatial
 Query fields: `wkt` (required), `predicate` (`intersects` | `within` |
 `contains` | `dwithin`), `distance` (required for `dwithin`, in SRID units —
 degrees for EPSG:4326), `srid` (reproject the output), `limit`.
-
-## Loading the wasm in a Worker
-
-wasm-pack's `--target web` output fetches its `.wasm` relative to
-`import.meta.url`, which no Worker can do. Workers hand you the compiled
-module as an import instead, so `initSync` is the whole story — see
-`src/kenro.mjs`. The module is well inside Worker size limits (standard tier
-617 KB / 251 KB gzip, minimal 412 KB / 167 KB).
-
-`sync-wasm.sh` copies `../js/pkg` into `vendor/` because the Workers Vitest
-pool cannot resolve a `.wasm` module from outside the project root. In your
-own project, `import wasm from "kenro-wasm/pkg/kenro_wasm_bg.wasm"` off the
-published package works directly.
 
 ## Layout
 
