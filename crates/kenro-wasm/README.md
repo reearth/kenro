@@ -49,7 +49,7 @@ write time, kenro runs the exact predicate in JS:
 - **`kenro-wasm/tiles`** — bounding box → Web Mercator tile ids, the
   B-tree-indexable stand-in for the R-tree that sql.js and D1/DO SQLite lack
 
-Both subpaths ship TypeScript types.
+Every subpath ships TypeScript types, checked in CI against the exports map.
 
 Both are documented in [docs/wasm.md](../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
 
@@ -77,4 +77,7 @@ cd crates/kenro-wasm/js && npm ci && npm test
 
 Tier 1 replays all committed golden vectors (PostGIS / H3 reference
 library) against the raw wasm exports; Tier 2 runs every registered
-function through SQL on each of the three hosts.
+function through SQL on each of the three hosts. `npm test` then runs
+`tsc` over `type-tests/api.ts`, which imports every subpath through the
+package's own exports map — the hand-written `.d.ts` files are the public
+API, and nothing else would notice them drifting from `src/*.mjs`.

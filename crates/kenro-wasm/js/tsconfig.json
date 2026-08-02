@@ -1,0 +1,15 @@
+{
+  // Typecheck-only project for test/types.ts: the hand-written .d.ts files
+  // are the package's public API, and nothing else would notice them drifting
+  // from src/*.mjs.
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": ["type-tests/api.ts"]
+}

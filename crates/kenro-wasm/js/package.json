@@ -1,7 +1,7 @@
 {
   "name": "kenro-wasm",
   "version": "0.1.0",
-  "description": "SpatiaLite-style spatial SQL for SQLite in the browser \u2014 PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
+  "description": "SpatiaLite-style spatial SQL for SQLite in the browser — PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
   "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",
@@ -28,10 +28,22 @@
   "exports": {
     ".": "./pkg/kenro_wasm.js",
     "./pkg/kenro_wasm_bg.wasm": "./pkg/kenro_wasm_bg.wasm",
-    "./sqlite-wasm": "./src/sqlite-wasm.mjs",
-    "./sqljs": "./src/sqljs.mjs",
-    "./wa-sqlite": "./src/wa-sqlite.mjs",
-    "./core": "./src/core.mjs",
+    "./sqlite-wasm": {
+      "types": "./src/sqlite-wasm.d.ts",
+      "default": "./src/sqlite-wasm.mjs"
+    },
+    "./sqljs": {
+      "types": "./src/sqljs.d.ts",
+      "default": "./src/sqljs.mjs"
+    },
+    "./wa-sqlite": {
+      "types": "./src/wa-sqlite.d.ts",
+      "default": "./src/wa-sqlite.mjs"
+    },
+    "./core": {
+      "types": "./src/core.d.ts",
+      "default": "./src/core.mjs"
+    },
     "./tiles": {
       "types": "./src/tiles.d.ts",
       "default": "./src/tiles.mjs"
@@ -50,11 +62,13 @@
   ],
   "scripts": {
     "prepack": "node -e \"fs.rmSync('pkg/.gitignore',{force:true})\"",
-    "test": "node --test"
+    "test": "node --test && npm run test:types",
+    "test:types": "tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@sqlite.org/sqlite-wasm": "^3.50.0-build1",
     "sql.js": "^1.13.0",
+    "typescript": "^5.7.0",
     "wa-sqlite": "^1.0.0"
   }
 }
