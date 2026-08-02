@@ -1,9 +1,12 @@
 # Spatial queries on Cloudflare D1 and Durable Object SQLite
 
 A working Worker that gives D1 and Durable Object SQLite a spatial index and
-PostGIS-style predicates, using [kenro-wasm](../README.md). Both backends run
-the same plan from the same code (`src/spatial.mjs`) and the same test suite;
-only the row plumbing differs.
+PostGIS-style predicates, using [kenro-wasm](../README.md) — whose API
+reference for the two pieces this leans on, the `Prepared` handle and
+`kenro-wasm/tiles`, is
+[docs/wasm.md](../../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
+Both backends run the same plan from the same code (`src/spatial.mjs`) and the
+same test suite; only the row plumbing differs.
 
 Neither D1 nor Durable Object SQLite supports user-defined functions or
 loadable extensions — the supported extension set is FTS5, JSON and the math
@@ -65,6 +68,98 @@ complete, only performance does. `stats` in every query response reports how
 many rows reached the predicate; if that number tracks the table size, the
 zoom is wrong for the data.
 
+## End to end
+
+Two tables. Nothing in them is spatial — which is the point, because that is
+all D1 and Durable Object SQLite can index:
+
+```sql
+CREATE TABLE features (
+  id    TEXT PRIMARY KEY,
+  geom  BLOB NOT NULL,          -- GeoPackage blob; its header envelope makes ST_MinX free
+  props TEXT NOT NULL,
+  minx  REAL NOT NULL, miny REAL NOT NULL,
+  maxx  REAL NOT NULL, maxy REAL NOT NULL
+);
+CREATE TABLE feature_cells (   -- one row per (tile, feature): the R-tree stand-in
+  cell INTEGER NOT NULL,
+  id   TEXT NOT NULL,
+  PRIMARY KEY (cell, id)
+) WITHOUT ROWID;
+```
+
+**Write.** kenro parses the geometry once and hands SQL the numbers it can
+index. `cellsForFeature` returns one cell per tile the feature touches — or
+`[OVERSIZED]` when that would be too many, which keeps the index complete
+without exploding:
+
+```js
+import * as kenro from "kenro-wasm";
+import { cellsForFeature } from "kenro-wasm/tiles";
+
+function load(feature) {
+  const id = String(feature.id);
+  const geom = kenro.stAsGpb(kenro.stGeomFromGeojson(JSON.stringify(feature.geometry)));
+  const bbox = {
+    minx: kenro.stMinX(geom), miny: kenro.stMinY(geom),
+    maxx: kenro.stMaxX(geom), maxy: kenro.stMaxY(geom),
+  };
+
+  sql.exec(
+    `INSERT INTO features (id, geom, props, minx, miny, maxx, maxy)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    id, geom, JSON.stringify(feature.properties), bbox.minx, bbox.miny, bbox.maxx, bbox.maxy);
+
+  for (const cell of cellsForFeature(bbox))
+    sql.exec("INSERT INTO feature_cells (cell, id) VALUES (?, ?)", cell, id);
+}
+```
+
+**Read.** `cellsForQuery` turns the window's bounding box into the cell list
+to look up — or `null`, meaning the window is too large to enumerate, so drop
+the filter and scan. Then SQL narrows, and kenro decides:
+
+```js
+import { bboxOverlaps, cellsForQuery } from "kenro-wasm/tiles";
+
+function query(wkt) {
+  const window = kenro.stGeomFromText(wkt);
+  const search = {
+    minx: kenro.stMinX(window), miny: kenro.stMinY(window),
+    maxx: kenro.stMaxX(window), maxy: kenro.stMaxY(window),
+  };
+  const cells = cellsForQuery(search);
+  const columns = "id, geom, props, minx, miny, maxx, maxy";
+
+  //  stage 1 — indexed lookup in SQL
+  const rows = (cells === null
+    ? sql.exec(`SELECT ${columns} FROM features`)
+    : sql.exec(
+        `SELECT ${columns} FROM features
+          WHERE id IN (SELECT id FROM feature_cells
+                        WHERE cell IN (${cells.map(() => "?").join(", ")}))`,
+        ...cells)
+  ).toArray();
+
+  const hits = [];
+  using win = kenro.Prepared.fromBlob(window);      // decoded once for the scan
+  for (const row of rows) {
+    //  stage 2 — bounding boxes, from the columns SQL just returned
+    if (!bboxOverlaps(search, row)) continue;
+    //  stage 3 — the exact predicate, the only stage that touches geometry
+    using g = kenro.Prepared.fromBlob(new Uint8Array(row.geom));
+    if (g.stIntersects(win)) hits.push(JSON.parse(g.stAsGeojson()));
+  }
+  return hits;
+}
+```
+
+That is the whole design. `src/spatial.mjs` is this with the predicate made
+selectable, reprojection on output, and a candidate counter; the two backend
+files differ only in how rows go in and come out — a Durable Object's
+`sql.exec` is synchronous and returns BLOBs as `ArrayBuffer`, D1's is
+awaited and returns them as `number[]`.
+
 ## Using this in your own Worker
 
 Install the package — there is nothing to build:
@@ -73,10 +168,14 @@ Install the package — there is nothing to build:
 npm install kenro-wasm
 ```
 
+The one thing the snippets above leave out is where `kenro` comes from.
+Wrangler hands a Worker the compiled `WebAssembly.Module` as an import, so
+initialization is one synchronous call per isolate — no fetch, no top-level
+await:
+
 ```js
 import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";
 import * as kenro from "kenro-wasm";
-import { cellsForFeature, cellsForQuery } from "kenro-wasm/tiles";
 
 let ready = false;
 function init() {
@@ -85,23 +184,15 @@ function init() {
 }
 ```
 
-Wrangler hands a Worker the compiled `WebAssembly.Module` as an import, so
-`initSync` is the whole story — no fetch, no top-level await, one call per
-isolate. (wasm-pack's `--target web` output would otherwise fetch its `.wasm`
-relative to `import.meta.url`, which no Worker can do.) The module is well
-inside Worker size limits at every feature tier — the measured table lives in
+(wasm-pack's `--target web` output would otherwise fetch its `.wasm` relative
+to `import.meta.url`, which no Worker can do.) The module is well inside
+Worker size limits at every feature tier — the measured table lives in
 [docs/wasm.md](../../../docs/wasm.md#size), next to the CI gate that enforces
-it.
+it. Both subpaths ship TypeScript types.
 
-Then take what you need from this directory — `src/spatial.mjs` is the whole
-plan in ~150 lines, `src/spatial-do.mjs` and `src/spatial-d1.mjs` are the two
-plumbings — and adapt the schema to your data.
-
-The two pieces this leans on are part of the package and documented in
-[docs/wasm.md](../../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles):
-`Prepared` (a geometry decoded once, with predicates, output and
-reprojection chained off it) and `kenro-wasm/tiles` (the R-tree stand-in).
-Both ship TypeScript types.
+From there, take what you need from this directory: `src/spatial.mjs` is the
+plan above in ~150 lines, `src/spatial-do.mjs` and `src/spatial-d1.mjs` are
+the two plumbings, `migrations/` is the D1 schema.
 
 ## Running this example from the repo
 
