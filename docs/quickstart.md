@@ -76,7 +76,7 @@ No extension binary needed — kenro registers directly on the connection:
 
 ```toml
 [dependencies]
-kenro = { version = "0.1", features = ["rusqlite"] }
+kenro = { version = "0.2", features = ["rusqlite"] }
 # MVT, transform, H3 and GeoJSON are already in the default set; "full" adds
 # the overlay engine on top (ST_Intersection/Union/Difference/SymDifference/
 # ST_Buffer/ST_MakeValid): features = ["rusqlite", "full"]
@@ -229,7 +229,7 @@ pattern is identical for Python/Go/Ruby images):
 FROM node:22-slim
 WORKDIR /app
 ADD --checksum=sha256:PASTE_FROM_SHA256SUMS \
-    https://github.com/reearth/kenro/releases/download/v0.1.0/kenro-ext-x86_64-unknown-linux-gnu.tar.gz \
+    https://github.com/reearth/kenro/releases/download/v0.2.0/kenro-ext-x86_64-unknown-linux-gnu.tar.gz \
     /tmp/kenro.tar.gz
 RUN tar xzf /tmp/kenro.tar.gz -C /app libkenro_ext.so && rm /tmp/kenro.tar.gz
 COPY . .

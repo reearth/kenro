@@ -11,6 +11,7 @@
 /// Negative zero prints as `0`. It arrives two ways — SVG negates every Y, so
 /// `y = 0` becomes `-0.0`, and any small negative rounds to it — and PostGIS
 /// prints `0` for both, in all three encodings. Verified live.
+#[cfg(any(feature = "gml", feature = "text-encodings"))]
 pub(crate) fn num(v: f64, digits: usize) -> String {
     let s = format!("{v:.digits$}");
     let s = if s.contains('.') {
@@ -26,6 +27,9 @@ pub(crate) fn num(v: f64, digits: usize) -> String {
 
 pub mod accessors;
 pub mod affine;
+// Operand-class helpers shared by the overlay engine and the MVT encoder,
+// and used by nothing else — a minimal build carries neither.
+#[cfg(any(feature = "overlay", feature = "mvt"))]
 pub(crate) mod classify;
 pub mod compat;
 pub mod edit;

@@ -501,6 +501,7 @@ fn edit_functions_are_null_strict() {
 
 // ---- Sphere/spheroid, dimension, orientation, linear referencing ----
 
+#[cfg(feature = "spheroid")]
 const WGS84_SPHEROID: &str = "SPHEROID[\"WGS 84\",6378137,298.257223563]";
 
 #[test]

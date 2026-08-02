@@ -26,7 +26,7 @@ strip = true
 
 [package]
 name = "kenro"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "SpatiaLite-style spatial SQL for SQLite in pure Rust — PostGIS-compatible ST_ functions, GeoPackage R-tree, CRS transform, H3, MVT. Use via rusqlite, loadable extension, or WASM"

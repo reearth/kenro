@@ -31,7 +31,7 @@ The headline: **with kenro registered, a plain SQLite build maintains a GeoPacka
 
 ```toml
 [dependencies]
-kenro = { version = "0.1", features = ["rusqlite"] }  # add "full" for overlay/repair
+kenro = { version = "0.2", features = ["rusqlite"] }  # add "full" for overlay/repair
 ```
 
 ```rust
@@ -292,6 +292,7 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
 7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
 8. ✅ v0.1.0 on [crates.io](https://crates.io/crates/kenro) + [npm as `kenro-wasm`](https://www.npmjs.com/package/kenro-wasm)
+9. ✅ v0.2.0: pure-Go binding (no cgo), Cloudflare D1/Durable Objects support, GML 2/3 I/O, KML and SVG output, 3D and POLYHEDRALSURFACE/TIN pass-through, `ST_Split` / `ST_LineMerge` / `ST_IsSimple` / `ST_TriangulatePolygon`, and the concave-hull, Delaunay and full-EPSG tiers
 
 ## License
 
