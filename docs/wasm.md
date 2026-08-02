@@ -228,6 +228,43 @@ typical feature fits in one: too coarse and every query scans, too fine and
 `maxCells` sends everything to `OVERSIZED`. `stats.refined` in the example's
 query response is how you tell.
 
+## Cloudflare Workers, D1 and Durable Objects
+
+Workers cannot load native extensions, and neither **D1** nor **Durable
+Object SQLite** supports user-defined functions — their extension set is
+FTS5, JSON and math, with no R-tree module either. So `ST_Intersects(...)`
+cannot appear in their SQL at all. Three patterns that do work, in
+increasing order of how much data they scale to:
+
+1. **Process geometry in the Worker.** Store GeoPackage blobs in a column,
+   `SELECT` them out, and call `stAsText` / `stIntersects` / `stTransform` …
+   on the values in JS. Fine when the row set is already small.
+2. **Index in SQL, refine in kenro** — the scalable version: derive a
+   bounding box and tile cells with kenro at *write* time, let SQL filter on
+   those with a plain B-tree index, then run the exact predicate in JS on the
+   survivors. This is what [`Prepared` and `kenro-wasm/tiles`](#without-sqlite-prepared-and-kenro-wasmtiles)
+   above are for. A complete Worker doing it on both backends — schema,
+   migrations, and tests that run in workerd — is in
+   [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).
+3. **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite] over
+   bytes fetched from R2/KV — read-only analytics on a shipped
+   `.gpkg`/`.sqlite` — and `registerKenro` as usual, the same adapters used
+   in the browser. Then ordinary spatial SQL works, at the cost of loading
+   the database into the isolate.
+
+Loading the wasm is one synchronous call, because Wrangler hands a Worker the
+compiled module as an import:
+
+```js
+import wasmModule from "kenro-wasm/pkg/kenro_wasm_bg.wasm";
+import * as kenro from "kenro-wasm";
+
+kenro.initSync({ module: wasmModule });   // once per isolate; no fetch, no await
+```
+
+(wasm-pack's `--target web` output would otherwise fetch its `.wasm` relative
+to `import.meta.url`, which no Worker can do.)
+
 ## Semantics
 
 Identical to native kenro: the adapters reproduce the rusqlite binding's

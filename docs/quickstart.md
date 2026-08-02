@@ -1,7 +1,12 @@
 # Platform quickstarts
 
-kenro reaches your SQLite connection through one of three delivery forms.
-Pick the row that matches your platform, then jump to its section:
+**JavaScript hosts are a separate page.** In the browser, and on Cloudflare
+Workers / D1 / Durable Objects, there is no native extension to load — kenro
+runs as wasm, and on D1 and Durable Objects it cannot run inside SQL at all.
+That whole story is [docs/wasm.md](wasm.md).
+
+This page covers the platforms that reach kenro through the Rust crate or the
+loadable extension binary. Pick your row:
 
 | Platform | Delivery | Section |
 |---|---|---|
@@ -16,11 +21,10 @@ Pick the row that matches your platform, then jump to its section:
 | `sqlite3` CLI | loadable extension | [sqlite3 CLI](#sqlite3-cli) |
 | Docker / Cloud Run / Fly.io / ECS | loadable extension in a container | [Containers](#containers-cloud-run-flyio-ecs-) |
 | AWS Lambda | loadable extension (layer or container) | [AWS Lambda](#aws-lambda) |
-| Cloudflare Workers / D1 / Durable Objects | kenro-wasm (no UDFs there — see below) | [Cloudflare](#cloudflare-workers-d1-and-durable-objects) |
-| Browser | kenro-wasm | [docs/wasm.md](wasm.md) |
+| Browser | kenro-wasm | → [docs/wasm.md](wasm.md) |
+| Cloudflare Workers / D1 / Durable Objects | kenro-wasm | → [docs/wasm.md](wasm.md#cloudflare-workers-d1-and-durable-objects) |
 
-The two wasm rows need no extension binary; everything else below assumes it
-exists — grab it first:
+Everything below assumes the extension binary exists — grab it first:
 
 ## Getting the loadable extension
 
@@ -276,29 +280,10 @@ loading enabled.)
 
 ## Cloudflare Workers, D1 and Durable Objects
 
-Workers cannot load native extensions, and neither **D1** nor **Durable
-Object SQLite** supports user-defined functions (the supported extension set
-is FTS5, JSON and math — no R-tree either) — kenro cannot run *inside* their
-queries. Three patterns that do work:
-
-- **Process geometry in the Worker** with kenro-wasm's exports directly:
-  store GeoPackage blobs in D1 columns, `SELECT` them out, then call
-  `stAsText` / `stIntersects` / `stTransform` … on the values in JS. The
-  wasm module is well inside Worker size limits at every feature tier
-  ([measured sizes](wasm.md#size)).
-- **Index in SQL, refine in kenro** — the scalable version of the above:
-  derive the bounding box and a tile cell with kenro at write time, let SQL
-  filter on those with a plain B-tree index, and run the exact predicate in
-  JS on the survivors. A complete Worker doing this on both D1 and Durable
-  Object SQLite, with tests that run in workerd, lives in
-  [`crates/kenro-wasm/cloudflare/`](../crates/kenro-wasm/cloudflare/README.md).
-  The pieces it uses — the `Prepared` handle and `kenro-wasm/tiles` — are
-  documented in [docs/wasm.md](wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
-- **Run a full SQLite inside the Worker** with [sql.js] or [wa-sqlite]
-  over bytes fetched from R2/KV (read-only analytics on a shipped
-  `.gpkg`/`.sqlite`), and `registerKenro` as usual — the same adapters
-  used in the browser. See [docs/wasm.md](wasm.md) for the per-host
-  matrix (note: sql.js has no R-tree module and no int64/h3).
+Moved to [docs/wasm.md](wasm.md#cloudflare-workers-d1-and-durable-objects):
+Workers load no native extension, and neither D1 nor Durable Object SQLite
+accepts user-defined functions — so the answer there is not "load kenro" but
+"index in SQL, refine in JS", which belongs with the rest of the wasm story.
 
 ## Browser
 
@@ -308,5 +293,3 @@ sql.js and wa-sqlite, plus a drag-a-GeoPackage demo in
 
 [GitHub Release]: https://github.com/reearth/kenro/releases
 [mattn/go-sqlite3]: https://github.com/mattn/go-sqlite3
-[sql.js]: https://github.com/sql-js/sql.js
-[wa-sqlite]: https://github.com/rhashimoto/wa-sqlite

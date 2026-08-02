@@ -78,9 +78,10 @@ print(con.execute(
 
 **Copy-paste guides for every platform live in
 [docs/quickstart.md](docs/quickstart.md)**: Python, Node.js, Bun, Deno,
-Go, Ruby, C/C++, the sqlite3 CLI, containers (Cloud Run / Fly.io / ECS),
-AWS Lambda, and Cloudflare Workers — including cross-compilation and
-per-platform gotchas (macOS system SQLite, D1's no-UDF limitation, …).
+Go, Ruby, C/C++, the sqlite3 CLI, containers (Cloud Run / Fly.io / ECS)
+and AWS Lambda, with the per-platform gotchas (macOS system SQLite,
+cross-compilation, …). JavaScript hosts — browser and Cloudflare — are
+[docs/wasm.md](docs/wasm.md), where no extension binary is involved.
 
 ## Quickstart (browser — kenro-wasm)
 
