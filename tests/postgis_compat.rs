@@ -1625,3 +1625,157 @@ fn a_surface_column_keeps_the_rtree_triggers_working() {
         .unwrap();
     assert_eq!((minx, maxx), (0.0, 1.0));
 }
+
+/// The three functions whose "out of scope" reasons turned out to be wrong,
+/// exercised through SQL. Every expectation was read off PostGIS 3.5 with
+/// GEOS 3.11 before it was written down.
+#[test]
+fn line_structure_matches_postgis_through_sql() {
+    let conn = conn();
+    let simple = |wkt: &str| {
+        int(
+            &conn,
+            &format!("SELECT ST_IsSimple(ST_GeomFromText('{wkt}'))"),
+        )
+    };
+    // A ring closes on itself and stays simple; hang a tail off the closing
+    // vertex and it does not. Nothing crosses in either — this is the case
+    // that decides whether the rule was implemented or merely approximated.
+    assert_eq!(simple("LINESTRING(0 0,10 0,10 10,0 10,0 0)"), Some(1));
+    assert_eq!(simple("LINESTRING(0 0,10 0,10 10,0 10,0 0,5 5)"), Some(0));
+    assert_eq!(simple("LINESTRING(0 0,10 10,0 10,10 0)"), Some(0));
+    assert_eq!(
+        simple("MULTILINESTRING((0 0,1 1),(1 1,2 0),(1 1,0 2))"),
+        Some(1)
+    );
+    assert_eq!(simple("MULTIPOINT(0 0,0 0)"), Some(0));
+    assert_eq!(simple("POLYGON((0 0,10 10,10 0,0 10,0 0))"), Some(0));
+
+    // Merging joins only where exactly two ends meet.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_LineMerge(ST_GeomFromText(\
+             'MULTILINESTRING((0 0,1 1),(1 1,2 2))')))"
+        )
+        .as_deref(),
+        Some("LINESTRING(0 0,1 1,2 2)")
+    );
+    // The directed form refuses to reverse a part, as PostGIS's does.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_LineMerge(ST_GeomFromText(\
+             'MULTILINESTRING((0 0,1 1),(2 2,1 1))'), true))"
+        )
+        .as_deref(),
+        Some("MULTILINESTRING((0 0,1 1),(2 2,1 1))")
+    );
+    // SQLite spells booleans 0/1; anything else is a loud error rather than
+    // a silently-defaulted flag.
+    assert!(
+        conn.query_row(
+            "SELECT ST_LineMerge(ST_GeomFromText('LINESTRING(0 0,1 1)'), 'yes')",
+            [],
+            |r| r.get::<_, Vec<u8>>(0)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+#[cfg(feature = "overlay")]
+fn splitting_matches_postgis_but_returns_a_multi() {
+    let conn = conn();
+    let square = "ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))')";
+    let blade = "ST_GeomFromText('LINESTRING(5 -1,5 11)')";
+    // PostGIS: GEOMETRYCOLLECTION of 2 polygons, 100 total. kenro: the same
+    // two polygons as a MULTIPOLYGON.
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_NumGeometries(ST_Split({square}, {blade}))")
+        ),
+        Some(2)
+    );
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_Split({square}, {blade}))")
+        ) - 100.0)
+            .abs()
+            < 1e-9
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_GeometryType(ST_Split({square}, {blade}))")
+        )
+        .as_deref(),
+        Some("ST_MultiPolygon")
+    );
+    // A hole survives the cut rather than being filled in — the winding of
+    // the interior rings has to reach the overlay engine intact.
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_Area(ST_Split(ST_GeomFromText(\
+             'POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))'), \
+             ST_GeomFromText('LINESTRING(5 -1,5 11)')))"
+        ) - 96.0)
+            .abs()
+            < 1e-9
+    );
+    // Lines split at the crossing, in order along the line.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Split(ST_GeomFromText('LINESTRING(0 0,10 0)'), \
+             ST_GeomFromText('MULTIPOINT(3 0,7 0)')))"
+        )
+        .as_deref(),
+        Some("MULTILINESTRING((0 0,3 0),(3 0,7 0),(7 0,10 0))")
+    );
+    // PostGIS refuses a point blade on a polygon; so does kenro.
+    assert!(
+        conn.query_row(
+            &format!("SELECT ST_Split({square}, ST_GeomFromText('POINT(5 5)'))"),
+            [],
+            |r| r.get::<_, Vec<u8>>(0)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+#[cfg(feature = "delaunay")]
+fn constrained_triangulation_covers_the_polygon_and_not_its_holes() {
+    let conn = conn();
+    let holed = "ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))')";
+    // PostGIS 3.5 / GEOS 3.11: 8 triangles totalling 96 — the hole is not
+    // covered, which is the whole difference from ST_DelaunayTriangles.
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_TriangulatePolygon({holed}))")
+        ) - 96.0)
+            .abs()
+            < 1e-9
+    );
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_DelaunayTriangles({holed}))")
+        ) - 100.0)
+            .abs()
+            < 1e-9
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_GeometryType(ST_TriangulatePolygon({holed}))")
+        )
+        .as_deref(),
+        Some("ST_MultiPolygon")
+    );
+}

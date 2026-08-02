@@ -259,6 +259,23 @@ whole group of ordinary functions. Each has its own feature, both are in
 |---|---|---|---|---|---|
 | `ST_ConcaveHull(geom, target_percent)` | geometry | ✅ | ✅ | ✅ | `concave-hull` feature. Keeps **PostGIS's argument contract** — the fraction of the convex hull's area to aim for, 1.0 being the convex hull — by searching `geo`'s differently-scaled "concavity" parameter for it, at a few hull computations per call. A value outside [0,1] is an error, so pasting geo's own concavity (~2) fails loudly instead of returning a very different shape. ⚠️ The hull family differs from GEOS's, so the vertices are not PostGIS's; what holds is the contract (never exceeds the convex hull, monotone in the target) |
 | `ST_DelaunayTriangles(geom)` | geometry | ✅ | ✅ | ❌ | `delaunay` feature. ⚠️ returns a **MULTIPOLYGON** where PostGIS returns a GEOMETRYCOLLECTION — kenro never produces collections. The `tolerance` and `flags` arguments are not implemented; `geo`'s triangulator has no snapping tolerance, and the edge output is `ST_Boundary` of this |
+| `ST_TriangulatePolygon(geom)` | geometry | ✅ | ❌ | ❌ | `delaunay` feature. The **constrained** triangulation: the triangles tile the polygon exactly, so holes and concavities stay uncovered — a square with a 2×2 hole triangulates to area 96, where `ST_DelaunayTriangles` spans the convex hull and gives 100. ⚠️ MULTIPOLYGON, not a GEOMETRYCOLLECTION; a triangulation is not unique, so the individual triangles are not GEOS's. Non-areal input is an error rather than PostGIS's empty collection |
+
+## Line structure
+
+Simplicity, merging and splitting. These were listed as out of scope on the
+grounds that they need a noding engine; re-checking that against the crates
+already in the tree, two thirds of it was wrong — `geo` has the segment-pair
+sweep `ST_IsSimple` needs, merging never required noding in the first place
+(GEOS's `LineMerger` doesn't node either), and `i_overlay` already carries
+the slice `ST_Split` uses. `ST_Node` — noding an arbitrary line soup against
+itself — really is the piece none of them needed, and stays out.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_IsSimple(geom)` | INTEGER | ✅ | ❌ | ✅ | No anomalous self-intersection: curves may close on themselves and may meet each other, but only end to end. A closed ring is simple; the same ring with a tail on its closing vertex is not. Areal input is judged **ring by ring** — a bow-tie ring fails, while two overlapping MULTIPOLYGON members are still simple (PostGIS agrees) |
+| `ST_LineMerge(geom [, directed])` | geometry | ✅ | ✅ | ✅ | Sews lines together at nodes where exactly two ends meet. A Y junction keeps all three arms, and two lines crossing in their interiors are **not** merged — there is no vertex there, and this function does not create one. `directed` honours the original directions instead of reversing parts to fit. ⚠️ Non-lineal input is an error, where PostGIS answers `GEOMETRYCOLLECTION EMPTY`; and the direction and start vertex of a chain assembled from reversed parts are arbitrary, so `ST_AsText` can read backwards from PostGIS's |
+| `ST_Split(input, blade)` | geometry | ✅ | ❌ | ✅ | `overlay` feature. Lineal input splits at the blade's points or crossings, areal input is sliced by a lineal blade. Holes survive the cut. A blade that misses returns the input unchanged. ⚠️ MULTILINESTRING or MULTIPOLYGON, not PostGIS's GEOMETRYCOLLECTION. Splitting a polygon by a point is an error, as in PostGIS |
 
 ## The tail
 
@@ -404,9 +421,11 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **PostGIS's Topology extension** — none of the ~18 `ST_AddEdge*` /
   `ST_CreateTopoGeo` / `ST_ModEdge*` family: that is a topology store, not a
   function set.
-- **Topology / network analysis** — no `ST_Node`/`ST_Polygonize`/`ST_Split`/
-  `ST_LineMerge`/`ST_Snap`, no routing (SpatiaLite's librttopo topology and
+- **Topology / network analysis** — no `ST_Node`, `ST_Polygonize` or
+  `ST_Snap`, and no routing (SpatiaLite's librttopo topology and
   VirtualRouting). These need a noding engine kenro does not carry.
+  (`ST_Split` and `ST_LineMerge` were once on this list and are now
+  implemented — see "Line structure" above; neither actually needed one.)
 - **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`, no grid
   generators (`ST_SquareGrid`, `ST_HexagonGrid`), no `ST_VoronoiPolygons`:
   they would need SQLite table-valued functions, and kenro registers scalars
@@ -415,16 +434,10 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
 - **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
-- **Simplicity testing** — no `ST_IsSimple`: `geo`'s validation reports
-  ring self-intersection for polygons (which is how `ST_IsRing` works) but
-  has no general self-intersection test for a linestring.
 - **3D geometry operations** — no `ST_3DIntersects`/`ST_3DDistance`, no
   volumes, no SOLID type (which is SFCGAL's, not stock PostGIS's). Surface
   collections are read and measured, never computed with; the design note
   behind that split is `tmp/3d-geometry-design.md`.
-- **Constrained triangulation** — no `ST_TriangulatePolygon`: the
-  unconstrained `ST_DelaunayTriangles` is implemented, but respecting a
-  polygon's edges as constraints is a different algorithm.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,

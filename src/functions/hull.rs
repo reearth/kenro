@@ -11,6 +11,7 @@
 use geo::algorithm::{Area, ConcaveHull, ConvexHull};
 use geo_types::Geometry;
 
+#[allow(unused_imports)]
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
@@ -163,6 +164,54 @@ pub fn st_delaunay_triangles(bytes: &[u8]) -> Result<Vec<u8>> {
     )
 }
 
+/// `ST_TriangulatePolygon(geom)` — triangulate a polygon **respecting its
+/// own edges**, so the triangles tile exactly the polygon and nothing else.
+///
+/// This is the constrained counterpart of `ST_DelaunayTriangles`, which
+/// triangulates the convex hull of the vertices and therefore covers holes
+/// and concavities as well. The constrained algorithm was previously listed
+/// as out of scope; it is in fact `geo`'s `TriangulateDelaunay`, and `spade` is
+/// already in the tree because the unconstrained triangulator uses it.
+///
+/// ⚠️ PostGIS returns a GEOMETRYCOLLECTION of triangle polygons; kenro
+/// returns a **MULTIPOLYGON**, as `ST_DelaunayTriangles` already does. The
+/// *set* of triangles is not GEOS's — a triangulation is not unique — but the
+/// contract is: every triangle lies inside the polygon, and their areas sum
+/// to the polygon's. Non-areal input is an error here rather than PostGIS's
+/// empty collection.
+#[cfg(feature = "delaunay")]
+pub fn st_triangulate_polygon(bytes: &[u8]) -> Result<Vec<u8>> {
+    use geo::algorithm::TriangulateDelaunay;
+    const FUNC: &str = "ST_TriangulatePolygon";
+    let g = geom::decode_auto(bytes)?;
+    let triangles = match &g.geometry {
+        Geometry::Polygon(p) => p.constrained_triangulation(Default::default()),
+        Geometry::MultiPolygon(mp) => mp.constrained_triangulation(Default::default()),
+        Geometry::Rect(r) => r.to_polygon().constrained_triangulation(Default::default()),
+        Geometry::Triangle(t) => t.to_polygon().constrained_triangulation(Default::default()),
+        _ => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: "argument must be a POLYGON or MULTIPOLYGON (PostGIS answers \
+                         GEOMETRYCOLLECTION EMPTY here; kenro will not return a collection, \
+                         and an empty result would hide the mistake)"
+                    .into(),
+            });
+        }
+    }
+    .map_err(|e| Error::Unsupported {
+        func: FUNC,
+        reason: format!("triangulation failed: {e:?}"),
+    })?;
+    out(
+        Geometry::MultiPolygon(geo_types::MultiPolygon::new(
+            triangles.into_iter().map(|t| t.to_polygon()).collect(),
+        )),
+        g.srid,
+        FUNC,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(any(feature = "concave-hull", feature = "delaunay"))]
@@ -232,5 +281,39 @@ mod tests {
             crate::functions::accessors::st_geometry_type(&triangles).unwrap(),
             "ST_MultiPolygon"
         );
+    }
+
+    /// The constrained triangulation's whole point is what it *doesn't*
+    /// cover, so the test is the difference from the unconstrained one.
+    #[cfg(feature = "delaunay")]
+    #[test]
+    fn constrained_triangulation_respects_holes_and_concavity() {
+        use crate::functions::accessors::{st_area, st_geometry_type, st_num_geometries};
+
+        // A square with a 2×2 hole. PostGIS 3.5 (GEOS 3.11): 8 triangles
+        // totalling 96 — the hole is not covered.
+        let holed = g("POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))");
+        let t = st_triangulate_polygon(&holed).unwrap();
+        assert!((st_area(&t).unwrap() - 96.0).abs() < 1e-9);
+        assert_eq!(st_geometry_type(&t).unwrap(), "ST_MultiPolygon");
+        // …whereas the unconstrained triangulation spans the convex hull of
+        // the vertices, hole included. This is the distinction that makes
+        // the second function worth having.
+        assert!((st_area(&st_delaunay_triangles(&holed).unwrap()).unwrap() - 100.0).abs() < 1e-9);
+
+        // A concave L keeps its notch.
+        let l = g("POLYGON((0 0,10 0,10 4,4 4,4 10,0 10,0 0))");
+        assert!((st_area(&st_triangulate_polygon(&l).unwrap()).unwrap() - 64.0).abs() < 1e-9);
+
+        // Disjoint members are triangulated separately, not bridged.
+        let two = g("MULTIPOLYGON(((0 0,1 0,1 1,0 0)),((5 5,6 5,6 6,5 5)))");
+        let t = st_triangulate_polygon(&two).unwrap();
+        assert_eq!(st_num_geometries(&t).unwrap(), 2);
+        assert!((st_area(&t).unwrap() - 1.0).abs() < 1e-9);
+
+        // Non-areal input errors rather than returning PostGIS's empty
+        // collection, which would look like a successful triangulation.
+        assert!(st_triangulate_polygon(&g("LINESTRING(0 0,1 1)")).is_err());
+        assert!(st_triangulate_polygon(&g("POINT(0 0)")).is_err());
     }
 }

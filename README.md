@@ -11,7 +11,7 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~199 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~203 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured and flattened rather than silently lost — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
@@ -21,7 +21,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 529 KB (203 KB wire), and the everything-included tier is 2.0 MB (609 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond GML, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
+- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 560 KB (216 KB wire), and the everything-included tier is 2.0 MB (637 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond GML, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -87,7 +87,7 @@ cross-compilation, …). JavaScript hosts — browser and Cloudflare — are
 
 Browser SQLite builds can't load native extensions, but they all accept
 JS-level user-defined functions — so kenro's SQLite-free core compiles to
-wasm — **547–2003 KB (211–609 KB wire) depending on the feature tier**
+wasm — **560–2098 KB (216–637 KB wire) depending on the feature tier**
 ([sizes](docs/wasm.md#size)) — with one adapter per host:
 
 ```js
@@ -262,9 +262,9 @@ refinement over the always-available spherical `ST_DistanceSphere`), plus
 functions whose algorithms cost more than any other single entry — and
 `crs-full`, the EPSG registry (+155 KB gzipped). With overlay present, `ST_AsMVTGeom`
 also upgrades to PostGIS-grade validity repair (invalid input and
-snap-induced self-intersections are made valid before tiling). In wasm terms: standard 728 KB
-(284 KB gzip) vs full 2003 KB (609 KB gzip, the EPSG registry being most of
-the difference); `--no-default-features` gives a 529 KB (203 KB gzip)
+snap-induced self-intersections are made valid before tiling). In wasm terms: standard 754 KB
+(296 KB gzip) vs full 2098 KB (637 KB gzip, the EPSG registry being most of
+the difference); `--no-default-features` gives a 560 KB (216 KB gzip)
 minimal build.
 
 Building with any feature off keeps the corresponding SQL functions

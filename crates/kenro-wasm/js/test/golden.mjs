@@ -942,6 +942,30 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_NumGeometries(ST_DelaunayTriangles(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))",
     check: (v) => Number(v) === 2,
   },
+  // The constrained triangulation leaves the hole uncovered: 96, not 100.
+  "ST_TriangulatePolygon/1": {
+    sql: "SELECT ST_Area(ST_TriangulatePolygon(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))')))",
+    check: (v) => Math.abs(Number(v) - 96) < 1e-9,
+  },
+
+  // --- line structure (functions::lines) ---
+  "ST_IsSimple/1": {
+    sql: "SELECT ST_IsSimple(ST_GeomFromText('LINESTRING(0 0,10 10,0 10,10 0)'))",
+    check: (v) => Number(v) === 0,
+  },
+  "ST_LineMerge/1": {
+    sql: "SELECT ST_AsText(ST_LineMerge(ST_GeomFromText('MULTILINESTRING((0 0,1 1),(1 1,2 2))')))",
+    check: (v) => v === "LINESTRING(0 0,1 1,2 2)",
+  },
+  // The boolean argument arrives as SQLite's 0/1.
+  "ST_LineMerge/2": {
+    sql: "SELECT ST_AsText(ST_LineMerge(ST_GeomFromText('MULTILINESTRING((0 0,1 1),(2 2,1 1))'), 1))",
+    check: (v) => v === "MULTILINESTRING((0 0,1 1),(2 2,1 1))",
+  },
+  "ST_Split/2": {
+    sql: "SELECT ST_Area(ST_Split(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('LINESTRING(5 -1,5 11)')))",
+    check: (v) => Math.abs(Number(v) - 100) < 1e-9,
+  },
 
 
   // --- the tail (functions::misc) ---

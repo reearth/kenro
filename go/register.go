@@ -238,6 +238,17 @@ func marshalArgs(ctx context.Context, in *instance, name string, kinds []string,
 				return nil, err
 			}
 			params = append(params, api.EncodeI32(int32(n)))
+		case "bool":
+			// SQLite has no boolean type; 0 and 1 are the only spellings,
+			// and SQL `true`/`false` are integer literals for exactly those.
+			n, err := asInt(name, v)
+			if err != nil {
+				return nil, err
+			}
+			if n != 0 && n != 1 {
+				return nil, errf("kenro: %s: expected a boolean (0 or 1), got %d", name, n)
+			}
+			params = append(params, api.EncodeI32(int32(n)))
 		case "i64":
 			n, err := asInt(name, v)
 			if err != nil {

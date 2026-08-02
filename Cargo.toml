@@ -62,7 +62,10 @@ geojson = ["dep:geojson"]
 # Overlay engine: ST_Intersection/Difference/SymDifference/Union/Buffer and
 # the ST_Union aggregate (pulls i_overlay's mesh — the largest single
 # contributor to wasm size).
-overlay = []
+# ST_Split reaches i_overlay's slice directly because geo does not re-export
+# it; the version must stay pinned to whatever geo depends on, or cargo links
+# two copies of the engine.
+overlay = ["dep:i_overlay"]
 # Ellipsoidal measures: ST_DistanceSpheroid / ST_LengthSpheroid, which pull
 # geographiclib (~17 KB of wasm). The spherical ST_DistanceSphere stays in the
 # default set — it costs nothing extra and answers "how many metres apart" for
@@ -110,6 +113,8 @@ geojson = { version = "0.24", optional = true, default-features = false, feature
     "geo-types",
 ] }
 quick-xml = { version = "0.37", optional = true, default-features = false }
+# Kept at the exact version geo 0.33 resolves to; see the `overlay` feature.
+i_overlay = { version = "4.5", optional = true, default-features = false }
 
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["functions", "bundled"] }

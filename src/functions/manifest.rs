@@ -696,6 +696,13 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Blob,
         Some("delaunay")
     ),
+    entry!(
+        "ST_TriangulatePolygon",
+        "stTriangulatePolygon",
+        [Blob],
+        Blob,
+        Some("delaunay")
+    ),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -820,6 +827,16 @@ pub const FUNCTIONS: &[FnEntry] = &[
         None
     ),
     entry!("ST_Azimuth", "stAzimuth", [Blob, Blob], OptReal, None),
+    // Line structure (functions::lines).
+    entry!("ST_IsSimple", "stIsSimple", [Blob], Bool, None),
+    entry!("ST_LineMerge", "stLineMerge", [Blob], Blob, None),
+    entry!(
+        "ST_LineMerge",
+        "stLineMergeDirected",
+        [Blob, Bool],
+        Blob,
+        None
+    ),
     // Overlay.
     entry!(
         "ST_Intersection",
@@ -850,6 +867,7 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Some("overlay")
     ),
     entry!("ST_Union", "stUnion", [Blob, Blob], Blob, Some("overlay")),
+    entry!("ST_Split", "stSplit", [Blob, Blob], Blob, Some("overlay")),
     entry!("ST_Buffer", "stBuffer", [Blob, Real], Blob, Some("overlay")),
     entry!("ST_MakeValid", "stMakeValid", [Blob], Blob, Some("overlay")),
     entry!(
@@ -1045,6 +1063,10 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Subdivide", &[2]),
     ("ST_ConcaveHull", &[2]),
     ("ST_DelaunayTriangles", &[1]),
+    ("ST_TriangulatePolygon", &[1]),
+    ("ST_IsSimple", &[1]),
+    ("ST_LineMerge", &[1, 2]),
+    ("ST_Split", &[2]),
     ("ST_AsGML", &[1, 2, 3]),
     ("ST_GeomFromGML", &[1, 2]),
     ("ST_GMLToSQL", &[1]),

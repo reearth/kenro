@@ -19,6 +19,7 @@ pub mod h3;
 pub mod hull;
 pub mod io;
 pub mod linear;
+pub mod lines;
 pub mod manifest;
 pub mod measures;
 pub mod misc;

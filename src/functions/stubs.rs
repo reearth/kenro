@@ -88,6 +88,10 @@ pub const OVERLAY_OFF: &[Stub] = &[
         hint: "kenro was built without the `overlay` cargo feature.",
     },
     Stub {
+        name: "ST_Split",
+        hint: "kenro was built without the `overlay` cargo feature.",
+    },
+    Stub {
         name: "ST_Buffer",
         hint: "kenro was built without the `overlay` cargo feature.",
     },
@@ -141,10 +145,16 @@ pub static CONCAVE_HULL_OFF: &[Stub] = &[Stub {
 }];
 
 /// Registered when `delaunay` is off (+81 KB of wasm when on).
-pub static DELAUNAY_OFF: &[Stub] = &[Stub {
-    name: "ST_DelaunayTriangles",
-    hint: "kenro was built without the `delaunay` cargo feature.",
-}];
+pub static DELAUNAY_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_DelaunayTriangles",
+        hint: "kenro was built without the `delaunay` cargo feature.",
+    },
+    Stub {
+        name: "ST_TriangulatePolygon",
+        hint: "kenro was built without the `delaunay` cargo feature.",
+    },
+];
 
 /// Registered when `gml` is off (+13 KB of wasm when on, for quick-xml).
 pub static GML_OFF: &[Stub] = &[

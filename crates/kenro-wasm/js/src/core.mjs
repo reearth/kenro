@@ -34,6 +34,14 @@ function convertArg(entry, i, v) {
       if (typeof n === "number" && Number.isInteger(n)) return n;
       throw fail(name, "expected an INTEGER");
     }
+    case "bool": {
+      // SQLite has no boolean type: 0/1 is how `true` arrives, and callers
+      // who write JS booleans should not be punished for it.
+      if (typeof v === "boolean") return v;
+      const n = typeof v === "bigint" ? Number(v) : v;
+      if (n === 0 || n === 1) return n === 1;
+      throw fail(name, "expected a boolean (0 or 1)");
+    }
     case "i64":
       if (typeof v === "bigint") return v;
       if (typeof v === "number" && Number.isSafeInteger(v)) return BigInt(v);

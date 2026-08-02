@@ -28,9 +28,9 @@ naming the missing feature:
 
 | tier | cargo flags | adds | raw | gzipped (wire) |
 |---|---|---|---|---|
-| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 547 KB | 211 KB |
-| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 743 KB | 291 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), and `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading) | 2003 KB | 609 KB |
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 560 KB | 216 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 754 KB | 296 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), and `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading) | 2098 KB | 637 KB |
 
 The full tier carries `crs-full`, so `ST_Transform` reaches every EPSG code
 in the registry — Japan's plane rectangular systems, the British National

@@ -221,6 +221,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         register_geom2_to_blob(conn, "ST_Union", overlay::st_union)?;
         register_geom_to_blob(conn, "ST_UnaryUnion", overlay::st_unary_union)?;
         register_geom2_to_blob(conn, "ST_ClipByBox2D", overlay::st_clip_by_box_2d)?;
+        register_geom2_to_blob(conn, "ST_Split", crate::functions::lines::st_split)?;
         conn.create_scalar_function("ST_Subdivide", 2, FLAGS, |ctx| {
             let (Some(g), Some(max)) = (
                 blob_or_null(ctx, 0, "ST_Subdivide")?,
@@ -491,6 +492,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_misc(conn)?;
     register_threed(conn)?;
     register_surface(conn)?;
+    register_lines(conn)?;
     #[cfg(feature = "gml")]
     register_gml(conn)?;
 
@@ -1399,6 +1401,33 @@ fn register_hull(conn: &Connection) -> rusqlite::Result<()> {
         "ST_DelaunayTriangles",
         crate::functions::hull::st_delaunay_triangles,
     )?;
+    #[cfg(feature = "delaunay")]
+    register_geom_to_blob(
+        conn,
+        "ST_TriangulatePolygon",
+        crate::functions::hull::st_triangulate_polygon,
+    )?;
+    Ok(())
+}
+
+/// Line structure: simplicity and merging (see `functions::lines`).
+/// `ST_Split` needs the overlay engine and is registered with it.
+fn register_lines(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::lines;
+
+    register_predicate_1(conn, "ST_IsSimple", lines::st_is_simple)?;
+    register_geom_to_blob(conn, "ST_LineMerge", lines::st_line_merge)?;
+    // PostGIS's second argument is a boolean; SQLite spells it 0/1, and
+    // `true`/`false` are integer literals there too.
+    conn.create_scalar_function("ST_LineMerge", 2, FLAGS, |ctx| {
+        let (Some(g), Some(directed)) = (
+            blob_or_null(ctx, 0, "ST_LineMerge")?,
+            bool_or_null(ctx, 1, "ST_LineMerge")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(lines::st_line_merge_directed(g, directed))
+    })?;
     Ok(())
 }
 
@@ -1862,6 +1891,20 @@ fn i64_or_null(ctx: &Context<'_>, i: usize, func: &'static str) -> rusqlite::Res
         other => Err(sql_err(Error::Unsupported {
             func,
             reason: format!("expected an INTEGER, got {}", other.data_type()),
+        })),
+    }
+}
+
+/// SQLite has no boolean type: 0 and 1 are the only accepted spellings, and
+/// `true`/`false` in SQL are integer literals for exactly those.
+fn bool_or_null(ctx: &Context<'_>, i: usize, func: &'static str) -> rusqlite::Result<Option<bool>> {
+    match ctx.get_raw(i) {
+        ValueRef::Null => Ok(None),
+        ValueRef::Integer(0) => Ok(Some(false)),
+        ValueRef::Integer(1) => Ok(Some(true)),
+        other => Err(sql_err(Error::Unsupported {
+            func,
+            reason: format!("expected a boolean (0 or 1), got {}", other.data_type()),
         })),
     }
 }

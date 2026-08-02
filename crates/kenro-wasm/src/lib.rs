@@ -698,6 +698,29 @@ pub fn st_delaunay_triangles(geom: &[u8]) -> R<Vec<u8>> {
     kenro::functions::hull::st_delaunay_triangles(geom).map_err(err)
 }
 
+#[cfg(feature = "delaunay")]
+#[wasm_bindgen(js_name = stTriangulatePolygon)]
+pub fn st_triangulate_polygon(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_triangulate_polygon(geom).map_err(err)
+}
+
+// ---- Line structure (functions::lines) ----
+
+#[wasm_bindgen(js_name = stIsSimple)]
+pub fn st_is_simple(geom: &[u8]) -> R<bool> {
+    kenro::functions::lines::st_is_simple(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineMerge)]
+pub fn st_line_merge(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::lines::st_line_merge(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineMergeDirected)]
+pub fn st_line_merge_directed(geom: &[u8], directed: bool) -> R<Vec<u8>> {
+    kenro::functions::lines::st_line_merge_directed(geom, directed).map_err(err)
+}
+
 // ---- The tail (functions::misc) ----
 
 #[wasm_bindgen(js_name = stPolygon)]
@@ -1057,6 +1080,12 @@ pub fn st_sym_difference(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
 #[wasm_bindgen(js_name = stUnion)]
 pub fn st_union(a: &[u8], b: &[u8]) -> R<Vec<u8>> {
     kenro::functions::overlay::st_union(a, b).map_err(err)
+}
+
+#[cfg(feature = "overlay")]
+#[wasm_bindgen(js_name = stSplit)]
+pub fn st_split(input: &[u8], blade: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::lines::st_split(input, blade).map_err(err)
 }
 
 #[cfg(feature = "overlay")]
@@ -1622,6 +1651,11 @@ mod tests {
             "stGeohashChars",
             "stConcaveHull",
             "stDelaunayTriangles",
+            "stTriangulatePolygon",
+            "stIsSimple",
+            "stLineMerge",
+            "stLineMergeDirected",
+            "stSplit",
             "stPolygon",
             "stLineFromMultipoint",
             "stLineExtend",

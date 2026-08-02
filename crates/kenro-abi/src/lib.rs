@@ -1401,7 +1401,38 @@ pub extern "C" fn k_stDelaunayTriangles(geom_p: *const u8, geom_l: u32) -> i32 {
     blob(hull::st_delaunay_triangles(s(geom_p, geom_l)))
 }
 
+#[cfg(feature = "delaunay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stTriangulatePolygon(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(hull::st_triangulate_polygon(s(geom_p, geom_l)))
+}
+
+// ---- Line structure (functions::lines) ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stIsSimple(geom_p: *const u8, geom_l: u32) -> i32 {
+    boolean(kenro::functions::lines::st_is_simple(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineMerge(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(kenro::functions::lines::st_line_merge(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineMergeDirected(geom_p: *const u8, geom_l: u32, directed: i32) -> i32 {
+    blob(kenro::functions::lines::st_line_merge_directed(
+        s(geom_p, geom_l),
+        directed != 0,
+    ))
+}
+
 #[cfg(feature = "overlay")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSplit(a_p: *const u8, a_l: u32, b_p: *const u8, b_l: u32) -> i32 {
+    blob(kenro::functions::lines::st_split(s(a_p, a_l), s(b_p, b_l)))
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn k_stPointFromText(v_p: *const u8, v_l: u32) -> i32 {
     opt_blob(compat::from_text_typed(

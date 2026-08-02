@@ -611,6 +611,7 @@ dependencies = [
  "geojson",
  "geozero",
  "h3o",
+ "i_overlay",
  "proj4rs",
  "proptest",
  "quick-xml",
