@@ -32,6 +32,13 @@ naming the missing feature:
 | standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 688 KB | 273 KB |
 | full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`) | 1141 KB | 425 KB |
 
+`crs-full` is deliberately outside this table. Adding the whole EPSG
+registry to the full tier measures **1918 KB raw / 580 KB gzipped** — past
+the CI gate above, and 155 KB of wire for tables most callers never touch.
+kenro's built-in CRS set (WGS84, Web Mercator, every UTM zone) covers the
+common cases; a national or local system needs that feature and a build of
+your own.
+
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
 (~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at
 the cost of the GEOS/GDAL feature classes kenro doesn't cover.

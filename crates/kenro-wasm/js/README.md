@@ -10,7 +10,7 @@ kenro is a spatial SQL engine in pure Rust (~161 functions: the DE-9IM
 predicate family, overlay/repair/buffer, CRS transform, H3, GeoJSON, MVT
 vector tiles, spatial aggregates), golden-tested against PostGIS. This
 package is its wasm build plus one small adapter per host. The bundled
-wasm is the **full** feature tier (~353 KB gzipped); smaller tiers are
+wasm is the **full** feature tier (~425 KB gzipped); smaller tiers are
 attached to the [GitHub Releases].
 
 **Live demo:** <https://reearth.github.io/kenro/> — drag a GeoPackage in
