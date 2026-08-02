@@ -147,9 +147,37 @@ Measured over a 500-candidate loop, half of them hits:
 Only decoding is saved, so the gain shrinks as the relate itself grows to
 dominate, and widens as more calls per row are chained onto one handle.
 
-**`free()` is mandatory.** wasm-bindgen cannot collect a handle for you; a
-leaked one keeps its geometry in the wasm heap for the life of the isolate.
-Use `try`/`finally`, including around early exits.
+**A handle must be freed.** wasm-bindgen cannot collect it for you; a leaked
+one keeps its geometry in the wasm heap for the life of the isolate. Freeing
+*twice* traps with `null pointer passed to rust`, so the early-exit paths are
+where this goes wrong.
+
+`Symbol.dispose` is wired to `free`, so where explicit resource management is
+available the language handles it (verified on Node and in workerd):
+
+```js
+using g = kenroWasm.Prepared.fromBlob(row.geom);   // freed at end of block
+```
+
+Everywhere else, `kenro-wasm/prepared` is the callback equivalent — plus the
+idempotence the built-in dispose lacks (it *is* `free`, so mixing `using`
+with a manual `free()` still traps):
+
+| | |
+|---|---|
+| `freeOnce(handle)` | free at most once; a no-op on an already-freed handle, `null` or `undefined` |
+| `withPrepared(handle, fn)` | own one handle for `fn`, free however it exits, return `fn`'s value |
+| `withScope(fn)` | `fn(own)`; every `own(handle)` is freed on the way out, in reverse order — this is the one that covers a handle created mid-scope, like a reprojection |
+
+```js
+import { withScope } from "kenro-wasm/prepared";
+
+const geojson = withScope((own) => {          // one scope per row, not per scan
+  const g = own(kenroWasm.Prepared.fromBlob(row.geom));
+  if (!g.stIntersects(win)) return null;
+  return own(g.stTransform(3857)).stAsGeojson();
+});
+```
 
 **`kenro-wasm/tiles`** — a B-tree-indexable stand-in for the R-tree that
 sql.js and D1/DO SQLite lack. It maps a bounding box to Web Mercator tile
@@ -167,7 +195,30 @@ The asymmetry is the point: `cellsForFeature` files a too-large feature
 under `OVERSIZED` (a permanent candidate), while `cellsForQuery` returns
 `null` for a too-large *window*, meaning "drop the filter and scan". Reading
 the second as the first returns only continent-sized features for a wide
-query and silently drops the rest.
+query and silently drops the rest. TypeScript enforces that difference —
+`cellsForQuery` is `number[] | null` and `cellsForFeature` is `number[]`.
+
+A bounding box is `{minx, miny, maxx, maxy}` in WGS84 degrees; every function
+takes an optional `{zoom = 8, maxCells = 64}`.
+
+| | |
+|---|---|
+| `cellsForFeature(bbox, opts?)` → `number[]` | cells to store a feature under: its cover, or `[OVERSIZED]` |
+| `cellsForQuery(bbox, opts?)` → `number[] \| null` | cells to search: the window's cover **plus `OVERSIZED`**, or `null` = too large, scan the table |
+| `tileCover(bbox, opts?)` → `number[] \| null` | the raw cover the two build on; `null` = over `maxCells` |
+| `bboxOverlaps(a, b)` → `boolean` | inclusive overlap — the cheap reject before any wasm call |
+| `padBbox(bbox, d)` → `Bbox` | grow on every side, for an `ST_DWithin` search area |
+| `OVERSIZED` = `-1` | the bucket for features too large to enumerate |
+| `DEFAULT_ZOOM` = `8`, `DEFAULT_MAX_CELLS` = `64` | |
+
+Cell ids are `y * 2**zoom + x` — a safe integer below zoom 26, so a plain
+`INTEGER` column indexes them. Web Mercator's y grows southward, and
+latitudes beyond ±85.05° are clamped rather than allowed to go infinite.
+
+Pick `zoom` so that a typical query window covers a handful of cells and a
+typical feature fits in one: too coarse and every query scans, too fine and
+`maxCells` sends everything to `OVERSIZED`. `stats.refined` in the example's
+query response is how you tell.
 
 ## Semantics
 

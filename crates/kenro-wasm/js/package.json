@@ -1,7 +1,7 @@
 {
   "name": "kenro-wasm",
   "version": "0.1.0",
-  "description": "SpatiaLite-style spatial SQL for SQLite in the browser — PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
+  "description": "SpatiaLite-style spatial SQL for SQLite in the browser \u2014 PostGIS-compatible ST_ functions as UDFs for sql.js, wa-sqlite and the official SQLite WASM build",
   "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",
@@ -32,7 +32,14 @@
     "./sqljs": "./src/sqljs.mjs",
     "./wa-sqlite": "./src/wa-sqlite.mjs",
     "./core": "./src/core.mjs",
-    "./tiles": "./src/tiles.mjs"
+    "./tiles": {
+      "types": "./src/tiles.d.ts",
+      "default": "./src/tiles.mjs"
+    },
+    "./prepared": {
+      "types": "./src/prepared.d.ts",
+      "default": "./src/prepared.mjs"
+    }
   },
   "files": [
     "pkg",

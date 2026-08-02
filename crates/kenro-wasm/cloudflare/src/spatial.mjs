@@ -23,6 +23,8 @@ import {
   cellsForQuery,
   padBbox,
 } from "../../js/src/tiles.mjs";
+// Published as `kenro-wasm/prepared`.
+import { withPrepared, withScope } from "../../js/src/prepared.mjs";
 
 export const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS features (
@@ -145,35 +147,29 @@ export function refine(rows, { search, window, test, srid, limit }) {
   const features = [];
   let refined = 0;
 
-  // The window is decoded once for the whole scan. Handles are wasm-heap
-  // allocations that JS cannot collect, so every one of them is freed —
-  // including on the early `break` and on a mid-loop throw.
-  const win = wasm.Prepared.fromBlob(window);
-  try {
+  // Handles are wasm-heap allocations that JS cannot collect. The window is
+  // decoded once for the whole scan; each row gets its own scope, so the
+  // early `continue`, the `break` and any throw all still free.
+  withPrepared(wasm.Prepared.fromBlob(window), (win) => {
     for (const row of rows) {
       if (!bboxOverlaps(search, row)) continue; // cheap reject before wasm
       refined++;
-      const candidate = wasm.Prepared.fromBlob(row.geom);
-      // Reprojection returns a second handle, so a hit holds two at once.
-      let projected;
-      try {
-        if (!test(candidate, win)) continue;
-        projected = srid ? candidate.stTransform(srid) : null;
-        features.push({
+      const feature = withScope((own) => {
+        const candidate = own(wasm.Prepared.fromBlob(row.geom));
+        if (!test(candidate, win)) return null;
+        // Reprojection returns a second handle; `own` covers it too.
+        const out = srid ? own(candidate.stTransform(srid)) : candidate;
+        return {
           type: "Feature",
           id: row.id,
-          geometry: JSON.parse((projected ?? candidate).stAsGeojson()),
+          geometry: JSON.parse(out.stAsGeojson()),
           properties: JSON.parse(row.props),
-        });
-      } finally {
-        projected?.free();
-        candidate.free();
-      }
+        };
+      });
+      if (feature) features.push(feature);
       if (features.length >= limit) break;
     }
-  } finally {
-    win.free();
-  }
+  });
 
   return {
     type: "FeatureCollection",

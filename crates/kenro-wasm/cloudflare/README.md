@@ -89,8 +89,9 @@ Wrangler hands a Worker the compiled `WebAssembly.Module` as an import, so
 `initSync` is the whole story — no fetch, no top-level await, one call per
 isolate. (wasm-pack's `--target web` output would otherwise fetch its `.wasm`
 relative to `import.meta.url`, which no Worker can do.) The module is well
-inside Worker size limits: 617 KB / 251 KB gzip for the standard tier,
-412 KB / 167 KB minimal.
+inside Worker size limits at every feature tier — the measured table lives in
+[docs/wasm.md](../../../docs/wasm.md#size), next to the CI gate that enforces
+it.
 
 Then take what you need from this directory — `src/spatial.mjs` is the whole
 plan in ~150 lines, `src/spatial-do.mjs` and `src/spatial-d1.mjs` are the two

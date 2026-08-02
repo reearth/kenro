@@ -42,10 +42,14 @@ write time, kenro runs the exact predicate in JS:
 
 - **`Prepared`** — decode a geometry once, then chain predicates, GeoJSON/WKT
   output and reprojection off that one handle instead of re-decoding a blob
-  per call (16–41% over a refine loop, depending on how much is chained;
-  `free()` is mandatory)
+  per call (16–41% over a refine loop, depending on how much is chained). A
+  handle must be freed: `using` does it where available, and
+  **`kenro-wasm/prepared`** (`freeOnce` / `withPrepared` / `withScope`) does
+  it everywhere else
 - **`kenro-wasm/tiles`** — bounding box → Web Mercator tile ids, the
   B-tree-indexable stand-in for the R-tree that sql.js and D1/DO SQLite lack
+
+Both subpaths ship TypeScript types.
 
 Both are documented in [docs/wasm.md](../../docs/wasm.md#without-sqlite-prepared-and-kenro-wasmtiles).
 

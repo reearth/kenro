@@ -283,8 +283,8 @@ queries. Three patterns that do work:
 - **Process geometry in the Worker** with kenro-wasm's exports directly:
   store GeoPackage blobs in D1 columns, `SELECT` them out, then call
   `stAsText` / `stIntersects` / `stTransform` … on the values in JS. The
-  wasm module is well inside Worker size limits (standard tier
-  617 KB / 251 KB gzip, minimal 412 KB / 167 KB).
+  wasm module is well inside Worker size limits at every feature tier
+  ([measured sizes](wasm.md#size)).
 - **Index in SQL, refine in kenro** — the scalable version of the above:
   derive the bounding box and a tile cell with kenro at write time, let SQL
   filter on those with a plain B-tree index, and run the exact predicate in
