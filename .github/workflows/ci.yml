@@ -85,7 +85,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 24, matching release.yml. `using` declarations (explicit resource
+          # management) are a documented way to free a Prepared handle and are
+          # exercised by test/prepared-scope.test.mjs; Node 22 rejects the
+          # syntax outright, so that whole file failed to parse and took nine
+          # tests with it.
+          node-version: 24
       # Separate cargo invocations, per the workspace warning in Cargo.toml.
       - name: Clippy (kenro-wasm, wasm target)
         run: cargo clippy -p kenro-wasm --target wasm32-unknown-unknown -- -D warnings

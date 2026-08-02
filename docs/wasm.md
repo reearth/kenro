@@ -169,7 +169,9 @@ one keeps its geometry in the wasm heap for the life of the isolate. Freeing
 where this goes wrong.
 
 `Symbol.dispose` is wired to `free`, so where explicit resource management is
-available the language handles it (verified on Node and in workerd):
+available the language handles it (verified on Node 24+ and in workerd —
+Node 22 rejects the `using` syntax at parse time, so the callback helpers
+below are the portable form):
 
 ```js
 using g = kenroWasm.Prepared.fromBlob(row.geom);   // freed at end of block
