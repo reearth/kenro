@@ -73,9 +73,13 @@ wasm-pack build crates/kenro-wasm --target web --release --out-dir js/pkg -- --f
 
 # 2. from this directory
 npm install
-npm test        # runs the Worker + DO in workerd, real SQLite, real wasm
+npm test        # runs the Worker in workerd, real SQLite, real wasm
 npm run dev     # http://localhost:8787
 ```
+
+`npm test` runs in CI on every push (the `wasm` job, against the wasm built
+in the same job): this example is where `Prepared` and `kenro-wasm/tiles`
+meet a real host, so a regression in either shows up here.
 
 ```sh
 curl -X POST 'localhost:8787/load' --data-binary @parks.geojson

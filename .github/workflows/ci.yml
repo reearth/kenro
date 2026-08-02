@@ -104,6 +104,14 @@ jobs:
         run: |
           npm ci
           npm test
+      # The Cloudflare example is the only place `Prepared` and
+      # `kenro-wasm/tiles` are exercised against a real host: workerd, real
+      # SQLite (D1 and Durable Object), the freshly built wasm.
+      - name: Cloudflare example (workerd)
+        working-directory: crates/kenro-wasm/cloudflare
+        run: |
+          npm ci
+          npm test
 
   go:
     runs-on: ubuntu-latest
