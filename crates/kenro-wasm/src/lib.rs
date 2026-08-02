@@ -11,7 +11,8 @@
 use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
-    accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree, threed,
+    accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree,
+    surface, threed,
 };
 use kenro::geom;
 
@@ -816,6 +817,23 @@ pub fn st_geom_from_gml(text: &str) -> R<Vec<u8>> {
 #[wasm_bindgen(js_name = stGeomFromGmlSrid)]
 pub fn st_geom_from_gml_srid(text: &str, srid: i32) -> R<Vec<u8>> {
     kenro::functions::gml::st_geom_from_gml(text, Some(srid)).map_err(err)
+}
+
+// ---- Surface collections (functions::surface) ----
+
+#[wasm_bindgen(js_name = stNumPatches)]
+pub fn st_num_patches(geom: &[u8]) -> R<Option<i64>> {
+    surface::st_num_patches(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPatchN)]
+pub fn st_patch_n(geom: &[u8], n: i32) -> R<Option<Vec<u8>>> {
+    surface::st_patch_n(geom, n as i64).map_err(err)
+}
+
+#[wasm_bindgen(js_name = kenroGpkgExtensionRequired)]
+pub fn kenro_gpkg_extension_required(geom: &[u8]) -> R<Option<String>> {
+    surface::extension_required(geom).map_err(err)
 }
 
 // ---- SRID ----
@@ -1632,6 +1650,9 @@ mod tests {
             "stAsGmlDigits",
             "stGeomFromGml",
             "stGeomFromGmlSrid",
+            "stNumPatches",
+            "stPatchN",
+            "kenroGpkgExtensionRequired",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

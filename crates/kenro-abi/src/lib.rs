@@ -55,7 +55,7 @@ use kenro::functions::hull;
 use kenro::functions::overlay;
 use kenro::functions::{
     accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, misc,
-    predicates, processing, rtree, threed,
+    predicates, processing, rtree, surface, threed,
 };
 
 // ---------------------------------------------------------------- status
@@ -1814,6 +1814,22 @@ pub extern "C" fn k_stGeomFromGmlSrid(text_p: *const u8, text_l: u32, srid: i32)
 }
 
 #[cfg(feature = "overlay")]
+// ---- surface collections ----
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stNumPatches(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_int(surface::st_num_patches(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPatchN(geom_p: *const u8, geom_l: u32, n: i32) -> i32 {
+    opt_blob(surface::st_patch_n(s(geom_p, geom_l), n as i64))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_kenroGpkgExtensionRequired(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_text(surface::extension_required(s(geom_p, geom_l)))
+}
+
 // =============================================================== manifest
 
 fn kind_str(k: manifest::Kind) -> &'static str {

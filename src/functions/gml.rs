@@ -280,9 +280,23 @@ fn parse(text: &str) -> Result<Parsed> {
                         kind: MultiKind::Line,
                         parts: Vec::new(),
                     }),
-                    "MultiPolygon" | "MultiSurface" => stack.push(Frame::Multi {
+                    // CityGML's surface wrappers collapse to a MultiPolygon of
+                    // their patches — kenro reads the structure and drops Z,
+                    // as it does everywhere. A gml:Solid's shell is the same
+                    // shape once its exterior is unwrapped.
+                    "MultiPolygon"
+                    | "MultiSurface"
+                    | "CompositeSurface"
+                    | "Surface"
+                    | "TriangulatedSurface"
+                    | "Solid" => stack.push(Frame::Multi {
                         kind: MultiKind::Polygon,
                         parts: Vec::new(),
+                    }),
+                    "Triangle" => stack.push(Frame::Polygon {
+                        exterior: None,
+                        interiors: Vec::new(),
+                        in_interior: false,
                     }),
                     "pos" | "posList" | "coordinates" => {
                         collecting = true;
@@ -314,9 +328,21 @@ fn parse(text: &str) -> Result<Parsed> {
                             }
                         }
                     }
-                    "Point" | "LineString" | "LineStringSegment" | "LinearRing" | "Polygon"
-                    | "MultiPoint" | "MultiLineString" | "MultiCurve" | "MultiPolygon"
-                    | "MultiSurface" => {
+                    "Point"
+                    | "LineString"
+                    | "LineStringSegment"
+                    | "LinearRing"
+                    | "Polygon"
+                    | "Triangle"
+                    | "MultiPoint"
+                    | "MultiLineString"
+                    | "MultiCurve"
+                    | "MultiPolygon"
+                    | "MultiSurface"
+                    | "CompositeSurface"
+                    | "Surface"
+                    | "TriangulatedSurface"
+                    | "Solid" => {
                         let Some(frame) = stack.pop() else {
                             return Err(Error::InvalidWkt("unbalanced GML elements".into()));
                         };
@@ -390,31 +416,37 @@ fn close_frame(frame: Frame, stack: &mut [Frame], finished: &mut Vec<Geometry<f6
 }
 
 fn assemble_multi(kind: MultiKind, parts: Vec<Geometry<f64>>) -> Result<Geometry<f64>> {
+    // CityGML nests its wrappers — a gml:Solid holds a gml:CompositeSurface
+    // holds the polygons — so a child may already be a multi. Flatten rather
+    // than drop it, which is what an earlier version silently did.
     Ok(match kind {
         MultiKind::Point => Geometry::MultiPoint(MultiPoint::new(
             parts
                 .into_iter()
-                .filter_map(|g| match g {
-                    Geometry::Point(p) => Some(p),
-                    _ => None,
+                .flat_map(|g| match g {
+                    Geometry::Point(p) => vec![p],
+                    Geometry::MultiPoint(mp) => mp.0,
+                    _ => vec![],
                 })
                 .collect(),
         )),
         MultiKind::Line => Geometry::MultiLineString(MultiLineString::new(
             parts
                 .into_iter()
-                .filter_map(|g| match g {
-                    Geometry::LineString(l) => Some(l),
-                    _ => None,
+                .flat_map(|g| match g {
+                    Geometry::LineString(l) => vec![l],
+                    Geometry::MultiLineString(mls) => mls.0,
+                    _ => vec![],
                 })
                 .collect(),
         )),
         MultiKind::Polygon => Geometry::MultiPolygon(MultiPolygon::new(
             parts
                 .into_iter()
-                .filter_map(|g| match g {
-                    Geometry::Polygon(p) => Some(p),
-                    _ => None,
+                .flat_map(|g| match g {
+                    Geometry::Polygon(p) => vec![p],
+                    Geometry::MultiPolygon(mp) => mp.0,
+                    _ => vec![],
                 })
                 .collect(),
         )),
@@ -651,6 +683,40 @@ mod tests {
                 assert_eq!(st_srid(&back).unwrap(), 4326, "GML{version} lost the SRID");
             }
         }
+    }
+
+    #[test]
+    fn citygml_surface_wrappers_read_as_multipolygons() {
+        // A gml:Solid's shell, as CityGML LOD2 writes it: nested wrappers
+        // around a handful of 3D polygons.
+        let solid = st_geom_from_gml(
+            "<gml:Solid><gml:exterior><gml:CompositeSurface>\
+             <gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing>\
+             <gml:posList srsDimension=\"3\">0 0 0 1 0 0 1 1 0 0 0 0</gml:posList>\
+             </gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember>\
+             <gml:surfaceMember><gml:Polygon><gml:exterior><gml:LinearRing>\
+             <gml:posList srsDimension=\"3\">0 0 1 1 0 1 1 1 1 0 0 1</gml:posList>\
+             </gml:LinearRing></gml:exterior></gml:Polygon></gml:surfaceMember>\
+             </gml:CompositeSurface></gml:exterior></gml:Solid>",
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            st_as_text(&solid).unwrap(),
+            "MULTIPOLYGON(((0 0,1 0,1 1,0 0)),((0 0,1 0,1 1,0 0)))"
+        );
+        // A TriangulatedSurface of gml:Triangle patches reads the same way.
+        let tin = st_geom_from_gml(
+            "<gml:TriangulatedSurface><gml:trianglePatches><gml:Triangle><gml:exterior>\
+             <gml:LinearRing><gml:posList srsDimension=\"3\">0 0 0 1 0 0 1 1 0 0 0 0</gml:posList>\
+             </gml:LinearRing></gml:exterior></gml:Triangle></gml:trianglePatches></gml:TriangulatedSurface>",
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            st_as_text(&tin).unwrap(),
+            "MULTIPOLYGON(((0 0,1 0,1 1,0 0)))"
+        );
     }
 
     #[test]

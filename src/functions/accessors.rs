@@ -10,6 +10,11 @@ use crate::geom::{self, Geom};
 
 /// `ST_Area(geom)` — planar area; 0 for non-areal or empty geometries.
 pub fn st_area(bytes: &[u8]) -> Result<f64> {
+    // A surface collection is summed patch by patch, which is the planar sum
+    // PostGIS reports (measured) — not a 3D surface area.
+    if let Some(area) = crate::functions::surface::area(bytes)? {
+        return Ok(area);
+    }
     Ok(geom::decode_auto(bytes)?.geometry.unsigned_area())
 }
 
@@ -28,6 +33,9 @@ pub fn st_npoints(bytes: &[u8]) -> Result<i64> {
 /// `ST_Perimeter(geom)` — boundary length of areal geometries; 0 for
 /// points and linestrings (as in PostGIS — use ST_Length for those).
 pub fn st_perimeter(bytes: &[u8]) -> Result<f64> {
+    if let Some(p) = crate::functions::surface::perimeter(bytes)? {
+        return Ok(p);
+    }
     fn perimeter(g: &Geometry<f64>) -> f64 {
         fn polygon_perimeter(p: &Polygon<f64>) -> f64 {
             std::iter::once(p.exterior())
@@ -51,6 +59,9 @@ pub fn st_perimeter(bytes: &[u8]) -> Result<f64> {
 /// (`ST_Point`, …). GeoPackage triggers pair this with GPKG_IsAssignable,
 /// which normalizes both spellings.
 pub fn st_geometry_type(bytes: &[u8]) -> Result<String> {
+    if let Some(kind) = geom::surface_kind(bytes) {
+        return Ok(kind.type_name().to_string());
+    }
     let geom = geom::decode_auto(bytes)?;
     Ok(match geom.geometry {
         Geometry::Point(_) => "ST_Point",
@@ -67,6 +78,10 @@ pub fn st_geometry_type(bytes: &[u8]) -> Result<String> {
 /// `ST_NumGeometries(geom)` — element count for collections, 1 for
 /// non-empty single geometries (PostGIS ≥ 2.0), 0 for empty.
 pub fn st_num_geometries(bytes: &[u8]) -> Result<i64> {
+    // PostGIS counts a surface collection's patches as its members.
+    if let Some(n) = crate::functions::surface::st_num_patches(bytes)? {
+        return Ok(n);
+    }
     let geom = geom::decode_auto(bytes)?;
     Ok(match &geom.geometry {
         Geometry::GeometryCollection(gc) => gc.0.len() as i64,
@@ -378,6 +393,10 @@ pub fn st_simplify(bytes: &[u8], tolerance: f64) -> Result<Vec<u8>> {
 
 /// `ST_Dimension(geom)` — 0 for puntal, 1 for lineal, 2 for areal.
 pub fn st_dimension(bytes: &[u8]) -> Result<i64> {
+    // A surface collection is areal; PostGIS agrees (measured: 2).
+    if geom::surface_kind(bytes).is_some() {
+        return Ok(2);
+    }
     let g = geom::decode_auto(bytes)?;
     Ok(match g.geometry {
         Geometry::Point(_) | Geometry::MultiPoint(_) => 0,

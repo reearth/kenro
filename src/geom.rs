@@ -30,6 +30,61 @@ pub fn decode_auto(bytes: &[u8]) -> Result<Geom> {
     }
 }
 
+/// The surface collections kenro reads but cannot hold in `geo_types`:
+/// ISO WKB type codes 15, 16 and 17 (with the usual `+1000` Z forms).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceKind {
+    PolyhedralSurface,
+    Tin,
+    Triangle,
+}
+
+impl SurfaceKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            SurfaceKind::PolyhedralSurface => "POLYHEDRALSURFACE",
+            SurfaceKind::Tin => "TIN",
+            SurfaceKind::Triangle => "TRIANGLE",
+        }
+    }
+
+    /// The `ST_GeometryType` spelling, matching PostGIS.
+    pub fn type_name(self) -> &'static str {
+        match self {
+            SurfaceKind::PolyhedralSurface => "ST_PolyhedralSurface",
+            SurfaceKind::Tin => "ST_Tin",
+            SurfaceKind::Triangle => "ST_Triangle",
+        }
+    }
+}
+
+/// The surface kind of a WKB or GeoPackage blob, if it is one.
+///
+/// Cheap: reads the type word, touches nothing else.
+pub fn surface_kind(bytes: &[u8]) -> Option<SurfaceKind> {
+    let wkb = if gpb::is_gpb(bytes) {
+        let header = GpbHeader::parse(bytes).ok()?;
+        bytes.get(header.wkb_offset..)?
+    } else {
+        bytes
+    };
+    if wkb.len() < 5 {
+        return None;
+    }
+    let raw: [u8; 4] = wkb[1..5].try_into().ok()?;
+    let ty = match wkb[0] {
+        0 => u32::from_be_bytes(raw),
+        1 => u32::from_le_bytes(raw),
+        _ => return None,
+    };
+    match (ty & 0x0000_FFFF) % 1000 {
+        15 => Some(SurfaceKind::PolyhedralSurface),
+        16 => Some(SurfaceKind::Tin),
+        17 => Some(SurfaceKind::Triangle),
+        _ => None,
+    }
+}
+
 /// Decode ISO WKB or EWKB. An EWKB-embedded SRID populates `srid` unless
 /// `srid_override` is given (PostGIS behavior for `ST_GeomFromWKB(wkb, srid)`).
 pub fn decode_wkb(bytes: &[u8], srid_override: Option<i32>) -> Result<Geom> {
@@ -66,6 +121,22 @@ fn wkb_to_geo(bytes: &[u8]) -> Result<Geometry<f64>> {
     // the counts — a random 4-byte count can demand gigabytes and abort
     // the process, which is not an Err).
     validate_wkb(bytes)?;
+
+    // The one guard for surface collections. `geo_types` has no variant for
+    // them, so rather than let 40 call sites each fail with "unknown WKB
+    // geometry type", every path into a 2D value stops here with the way
+    // forward in the message. `functions::surface` reads them from the
+    // bytes instead of coming through here.
+    if let Some(kind) = surface_kind(bytes) {
+        return Err(Error::Unsupported {
+            func: "kenro",
+            reason: format!(
+                "{} is a surface collection, which kenro reads but does not compute with; \
+                 flatten it with ST_Force2D first",
+                kind.name()
+            ),
+        });
+    }
 
     // POINT EMPTY arrives as a point with NaN coordinates (the GeoPackage
     // spec's own convention); geozero's geo-types writer refuses it, so
@@ -162,12 +233,30 @@ fn validate_wkb(bytes: &[u8]) -> Result<()> {
                     *pos += total;
                 }
             }
-            4..=7 => {
+            // 4..=7: multi/collection. 15 (PolyhedralSurface) and 16 (TIN)
+            // have the same shape — a count, then whole nested geometries.
+            4..=7 | 15 | 16 => {
                 need(*pos, 4)?;
                 let n = read_u32(b, *pos) as usize;
                 *pos += 4;
                 for _ in 0..n {
                     walk(b, pos, depth + 1)?;
+                }
+            }
+            // 17 (Triangle) is laid out exactly like a Polygon.
+            17 => {
+                need(*pos, 4)?;
+                let rings = read_u32(b, *pos) as usize;
+                *pos += 4;
+                for _ in 0..rings {
+                    need(*pos, 4)?;
+                    let n = read_u32(b, *pos) as usize;
+                    *pos += 4;
+                    let total = n
+                        .checked_mul(coord_size)
+                        .ok_or_else(|| fail("count overflow"))?;
+                    need(*pos, total)?;
+                    *pos += total;
                 }
             }
             _ => return Err(fail("unknown WKB geometry type")),

@@ -1450,3 +1450,178 @@ fn gml_names_its_feature_when_off() {
         .to_string();
     assert!(err.contains("gml"), "{err}");
 }
+
+// ---- Surface collections (functions::surface) ----
+
+/// PostGIS 3.5's own bytes for
+/// `POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))`. WKT cannot build
+/// one (kenro's reader is 2D) and `ST_GeomFromWKB` re-encodes, so the blob
+/// goes in raw — which is how a GDAL-written column arrives anyway.
+fn polyhedral_square() -> Vec<u8> {
+    let hex = "01f70300000100000001eb03000001000000050000000000000000000000000000000000000000000000000000000000000000000000000000000000f03f0000000000000000000000000000f03f000000000000f03f0000000000000000000000000000f03f00000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    let clean: String = hex.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+    (0..clean.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&clean[i..i + 2], 16).unwrap())
+        .collect()
+}
+
+#[test]
+fn a_surface_collection_is_readable_measurable_and_flattenable() {
+    let conn = conn();
+    let s = polyhedral_square();
+
+    // PostGIS 3.5 on the same bytes: ST_PolyhedralSurface, 1 patch, area 1,
+    // dimension 2.
+    assert_eq!(
+        conn.query_row("SELECT ST_GeometryType(?1)", [&s], |r| r
+            .get::<_, String>(0))
+            .unwrap(),
+        "ST_PolyhedralSurface"
+    );
+    assert_eq!(
+        conn.query_row("SELECT ST_NumPatches(?1)", [&s], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        conn.query_row("SELECT ST_Dimension(?1)", [&s], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        2
+    );
+    assert!(
+        (conn
+            .query_row("SELECT ST_Area(?1)", [&s], |r| r.get::<_, f64>(0))
+            .unwrap()
+            - 1.0)
+            .abs()
+            < 1e-12
+    );
+
+    // A patch comes out as an ordinary 2D polygon, 1-based like ST_GeometryN.
+    assert_eq!(
+        conn.query_row("SELECT ST_AsText(ST_PatchN(?1, 1))", [&s], |r| r
+            .get::<_, String>(0))
+            .unwrap(),
+        "POLYGON((0 0,0 1,1 1,1 0,0 0))"
+    );
+
+    // The R-tree columns answer, so a surface column stays indexable.
+    let (minx, maxy): (f64, f64) = conn
+        .query_row("SELECT ST_MinX(?1), ST_MaxY(?1)", [&s], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap();
+    assert_eq!((minx, maxy), (0.0, 1.0));
+    assert_eq!(
+        conn.query_row("SELECT ST_IsEmpty(?1)", [&s], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+
+    // Z is readable even though nothing computes in 3D.
+    assert_eq!(
+        conn.query_row("SELECT ST_HasZ(?1), ST_NDims(?1)", [&s], |r| Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, i64>(1)?
+        )))
+        .unwrap(),
+        (1, 3)
+    );
+}
+
+#[test]
+fn every_predicate_refuses_a_surface_and_says_how_to_proceed() {
+    let conn = conn();
+    let s = polyhedral_square();
+    // One guard, not forty copies: anything needing a 2D value stops with a
+    // message naming the way through.
+    for sql in [
+        "SELECT ST_Intersects(?1, ST_GeomFromText('POINT(0 0)'))",
+        "SELECT ST_AsText(?1)",
+        "SELECT ST_Centroid(?1)",
+    ] {
+        let err = conn
+            .query_row(sql, [&s], |r| r.get::<_, Option<Vec<u8>>>(0))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("POLYHEDRALSURFACE"), "{sql}: {err}");
+        assert!(err.contains("ST_Force2D"), "{sql}: {err}");
+    }
+
+    // The overlay family too, where it is compiled in.
+    #[cfg(feature = "overlay")]
+    {
+        let err = conn
+            .query_row("SELECT ST_Buffer(?1, 1.0)", [&s], |r| {
+                r.get::<_, Option<Vec<u8>>>(0)
+            })
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("ST_Force2D"), "{err}");
+    }
+
+    // …and ST_Force2D really is the way through.
+    let flat: String = conn
+        .query_row("SELECT ST_AsText(ST_Force2D(?1))", [&s], |r| r.get(0))
+        .unwrap();
+    assert_eq!(flat, "MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)))");
+    assert_eq!(
+        conn.query_row(
+            "SELECT ST_Intersects(ST_Force2D(?1), ST_GeomFromText('POINT(0.5 0.5)'))",
+            [&s],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn the_geopackage_extension_obligation_is_reported() {
+    let conn = conn();
+    // GeoPackage Annex F.1: an extended geometry type is legal only if the
+    // file declares it. kenro names the row rather than writing it.
+    assert_eq!(
+        conn.query_row(
+            "SELECT kenro_gpkg_extension_required(?1)",
+            [&polyhedral_square()],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        "gpkg_geom_POLYHEDRALSURFACE"
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT kenro_gpkg_extension_required(ST_GeomFromText('POINT(1 2)'))"
+        ),
+        None
+    );
+}
+
+#[test]
+fn a_surface_column_keeps_the_rtree_triggers_working() {
+    let conn = conn();
+    // The GeoPackage path: a surface column still maintains a 2D bbox index.
+    conn.execute_batch(
+        "CREATE TABLE b (fid INTEGER PRIMARY KEY, geom BLOB);
+         CREATE VIRTUAL TABLE rtree_b_geom USING rtree(id, minx, maxx, miny, maxy);
+         CREATE TRIGGER b_ai AFTER INSERT ON b WHEN NEW.geom NOT NULL AND NOT ST_IsEmpty(NEW.geom)
+         BEGIN
+           INSERT OR REPLACE INTO rtree_b_geom VALUES (
+             NEW.fid, ST_MinX(NEW.geom), ST_MaxX(NEW.geom), ST_MinY(NEW.geom), ST_MaxY(NEW.geom));
+         END;",
+    )
+    .unwrap();
+    conn.execute("INSERT INTO b VALUES (1, ?1)", [&polyhedral_square()])
+        .unwrap();
+    let (minx, maxx): (f64, f64) = conn
+        .query_row(
+            "SELECT minx, maxx FROM rtree_b_geom WHERE id = 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((minx, maxx), (0.0, 1.0));
+}

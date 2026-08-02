@@ -74,9 +74,9 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_Translate(geom, dx, dy)` | geometry | ✅ | ✅ | ✅ | |
 | `ST_Scale(geom, xf, yf)` | geometry | ✅ | ✅ | ⚠️ named `ScaleCoords` | About the origin, like PostGIS |
 | **GeoPackage triggers** | | | | | |
-| `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | ✅ | kenro uses the GeoPackage spec's trigger names (Annex F.3) — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin` |
+| `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | ✅ | kenro uses the GeoPackage spec's R-tree trigger names — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin` |
 | `ST_IsEmpty(geom)` | 0/1 | ✅ | ✅ | ✅ | gpkg R-tree contract; NULL on NULL |
-| `GPKG_IsAssignable(expected, actual)` | 0/1 | ❌ | ❌ | ✅ | kenro-only: the geometry-type-trigger helper (Annex F.4); accepts both `'POINT'` and `'ST_Point'` spellings so the spec DDL works with kenro's `ST_GeometryType` |
+| `GPKG_IsAssignable(expected, actual)` | 0/1 | ❌ | ❌ | ✅ | The geometry-type-trigger helper. ⚠️ that extension was **removed from the GeoPackage standard in 2016** over interoperability concerns and now survives only in the 1.1.0 archive — kenro keeps the function because files carrying those triggers are still out there. Accepts both `'POINT'` and `'ST_Point'` spellings so the old DDL works with kenro's `ST_GeometryType` |
 | **H3 cells** (`h3` feature) | | | | | |
 | `h3_latlng_to_cell(geom, res)` | INT | via [h3-pg] ext | via community `h3` ext | ❌ | Same name in all three ecosystems; POINT in lon/lat only |
 | `h3_cell_to_parent(cell, res)` | INT | via h3-pg | via `h3` ext | ❌ | For coarser `GROUP BY` |
@@ -125,7 +125,7 @@ wasm export — so they cost a registration and nothing else.
 
 | Alias | Same as | Note |
 |---|---|---|
-| `ST_XMin` / `ST_XMax` / `ST_YMin` / `ST_YMax` | `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | kenro's primary names are the GeoPackage trigger spellings (Annex F.3), required verbatim for index maintenance |
+| `ST_XMin` / `ST_XMax` / `ST_YMin` / `ST_YMax` | `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | kenro's primary names are the GeoPackage R-tree trigger spellings, required verbatim for index maintenance |
 | `ST_GeometryFromText(wkt [, srid])` | `ST_GeomFromText` | |
 | `ST_GeomFromEWKB(bytes)` | `ST_GeomFromWKB` | kenro's WKB reader already accepts EWKB |
 | `ST_SymmetricDifference(a, b)` | `ST_SymDifference` | `overlay` feature |
@@ -325,6 +325,69 @@ does neither, and a pull parser is all that is left.
 | `ST_AsGML([version, ] geom [, maxdecimaldigits])` | TEXT | ✅ | ❌ | ✅ | Byte-identical to PostGIS for the shapes kenro supports, golden-tested — including GML 3's habit of writing a `Curve` with segments where a `LineString` would do, and `MultiCurve`/`MultiSurface` for the multis. Version defaults to 2 and precision to 15, as in PostGIS. The `options`, `nprefix` and `id` arguments are not implemented: always the `gml:` prefix, never an id |
 | `ST_GeomFromGML(text [, srid])` / `ST_GMLToSQL` | geometry | ✅ | ❌ | ✅ | Structural, not schema-driven: elements are matched by **local name**, so any namespace prefix works and unknown elements are ignored — which is what lets a CityGML fragment be read without carrying the schema. `srsName` is read from either `EPSG:6697` or the `urn:ogc:def:crs:EPSG::6697` form. `srsDimension="3"` sets the coordinate stride, and the Z is dropped like everywhere else in kenro |
 
+## Surface collections: POLYHEDRALSURFACE, TIN, TRIANGLE
+
+kenro **reads** surface collections but does not compute with them. `geo_types`
+has no variant for one, and a second geometry model would mean two
+representations that can disagree, so these functions walk the encoding
+instead: they answer structural questions, measure patch by patch, and hand
+the whole thing to the 2D world through `ST_Force2D`.
+
+The route in is a GeoPackage written by GDAL, QGIS or a CityGML importer —
+the same route as [3D pass-through](#3d-pass-through). `ST_GeomFromWKB` will
+not do it, because it re-encodes.
+
+**Everything else refuses surface input, loudly and in one place.** A
+predicate or an overlay function raises with a message naming `ST_Force2D`;
+silently flattening a building into overlapping faces would be the same class
+of mistake as writing 2D where 3D went in.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_NumPatches(geom)` | INTEGER / NULL | ✅ | ❌ | ❌ | NULL for anything that is not a surface collection |
+| `ST_PatchN(geom, n)` | geometry / NULL | ✅ | ❌ | ❌ | Patch `n` as a 2D POLYGON, **1-based** like `ST_GeometryN`; Z readable via `ST_ZMin`/`ST_ZMax` |
+| `ST_GeometryType` | TEXT | ✅ | ❌ | ❌ | `ST_PolyhedralSurface` / `ST_Tin` / `ST_Triangle` |
+| `ST_Dimension` | INTEGER | ✅ | ❌ | ❌ | 2, as PostGIS reports |
+| `ST_Area`, `ST_Perimeter` | REAL | ✅ | ❌ | ❌ | Summed patch by patch — the **planar** sum PostGIS reports, not a 3D surface area (measured) |
+| `ST_NumGeometries`, `ST_IsEmpty` | INTEGER | ✅ | ❌ | ❌ | Patches count as members, so the R-tree triggers keep working |
+| `ST_MinX` … `ST_MaxY`, `ST_ZMin`, `ST_ZMax`, `ST_HasZ`, `ST_NDims` | | ✅ | ❌ | ❌ | Walked from the patches; a surface column stays indexable |
+| `ST_Force2D(geom)` | geometry | ✅ | ✅ | ❌ | → MULTIPOLYGON of the patches. ⚠️ a closed solid becomes **overlapping coplanar faces** — geometrically correct, visually surprising, and what PostGIS does |
+| `ST_IsClosed(geom)` | INTEGER | ✅ | ❌ | ❌ | Is this a closed shell? Combinatorial, not geometric: every edge shared by exactly two patches, tested on the 3D coordinates |
+| `kenro_gpkg_extension_required(geom)` | TEXT / NULL | ❌ | ❌ | ❌ | **kenro-only.** See below |
+
+`ST_GeomFromGML` also reads CityGML's surface wrappers — `gml:Solid`,
+`gml:CompositeSurface`, `gml:Surface`, `gml:TriangulatedSurface`,
+`gml:Triangle` — flattening them to a MULTIPOLYGON on the way in.
+
+### The GeoPackage obligation
+
+GeoPackage Annex F.1 makes an extended geometry type legal **only if the file
+declares it**: one row in `gpkg_extensions` per (table, column).
+
+```sql
+INSERT INTO gpkg_extensions (table_name, column_name, extension_name, definition, scope)
+VALUES ('buildings', 'geom', 'gpkg_geom_POLYHEDRALSURFACE',
+        'http://www.geopackage.org/spec120/#extension_geometry_types', 'read-write');
+```
+
+…and `gpkg_geometry_columns.geometry_type_name` carries `POLYHEDRALSURFACE`
+rather than a core type name.
+
+kenro does not write that row. It registers functions; it does not manage
+schemas — the same reason SpatiaLite's `InitSpatialMetadata` is out of scope,
+and a function with a side effect could no longer be `SQLITE_DETERMINISTIC`
+and `SQLITE_INNOCUOUS`, which the GeoPackage triggers depend on. What it does
+instead is **name the obligation** so it is detectable rather than folklore:
+
+```sql
+SELECT kenro_gpkg_extension_required(geom) FROM buildings LIMIT 1;
+-- 'gpkg_geom_POLYHEDRALSURFACE', or NULL when no extension is needed
+```
+
+The name is deliberately not `GPKG_*`: the spec reserves the `gpkg` author
+prefix for OGC-adopted extension *names*, and although it says nothing about
+SQL function names, a `GPKG_` function would read as one the standard defines.
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
@@ -357,6 +420,10 @@ does neither, and a pull parser is all that is left.
 - **Simplicity testing** — no `ST_IsSimple`: `geo`'s validation reports
   ring self-intersection for polygons (which is how `ST_IsRing` works) but
   has no general self-intersection test for a linestring.
+- **3D geometry operations** — no `ST_3DIntersects`/`ST_3DDistance`, no
+  volumes, no SOLID type (which is SFCGAL's, not stock PostGIS's). Surface
+  collections are read and measured, never computed with; the design note
+  behind that split is `tmp/3d-geometry-design.md`.
 - **Constrained triangulation** — no `ST_TriangulatePolygon`: the
   unconstrained `ST_DelaunayTriangles` is implemented, but respecting a
   polygon's edges as constraints is a different algorithm.

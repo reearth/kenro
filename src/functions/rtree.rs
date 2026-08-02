@@ -13,22 +13,39 @@ use crate::geom;
 use crate::gpb::{self, Envelope, GpbHeader};
 
 pub fn st_min_x(blob: &[u8]) -> Result<Option<f64>> {
+    if let Some((minx, ..)) = crate::functions::surface::envelope(blob)? {
+        return Ok(Some(minx));
+    }
     Ok(envelope_of(blob)?.map(|e| e.min_x))
 }
 
 pub fn st_max_x(blob: &[u8]) -> Result<Option<f64>> {
+    if let Some((_, _, maxx, _)) = crate::functions::surface::envelope(blob)? {
+        return Ok(Some(maxx));
+    }
     Ok(envelope_of(blob)?.map(|e| e.max_x))
 }
 
 pub fn st_min_y(blob: &[u8]) -> Result<Option<f64>> {
+    if let Some((_, miny, ..)) = crate::functions::surface::envelope(blob)? {
+        return Ok(Some(miny));
+    }
     Ok(envelope_of(blob)?.map(|e| e.min_y))
 }
 
 pub fn st_max_y(blob: &[u8]) -> Result<Option<f64>> {
+    if let Some((.., maxy)) = crate::functions::surface::envelope(blob)? {
+        return Ok(Some(maxy));
+    }
     Ok(envelope_of(blob)?.map(|e| e.max_y))
 }
 
 pub fn st_is_empty(blob: &[u8]) -> Result<bool> {
+    // The R-tree triggers call this on every row, so it must answer for a
+    // surface column rather than raising.
+    if let Some(n) = crate::functions::surface::st_num_patches(blob)? {
+        return Ok(n == 0);
+    }
     if gpb::is_gpb(blob) {
         let header = GpbHeader::parse(blob)?;
         if header.empty {

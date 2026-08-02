@@ -30,6 +30,7 @@ pub mod predicates;
 pub mod processing;
 pub mod rtree;
 pub mod stubs;
+pub mod surface;
 pub mod threed;
 #[cfg(feature = "transform")]
 pub mod transform;

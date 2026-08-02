@@ -19,6 +19,10 @@ use crate::gpb;
 /// explicit opt-in to that flattening, and the only way to get a 3D
 /// GeoPackage column through the rest of kenro.
 pub fn st_force_2d(bytes: &[u8]) -> Result<Vec<u8>> {
+    // The bridge out of a surface collection: a MULTIPOLYGON of its patches.
+    if let Some(flat) = crate::functions::surface::force_2d(bytes)? {
+        return Ok(flat);
+    }
     let mut geom = geom::decode_auto(bytes)?;
     geom.has_zm = false; // the ordinates were already dropped on decode
     geom::encode_canonical_gpb(&geom, "ST_Force2D")

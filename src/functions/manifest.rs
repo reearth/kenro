@@ -368,6 +368,17 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Some("gml")
     ),
     entry!("ST_GMLToSQL", "stGeomFromGml", [Text], Blob, Some("gml")),
+    // Surface collections (functions::surface): read, measured and
+    // flattened, never computed with directly.
+    entry!("ST_NumPatches", "stNumPatches", [Blob], OptInt, None),
+    entry!("ST_PatchN", "stPatchN", [Blob, Int], OptBlob, None),
+    entry!(
+        "kenro_gpkg_extension_required",
+        "kenroGpkgExtensionRequired",
+        [Blob],
+        OptText,
+        None
+    ),
     entry!("ST_HasZ", "stHasZ", [Blob], Bool, None),
     entry!("ST_HasM", "stHasM", [Blob], Bool, None),
     entry!("ST_Z", "stZ", [Blob], OptReal, None),

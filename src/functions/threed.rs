@@ -94,10 +94,16 @@ fn ordinates(bytes: &[u8], func: &'static str) -> Result<Ordinates> {
 /// `ST_HasZ(geom)` / `ST_HasM(geom)` — does the *stored* geometry carry the
 /// ordinate? Answered from the encoding, not from kenro's decoded value.
 pub fn st_has_z(bytes: &[u8]) -> Result<bool> {
+    if crate::functions::surface::z_extent(bytes)?.is_some() {
+        return Ok(true);
+    }
     Ok(!ordinates(bytes, "ST_HasZ")?.z.is_empty())
 }
 
 pub fn st_has_m(bytes: &[u8]) -> Result<bool> {
+    if crate::geom::surface_kind(bytes).is_some() {
+        return Ok(false); // kenro's surface reader carries Z only
+    }
     Ok(!ordinates(bytes, "ST_HasM")?.m.is_empty())
 }
 
@@ -106,6 +112,10 @@ pub fn st_has_m(bytes: &[u8]) -> Result<bool> {
 /// This replaces the earlier constant 2: kenro computes in 2D, but the value
 /// it was handed may not be, and reporting otherwise was a small lie.
 pub fn st_coord_dim(bytes: &[u8]) -> Result<i64> {
+    if let Some(extent) = crate::functions::surface::z_extent(bytes)? {
+        let _ = extent;
+        return Ok(3);
+    }
     let o = ordinates(bytes, "ST_CoordDim")?;
     Ok(2 + i64::from(!o.z.is_empty()) + i64::from(!o.m.is_empty()))
 }
@@ -152,6 +162,9 @@ pub fn st_zmax(bytes: &[u8]) -> Result<Option<f64>> {
 }
 
 fn z_extent(bytes: &[u8], func: &'static str, pick: fn(f64, f64) -> f64) -> Result<Option<f64>> {
+    if let Some((lo, hi)) = crate::functions::surface::z_extent(bytes)? {
+        return Ok(Some(pick(lo, hi)));
+    }
     let g = geom::decode_auto(bytes)?;
     if geom::is_empty(&g.geometry) {
         return Ok(None);

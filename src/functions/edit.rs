@@ -174,6 +174,11 @@ fn rings_to_geometry(mut rings: Vec<LineString<f64>>) -> Geometry<f64> {
 /// `ST_IsClosed(geom)` — first vertex equals last. True for areal input
 /// (whose rings are closed by definition), false for a point.
 pub fn st_is_closed(bytes: &[u8]) -> Result<bool> {
+    // A surface collection is closed when it is a shell: every edge shared
+    // by exactly two patches.
+    if let Some(closed) = crate::functions::surface::is_closed(bytes)? {
+        return Ok(closed);
+    }
     let g = geom::decode_auto(bytes)?;
     Ok(match &g.geometry {
         Geometry::LineString(l) => is_closed_line(l),

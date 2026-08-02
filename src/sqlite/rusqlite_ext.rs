@@ -490,6 +490,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_hull(conn)?;
     register_misc(conn)?;
     register_threed(conn)?;
+    register_surface(conn)?;
     #[cfg(feature = "gml")]
     register_gml(conn)?;
 
@@ -1665,6 +1666,40 @@ fn register_gml(conn: &Connection) -> rusqlite::Result<()> {
             return Ok(None);
         };
         blob(gml::st_geom_from_gml(t, Some(srid)))
+    })?;
+    Ok(())
+}
+
+/// Surface collections (see `functions::surface`).
+fn register_surface(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::surface;
+
+    conn.create_scalar_function("ST_NumPatches", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "ST_NumPatches")? else {
+            return Ok(None);
+        };
+        surface::st_num_patches(b)
+            .map(|v| v.map(Value::Integer))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_PatchN", 2, FLAGS, |ctx| {
+        let (Some(b), Some(n)) = (
+            blob_or_null(ctx, 0, "ST_PatchN")?,
+            i64_or_null(ctx, 1, "ST_PatchN")?,
+        ) else {
+            return Ok(None);
+        };
+        surface::st_patch_n(b, n)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("kenro_gpkg_extension_required", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "kenro_gpkg_extension_required")? else {
+            return Ok(None);
+        };
+        surface::extension_required(b)
+            .map(|v| v.map(Value::Text))
+            .map_err(sql_err)
     })?;
     Ok(())
 }
