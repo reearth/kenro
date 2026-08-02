@@ -7,6 +7,8 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/reearth/kenro/go.svg)](https://pkg.go.dev/github.com/reearth/kenro/go)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](LICENSE-MIT)
 
+> **Status: v0 — usable, but unstable. Use at your own risk.** The API and behaviour can change in any release. Production use is not recommended, and mission-critical systems least of all. As the license already says: no warranty of any kind.
+
 **SpatiaLite-style spatial SQL for SQLite, in pure Rust** — PostGIS-compatible `ST_` functions that work with rusqlite, as a loadable extension (Python / Node / Bun / Deno / Go / Ruby / C / sqlite3 CLI), in pure Go with no cgo (modernc.org/sqlite + wazero), in containers and serverless (Cloud Run / Lambda / Cloudflare Workers, D1 and Durable Objects), and in the browser (sql.js / wa-sqlite / official SQLite WASM).
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
@@ -281,18 +283,6 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 - SQLite ≥ 3.31 (for `SQLITE_INNOCUOUS`, which lets kenro functions run inside the GeoPackage R-tree triggers under `PRAGMA trusted_schema=off`); the loadable-extension path needs SQLite ≥ 3.34 (it fails with a clear version-mismatch message on older hosts).
 - Loading kenro **and** SpatiaLite into the same connection: both register `ST_` names and SQLite keeps the last registration. Don't mix them (a registration-filter feature flag can be added if needed).
 - `ST_Distance` is 2D cartesian in the geometry's coordinate system. For meters over lon/lat, reproject to the local UTM zone first (e.g. `ST_Transform(geom, 32654)` around Tokyo, `32633` around Berlin).
-
-## Roadmap
-
-1. ✅ Core: GeoPackage blobs, WKB/WKT, predicates, R-tree functions, rusqlite registration, PostGIS golden tests
-2. ✅ `ST_Transform` (proj4rs; accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
-3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
-4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
-5. ✅ Full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
-6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
-7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
-8. ✅ v0.1.0 on [crates.io](https://crates.io/crates/kenro) + [npm as `kenro-wasm`](https://www.npmjs.com/package/kenro-wasm)
-9. ✅ v0.2.0: pure-Go binding (no cgo), Cloudflare D1/Durable Objects support, GML 2/3 I/O, KML and SVG output, 3D and POLYHEDRALSURFACE/TIN pass-through, `ST_Split` / `ST_LineMerge` / `ST_IsSimple` / `ST_TriangulatePolygon`, and the concave-hull, Delaunay and full-EPSG tiers
 
 ## License
 
