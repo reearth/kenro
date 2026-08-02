@@ -53,6 +53,7 @@ full = [
     "concave-hull",
     "delaunay",
     "crs-full",
+    "gml",
 ]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
@@ -77,6 +78,10 @@ delaunay = []
 # dedicated axis-aligned-rectangle algorithms, so this does NOT pull the
 # overlay engine and is cheap enough to sit in the default set.
 mvt = []
+# GML 2/3 I/O. Reading pulls quick-xml (+13 KB of wasm, measured); writing is
+# hand-rolled like the WKT and GeoJSON emitters. kenro validates nothing
+# against a schema, which is what libxml2 buys SpatiaLite here.
+gml = ["dep:quick-xml"]
 # The full crs-definitions EPSG registry as a fallback for codes outside
 # kenro's curated table — every national and local grid. In `full`, because a
 # build that says "full" should transform to EPSG:6677 without a rebuild; the
@@ -104,6 +109,7 @@ h3o = { version = "0.10", optional = true }
 geojson = { version = "0.24", optional = true, default-features = false, features = [
     "geo-types",
 ] }
+quick-xml = { version = "0.37", optional = true, default-features = false }
 
 [dev-dependencies]
 rusqlite = { version = "0.40", features = ["functions", "bundled"] }

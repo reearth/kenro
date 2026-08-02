@@ -12,6 +12,8 @@ pub mod extra;
 pub mod geodesic;
 #[cfg(feature = "geojson")]
 pub mod geojson;
+#[cfg(feature = "gml")]
+pub mod gml;
 #[cfg(feature = "h3")]
 pub mod h3;
 pub mod hull;

@@ -1109,6 +1109,33 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 30,
   },
 
+
+  // --- GML 2/3 I/O (functions::gml) ---
+  "ST_AsGML/1": {
+    sql: "SELECT ST_AsGML(ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v === '<gml:Point srsName="EPSG:4326"><gml:coordinates>1,2</gml:coordinates></gml:Point>',
+  },
+  "ST_AsGML/2": {
+    sql: "SELECT ST_AsGML(3, ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v === '<gml:Point srsName=\"EPSG:4326\"><gml:pos srsDimension=\"2\">1 2</gml:pos></gml:Point>'.replace(/\\/g, ""),
+  },
+  "ST_AsGML/3": {
+    sql: "SELECT ST_AsGML(3, ST_GeomFromText('POINT(1.123456789 2)', 4326), 3)",
+    check: (v) => v.includes("1.123 2"),
+  },
+  "ST_GeomFromGML/1": {
+    sql: "SELECT ST_AsText(ST_GeomFromGML('<gml:Point><gml:pos>1 2</gml:pos></gml:Point>'))",
+    check: (v) => v === "POINT(1 2)",
+  },
+  "ST_GeomFromGML/2": {
+    sql: "SELECT ST_SRID(ST_GeomFromGML('<gml:Point><gml:pos>1 2</gml:pos></gml:Point>', 6697))",
+    check: (v) => Number(v) === 6697,
+  },
+  "ST_GMLToSQL/1": {
+    sql: "SELECT ST_AsText(ST_GMLToSQL('<gml:Point><gml:pos>1 2</gml:pos></gml:Point>'))",
+    check: (v) => v === "POINT(1 2)",
+  },
+
 };
 
 /**

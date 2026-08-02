@@ -47,6 +47,8 @@
 
 use core::cell::UnsafeCell;
 
+#[cfg(feature = "gml")]
+use kenro::functions::gml;
 #[cfg(any(feature = "concave-hull", feature = "delaunay"))]
 use kenro::functions::hull;
 #[cfg(feature = "overlay")]
@@ -1770,6 +1772,48 @@ pub extern "C" fn k_stZMax(geom_p: *const u8, geom_l: u32) -> i32 {
     opt_real(threed::st_zmax(s(geom_p, geom_l)))
 }
 
+// ---- GML I/O ----
+
+#[cfg(feature = "gml")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsGml(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(gml::st_as_gml(s(geom_p, geom_l), 2, None))
+}
+
+#[cfg(feature = "gml")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsGmlVersion(version: i32, geom_p: *const u8, geom_l: u32) -> i32 {
+    text(gml::st_as_gml(s(geom_p, geom_l), version as i64, None))
+}
+
+#[cfg(feature = "gml")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stAsGmlDigits(
+    version: i32,
+    geom_p: *const u8,
+    geom_l: u32,
+    digits: i32,
+) -> i32 {
+    text(gml::st_as_gml(
+        s(geom_p, geom_l),
+        version as i64,
+        Some(digits as i64),
+    ))
+}
+
+#[cfg(feature = "gml")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeomFromGml(text_p: *const u8, text_l: u32) -> i32 {
+    blob(gml::st_geom_from_gml(try_str!(text_p, text_l), None))
+}
+
+#[cfg(feature = "gml")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeomFromGmlSrid(text_p: *const u8, text_l: u32, srid: i32) -> i32 {
+    blob(gml::st_geom_from_gml(try_str!(text_p, text_l), Some(srid)))
+}
+
+#[cfg(feature = "overlay")]
 // =============================================================== manifest
 
 fn kind_str(k: manifest::Kind) -> &'static str {

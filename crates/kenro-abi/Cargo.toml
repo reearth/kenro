@@ -24,6 +24,7 @@ full = [
     "concave-hull",
     "delaunay",
     "crs-full",
+    "gml",
 ]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
@@ -34,6 +35,7 @@ concave-hull = ["kenro/concave-hull"]
 delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
+gml = ["kenro/gml"]
 
 [dependencies]
 # No rusqlite, no wasm-bindgen, no serde: the whole point of this crate is a

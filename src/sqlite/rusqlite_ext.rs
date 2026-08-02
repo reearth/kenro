@@ -490,6 +490,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_hull(conn)?;
     register_misc(conn)?;
     register_threed(conn)?;
+    #[cfg(feature = "gml")]
+    register_gml(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -506,6 +508,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::CONCAVE_HULL_OFF)?;
     #[cfg(not(feature = "delaunay"))]
     register_stubs(conn, stubs::DELAUNAY_OFF)?;
+    #[cfg(not(feature = "gml"))]
+    register_stubs(conn, stubs::GML_OFF)?;
 
     Ok(())
 }
@@ -1605,6 +1609,63 @@ fn register_threed(conn: &Connection) -> rusqlite::Result<()> {
     register_rtree_minmax(conn, "ST_M", threed::st_m)?;
     register_rtree_minmax(conn, "ST_ZMin", threed::st_zmin)?;
     register_rtree_minmax(conn, "ST_ZMax", threed::st_zmax)?;
+    Ok(())
+}
+
+/// GML 2/3 I/O (see `functions::gml`).
+#[cfg(feature = "gml")]
+fn register_gml(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::gml;
+
+    // PostGIS's default version is 2; the leading integer selects it.
+    conn.create_scalar_function("ST_AsGML", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_AsGML")? else {
+            return Ok(None);
+        };
+        gml::st_as_gml(g, 2, None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsGML", 2, FLAGS, |ctx| {
+        let (Some(version), Some(g)) = (
+            int_or_null(ctx, 0, "ST_AsGML")?,
+            blob_or_null(ctx, 1, "ST_AsGML")?,
+        ) else {
+            return Ok(None);
+        };
+        gml::st_as_gml(g, version as i64, None)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_AsGML", 3, FLAGS, |ctx| {
+        let (Some(version), Some(g), Some(digits)) = (
+            int_or_null(ctx, 0, "ST_AsGML")?,
+            blob_or_null(ctx, 1, "ST_AsGML")?,
+            int_or_null(ctx, 2, "ST_AsGML")?,
+        ) else {
+            return Ok(None);
+        };
+        gml::st_as_gml(g, version as i64, Some(digits as i64))
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    for name in ["ST_GeomFromGML", "ST_GMLToSQL"] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(t) = text_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            blob(gml::st_geom_from_gml(t, None))
+        })?;
+    }
+    conn.create_scalar_function("ST_GeomFromGML", 2, FLAGS, |ctx| {
+        let (Some(t), Some(srid)) = (
+            text_or_null(ctx, 0, "ST_GeomFromGML")?,
+            int_or_null(ctx, 1, "ST_GeomFromGML")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(gml::st_geom_from_gml(t, Some(srid)))
+    })?;
     Ok(())
 }
 

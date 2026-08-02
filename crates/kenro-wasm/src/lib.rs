@@ -786,6 +786,38 @@ pub fn st_normalize(geom: &[u8]) -> R<Vec<u8>> {
     misc::st_normalize(geom).map_err(err)
 }
 
+// ---- GML 2/3 I/O (functions::gml) ----
+
+#[cfg(feature = "gml")]
+#[wasm_bindgen(js_name = stAsGml)]
+pub fn st_as_gml(geom: &[u8]) -> R<String> {
+    kenro::functions::gml::st_as_gml(geom, 2, None).map_err(err)
+}
+
+#[cfg(feature = "gml")]
+#[wasm_bindgen(js_name = stAsGmlVersion)]
+pub fn st_as_gml_version(version: i32, geom: &[u8]) -> R<String> {
+    kenro::functions::gml::st_as_gml(geom, version as i64, None).map_err(err)
+}
+
+#[cfg(feature = "gml")]
+#[wasm_bindgen(js_name = stAsGmlDigits)]
+pub fn st_as_gml_digits(version: i32, geom: &[u8], digits: i32) -> R<String> {
+    kenro::functions::gml::st_as_gml(geom, version as i64, Some(digits as i64)).map_err(err)
+}
+
+#[cfg(feature = "gml")]
+#[wasm_bindgen(js_name = stGeomFromGml)]
+pub fn st_geom_from_gml(text: &str) -> R<Vec<u8>> {
+    kenro::functions::gml::st_geom_from_gml(text, None).map_err(err)
+}
+
+#[cfg(feature = "gml")]
+#[wasm_bindgen(js_name = stGeomFromGmlSrid)]
+pub fn st_geom_from_gml_srid(text: &str, srid: i32) -> R<Vec<u8>> {
+    kenro::functions::gml::st_geom_from_gml(text, Some(srid)).map_err(err)
+}
+
 // ---- SRID ----
 
 #[wasm_bindgen(js_name = stSetSrid)]
@@ -1595,6 +1627,11 @@ mod tests {
             "stM",
             "stZMin",
             "stZMax",
+            "stAsGml",
+            "stAsGmlVersion",
+            "stAsGmlDigits",
+            "stGeomFromGml",
+            "stGeomFromGmlSrid",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

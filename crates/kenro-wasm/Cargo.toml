@@ -26,6 +26,7 @@ full = [
     "concave-hull",
     "delaunay",
     "crs-full",
+    "gml",
 ]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
@@ -36,6 +37,7 @@ concave-hull = ["kenro/concave-hull"]
 delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
+gml = ["kenro/gml"]
 
 [dependencies]
 # No rusqlite anywhere in this graph: the host SQLite lives in JS, and these

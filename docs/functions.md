@@ -6,8 +6,8 @@ PostGIS 3.5, a live DuckDB 1.4.0 + spatial session, and a live
 mod_spatialite 5.1 session, July–August 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
-Functions marked with the `overlay`, `spheroid`, `concave-hull` or
-`delaunay` feature need a `full` build (default builds register them as stubs naming the feature); everything
+Functions marked with the `overlay`, `spheroid`, `concave-hull`,
+`delaunay` or `gml` feature need a `full` build (default builds register them as stubs naming the feature); everything
 else, including MVT, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
@@ -312,6 +312,19 @@ predicate, every measure. What is *not* here is 3D geometry — no
 `ST_3DDistance`, no volumes, no `POLYHEDRALSURFACE` — which would need a
 geometry model kenro does not have.
 
+## GML 2/3 I/O
+
+`gml` feature (in `full`). Reading pulls `quick-xml`; writing is hand-rolled
+like the WKT and GeoJSON emitters, so the pair costs **+31 KB raw / +13 KB
+gzipped** measured on the full tier. SpatiaLite reaches for libxml2 here
+because it validates against a schema and stores XmlBLOBs (`XB_*`); kenro
+does neither, and a pull parser is all that is left.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_AsGML([version, ] geom [, maxdecimaldigits])` | TEXT | ✅ | ❌ | ✅ | Byte-identical to PostGIS for the shapes kenro supports, golden-tested — including GML 3's habit of writing a `Curve` with segments where a `LineString` would do, and `MultiCurve`/`MultiSurface` for the multis. Version defaults to 2 and precision to 15, as in PostGIS. The `options`, `nprefix` and `id` arguments are not implemented: always the `gml:` prefix, never an id |
+| `ST_GeomFromGML(text [, srid])` / `ST_GMLToSQL` | geometry | ✅ | ❌ | ✅ | Structural, not schema-driven: elements are matched by **local name**, so any namespace prefix works and unknown elements are ignored — which is what lets a CityGML fragment be read without carrying the schema. `srsName` is read from either `EPSG:6697` or the `urn:ogc:def:crs:EPSG::6697` form. `srsDimension="3"` sets the coordinate stride, and the Z is dropped like everywhere else in kenro |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
@@ -359,9 +372,10 @@ geometry model kenro does not have.
   (WKT/WKB/GeoJSON/GeoPackage blobs), not files; reading shapefiles,
   spreadsheets or writing whole GeoPackages is GDAL/ogr2ogr territory
   (DuckDB's `ST_Read`, SpatiaLite's VirtualShape/VirtualXL).
-- **Other text encodings** — no GML/KML/SVG output (SpatiaLite's
-  `AsGml`/`AsKml`/`AsSvg`) and no XML machinery (XB_*, SLD/SE styling,
-  WFS); kenro speaks WKT, WKB, GeoJSON, GeoPackage blobs and MVT.
+- **Other text encodings** — no KML/SVG/X3D output (SpatiaLite's
+  `AsKml`/`AsSvg`) and no XML machinery beyond geometry: no XmlBLOB (`XB_*`),
+  no SLD/SE styling, no WFS, and no schema validation. GML *is* supported
+  (see above); the rest of the XML surface is not.
 - **SQLite virtual tables** — no VirtualKNN-style modules; kenro registers
   scalar and aggregate functions only, and spatial indexing goes through
   the standard GeoPackage R-tree instead of a custom index.

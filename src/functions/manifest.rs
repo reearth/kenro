@@ -349,6 +349,25 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_NDims", "stCoordDim", [Blob], Int, None),
     // 3D pass-through (functions::threed): kenro computes in 2D but reads
     // and reports the ordinates the stored geometry actually has.
+    // GML 2/3 I/O (functions::gml).
+    entry!("ST_AsGML", "stAsGml", [Blob], Text, Some("gml")),
+    entry!("ST_AsGML", "stAsGmlVersion", [Int, Blob], Text, Some("gml")),
+    entry!(
+        "ST_AsGML",
+        "stAsGmlDigits",
+        [Int, Blob, Int],
+        Text,
+        Some("gml")
+    ),
+    entry!("ST_GeomFromGML", "stGeomFromGml", [Text], Blob, Some("gml")),
+    entry!(
+        "ST_GeomFromGML",
+        "stGeomFromGmlSrid",
+        [Text, Int],
+        Blob,
+        Some("gml")
+    ),
+    entry!("ST_GMLToSQL", "stGeomFromGml", [Text], Blob, Some("gml")),
     entry!("ST_HasZ", "stHasZ", [Blob], Bool, None),
     entry!("ST_HasM", "stHasM", [Blob], Bool, None),
     entry!("ST_Z", "stZ", [Blob], OptReal, None),
@@ -992,6 +1011,7 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("spheroid") => cfg!(feature = "spheroid"),
         Some("concave-hull") => cfg!(feature = "concave-hull"),
         Some("delaunay") => cfg!(feature = "delaunay"),
+        Some("gml") => cfg!(feature = "gml"),
         Some(_) => false,
     })
 }
@@ -1014,6 +1034,9 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_Subdivide", &[2]),
     ("ST_ConcaveHull", &[2]),
     ("ST_DelaunayTriangles", &[1]),
+    ("ST_AsGML", &[1, 2, 3]),
+    ("ST_GeomFromGML", &[1, 2]),
+    ("ST_GMLToSQL", &[1]),
     ("ST_Union", &[1, 2]),
     ("ST_Buffer", &[2, 3]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
@@ -1049,6 +1072,7 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("spheroid") => cfg!(feature = "spheroid"),
         Some("concave-hull") => cfg!(feature = "concave-hull"),
         Some("delaunay") => cfg!(feature = "delaunay"),
+        Some("gml") => cfg!(feature = "gml"),
         Some(_) => false,
     })
 }
@@ -1068,6 +1092,9 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "delaunay") {
         stubs.extend(super::stubs::DELAUNAY_OFF.iter());
+    }
+    if !cfg!(feature = "gml") {
+        stubs.extend(super::stubs::GML_OFF.iter());
     }
     if !cfg!(feature = "h3") {
         stubs.extend(super::stubs::H3_OFF.iter());

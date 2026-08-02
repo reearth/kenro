@@ -145,3 +145,19 @@ pub static DELAUNAY_OFF: &[Stub] = &[Stub {
     name: "ST_DelaunayTriangles",
     hint: "kenro was built without the `delaunay` cargo feature.",
 }];
+
+/// Registered when `gml` is off (+13 KB of wasm when on, for quick-xml).
+pub static GML_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_AsGML",
+        hint: "kenro was built without the `gml` cargo feature.",
+    },
+    Stub {
+        name: "ST_GeomFromGML",
+        hint: "kenro was built without the `gml` cargo feature.",
+    },
+    Stub {
+        name: "ST_GMLToSQL",
+        hint: "kenro was built without the `gml` cargo feature.",
+    },
+];

@@ -1339,3 +1339,114 @@ fn a_3d_column_survives_storage_and_still_indexes() {
         Some("POINT(1 2)")
     );
 }
+
+// ---- GML 2/3 I/O (functions::gml) ----
+
+#[test]
+#[cfg(feature = "gml")]
+fn gml_output_is_byte_identical_to_postgis() {
+    let conn = conn();
+    let p = "ST_GeomFromText('POINT(1 2)', 4326)";
+    // PostGIS 3.5: version 2 is the default.
+    assert_eq!(
+        text(&conn, &format!("SELECT ST_AsGML({p})")).as_deref(),
+        Some(
+            r#"<gml:Point srsName="EPSG:4326"><gml:coordinates>1,2</gml:coordinates></gml:Point>"#
+        )
+    );
+    assert_eq!(
+        text(&conn, &format!("SELECT ST_AsGML(3, {p})")).as_deref(),
+        Some(
+            r#"<gml:Point srsName="EPSG:4326"><gml:pos srsDimension="2">1 2</gml:pos></gml:Point>"#
+        )
+    );
+    // GML 3 writes a Curve with segments where a LineString would do.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsGML(3, ST_GeomFromText('LINESTRING(0 0,1 1)', 4326))"
+        )
+        .as_deref(),
+        Some(
+            r#"<gml:Curve srsName="EPSG:4326"><gml:segments><gml:LineStringSegment><gml:posList srsDimension="2">0 0 1 1</gml:posList></gml:LineStringSegment></gml:segments></gml:Curve>"#
+        )
+    );
+    // No SRID → no srsName; and the digits argument truncates.
+    assert_eq!(
+        text(&conn, "SELECT ST_AsGML(3, ST_GeomFromText('POINT(1 2)'))").as_deref(),
+        Some(r#"<gml:Point><gml:pos srsDimension="2">1 2</gml:pos></gml:Point>"#)
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsGML(3, ST_GeomFromText('POINT(1.123456789 2)', 4326), 3)"
+        )
+        .as_deref(),
+        Some(
+            r#"<gml:Point srsName="EPSG:4326"><gml:pos srsDimension="2">1.123 2</gml:pos></gml:Point>"#
+        )
+    );
+}
+
+#[test]
+#[cfg(feature = "gml")]
+fn gml_reading_takes_citygml_shaped_input() {
+    let conn = conn();
+    // Any prefix, either version, and a URN srsName as CityGML writes it.
+    assert_eq!(
+        text(&conn, r#"SELECT ST_AsText(ST_GeomFromGML('<Point srsName="urn:ogc:def:crs:EPSG::6697"><pos>1 2</pos></Point>'))"#).as_deref(),
+        Some("POINT(1 2)")
+    );
+    assert_eq!(
+        int(
+            &conn,
+            r#"SELECT ST_SRID(ST_GeomFromGML('<Point srsName="urn:ogc:def:crs:EPSG::6697"><pos>1 2</pos></Point>'))"#
+        ),
+        Some(6697)
+    );
+    // A 3D posList — CityGML's normal case. srsDimension decides the stride;
+    // Z is dropped, as everywhere else in kenro.
+    assert_eq!(
+        text(&conn, r#"SELECT ST_AsText(ST_GeomFromGML('<gml:LineString><gml:posList srsDimension="3">0 0 10 1 1 30</gml:posList></gml:LineString>'))"#).as_deref(),
+        Some("LINESTRING(0 0,1 1)")
+    );
+    // ST_GMLToSQL is PostGIS's alias for the reader.
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_GMLToSQL('<gml:Point><gml:coordinates>1,2</gml:coordinates></gml:Point>'))").as_deref(),
+        Some("POINT(1 2)")
+    );
+    // Round-trip through SQL, both versions.
+    for version in [2, 3] {
+        let sql = format!(
+            "SELECT ST_AsText(ST_GeomFromGML(ST_AsGML({version}, ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))', 4326))))"
+        );
+        assert_eq!(
+            text(&conn, &sql).as_deref(),
+            Some("POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1))"),
+            "GML{version}"
+        );
+    }
+    // Malformed input is a loud error, not a silent NULL.
+    assert!(
+        conn.query_row("SELECT ST_GeomFromGML('<html><body/></html>')", [], |r| r
+            .get::<_, Vec<
+            u8,
+        >>(
+            0
+        ))
+        .is_err()
+    );
+}
+
+#[test]
+#[cfg(not(feature = "gml"))]
+fn gml_names_its_feature_when_off() {
+    let conn = conn();
+    let err = conn
+        .query_row("SELECT ST_AsGML(ST_GeomFromText('POINT(1 2)'))", [], |r| {
+            r.get::<_, String>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("gml"), "{err}");
+}
