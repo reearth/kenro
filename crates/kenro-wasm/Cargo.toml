@@ -16,12 +16,14 @@ crate-type = ["cdylib", "rlib"]
 # it; `full` adds only the overlay engine (ST_Buffer/ST_MakeValid/…), whose
 # i_overlay mesh is the single largest contributor to wasm size.
 default = ["transform", "h3", "geojson", "mvt"]
-full = ["transform", "h3", "geojson", "mvt", "overlay", "spheroid"]
+full = ["transform", "h3", "geojson", "mvt", "overlay", "spheroid", "concave-hull", "delaunay"]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]
 overlay = ["kenro/overlay"]
 spheroid = ["kenro/spheroid"]
+concave-hull = ["kenro/concave-hull"]
+delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
 

@@ -503,6 +503,21 @@ pub const FUNCTIONS: &[FnEntry] = &[
     ),
     entry!("ST_GeoHash", "stGeohash", [Blob], OptText, None),
     entry!("ST_GeoHash", "stGeohashChars", [Blob, Int], OptText, None),
+    // The two size-gated algorithms (functions::hull).
+    entry!(
+        "ST_ConcaveHull",
+        "stConcaveHull",
+        [Blob, Real],
+        Blob,
+        Some("concave-hull")
+    ),
+    entry!(
+        "ST_DelaunayTriangles",
+        "stDelaunayTriangles",
+        [Blob],
+        Blob,
+        Some("delaunay")
+    ),
     entry!("ST_PolyFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
     entry!(
         "ST_PolyFromWKB",
@@ -827,6 +842,8 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("overlay") => cfg!(feature = "overlay"),
         Some("mvt") => cfg!(feature = "mvt"),
         Some("spheroid") => cfg!(feature = "spheroid"),
+        Some("concave-hull") => cfg!(feature = "concave-hull"),
+        Some("delaunay") => cfg!(feature = "delaunay"),
         Some(_) => false,
     })
 }
@@ -847,6 +864,8 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_UnaryUnion", &[1]),
     ("ST_ClipByBox2D", &[2]),
     ("ST_Subdivide", &[2]),
+    ("ST_ConcaveHull", &[2]),
+    ("ST_DelaunayTriangles", &[1]),
     ("ST_Union", &[1, 2]),
     ("ST_Buffer", &[2, 3]),
     ("ST_AsMVTGeom", &[2, 3, 4, 5]),
@@ -880,6 +899,8 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("overlay") => cfg!(feature = "overlay"),
         Some("mvt") => cfg!(feature = "mvt"),
         Some("spheroid") => cfg!(feature = "spheroid"),
+        Some("concave-hull") => cfg!(feature = "concave-hull"),
+        Some("delaunay") => cfg!(feature = "delaunay"),
         Some(_) => false,
     })
 }
@@ -893,6 +914,12 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "spheroid") {
         stubs.extend(super::stubs::SPHEROID_OFF.iter());
+    }
+    if !cfg!(feature = "concave-hull") {
+        stubs.extend(super::stubs::CONCAVE_HULL_OFF.iter());
+    }
+    if !cfg!(feature = "delaunay") {
+        stubs.extend(super::stubs::DELAUNAY_OFF.iter());
     }
     if !cfg!(feature = "h3") {
         stubs.extend(super::stubs::H3_OFF.iter());

@@ -14,6 +14,7 @@ pub mod geodesic;
 pub mod geojson;
 #[cfg(feature = "h3")]
 pub mod h3;
+pub mod hull;
 pub mod io;
 pub mod linear;
 pub mod manifest;

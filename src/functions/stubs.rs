@@ -132,3 +132,16 @@ pub static SPHEROID_OFF: &[Stub] = &[
         hint: "kenro was built without the `spheroid` cargo feature.",
     },
 ];
+
+/// Registered when `concave-hull` is off (+41 KB of wasm when on).
+pub static CONCAVE_HULL_OFF: &[Stub] = &[Stub {
+    name: "ST_ConcaveHull",
+    hint: "kenro was built without the `concave-hull` cargo feature; \
+           ST_ConvexHull is available in every build.",
+}];
+
+/// Registered when `delaunay` is off (+81 KB of wasm when on).
+pub static DELAUNAY_OFF: &[Stub] = &[Stub {
+    name: "ST_DelaunayTriangles",
+    hint: "kenro was built without the `delaunay` cargo feature.",
+}];

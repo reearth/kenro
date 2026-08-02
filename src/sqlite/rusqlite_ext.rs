@@ -487,6 +487,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_edit(conn)?;
     register_geodesic_and_linear(conn)?;
     register_extra(conn)?;
+    register_hull(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -499,6 +500,10 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::MVT_OFF)?;
     #[cfg(not(feature = "spheroid"))]
     register_stubs(conn, stubs::SPHEROID_OFF)?;
+    #[cfg(not(feature = "concave-hull"))]
+    register_stubs(conn, stubs::CONCAVE_HULL_OFF)?;
+    #[cfg(not(feature = "delaunay"))]
+    register_stubs(conn, stubs::DELAUNAY_OFF)?;
 
     Ok(())
 }
@@ -1360,6 +1365,28 @@ fn register_extra(conn: &Connection) -> rusqlite::Result<()> {
         }
     }
     conn.create_aggregate_function("ST_Extent", 1, FLAGS, ExtentAgg)?;
+    Ok(())
+}
+
+/// The two size-gated algorithms (see `functions::hull`).
+#[allow(unused_variables)]
+fn register_hull(conn: &Connection) -> rusqlite::Result<()> {
+    #[cfg(feature = "concave-hull")]
+    conn.create_scalar_function("ST_ConcaveHull", 2, FLAGS, |ctx| {
+        let (Some(g), Some(target)) = (
+            blob_or_null(ctx, 0, "ST_ConcaveHull")?,
+            real_or_null(ctx, 1, "ST_ConcaveHull")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(crate::functions::hull::st_concave_hull(g, target))
+    })?;
+    #[cfg(feature = "delaunay")]
+    register_geom_to_blob(
+        conn,
+        "ST_DelaunayTriangles",
+        crate::functions::hull::st_delaunay_triangles,
+    )?;
     Ok(())
 }
 

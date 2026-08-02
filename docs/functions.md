@@ -6,8 +6,8 @@ PostGIS 3.5, a live DuckDB 1.4.0 + spatial session, and a live
 mod_spatialite 5.1 session, July–August 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
-Functions marked with the `overlay` or `spheroid` feature need a `full`
-build (default builds register them as stubs naming the feature); everything
+Functions marked with the `overlay`, `spheroid`, `concave-hull` or
+`delaunay` feature need a `full` build (default builds register them as stubs naming the feature); everything
 else, including MVT, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
@@ -248,6 +248,18 @@ is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
 | `ST_GeoHash(geom [, maxchars])` | TEXT / NULL | ✅ | ❌ | ✅ | 20 characters by default. An extended geometry keeps only the prefix its bbox corners agree on (PostGIS's behavior); non-lon/lat input is an error |
 | `ST_Extent(geom)` **aggregate** | geometry / NULL | ✅ | ✅ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for. NULL rows are skipped; an all-NULL group is NULL |
 
+## Hulls and triangulation
+
+The two most expensive functions in the catalog by binary size — measured on
+the wasm standard tier at **+41 KB** and **+81 KB**, against ~21 KB for a
+whole group of ordinary functions. Each has its own feature, both are in
+`full`, and a build without them registers stubs naming the feature.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_ConcaveHull(geom, target_percent)` | geometry | ✅ | ✅ | ✅ | `concave-hull` feature. Keeps **PostGIS's argument contract** — the fraction of the convex hull's area to aim for, 1.0 being the convex hull — by searching `geo`'s differently-scaled "concavity" parameter for it, at a few hull computations per call. A value outside [0,1] is an error, so pasting geo's own concavity (~2) fails loudly instead of returning a very different shape. ⚠️ The hull family differs from GEOS's, so the vertices are not PostGIS's; what holds is the contract (never exceeds the convex hull, monotone in the target) |
+| `ST_DelaunayTriangles(geom)` | geometry | ✅ | ✅ | ❌ | `delaunay` feature. ⚠️ returns a **MULTIPOLYGON** where PostGIS returns a GEOMETRYCOLLECTION — kenro never produces collections. The `tolerance` and `flags` arguments are not implemented; `geo`'s triangulator has no snapping tolerance, and the edge output is `ST_Boundary` of this |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
@@ -265,10 +277,9 @@ is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
 - **Simplicity testing** — no `ST_IsSimple`: `geo`'s validation reports
   ring self-intersection for polygons (which is how `ST_IsRing` works) but
   has no general self-intersection test for a linestring.
-- **Hulls and triangulation beyond the convex hull** — no `ST_ConcaveHull`
-  (measured at **+41 KB** of wasm, more than the whole editing group) and no
-  `ST_DelaunayTriangles`/`ST_TriangulatePolygon` (**+81 KB**, pulling
-  `spade`). Both are implementable the day the size budget says yes.
+- **Constrained triangulation** — no `ST_TriangulatePolygon`: the
+  unconstrained `ST_DelaunayTriangles` is implemented, but respecting a
+  polygon's edges as constraints is a different algorithm.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,

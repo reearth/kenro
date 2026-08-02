@@ -915,6 +915,18 @@ export const SMOKE_SQL = {
     check: (v) => v === "xn76f",
   },
 
+
+  // --- size-gated algorithms (functions::hull) ---
+  "ST_ConcaveHull/2": {
+    // 1.0 is the convex hull, which for a square of points has area 16.
+    sql: "SELECT ST_Area(ST_ConcaveHull(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)'), 1.0))",
+    check: (v) => Math.abs(Number(v) - 16) < 1e-9,
+  },
+  "ST_DelaunayTriangles/1": {
+    sql: "SELECT ST_NumGeometries(ST_DelaunayTriangles(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))",
+    check: (v) => Number(v) === 2,
+  },
+
 };
 
 /**

@@ -632,6 +632,20 @@ impl ExtentAgg {
     }
 }
 
+// ---- Size-gated algorithms (functions::hull) ----
+
+#[cfg(feature = "concave-hull")]
+#[wasm_bindgen(js_name = stConcaveHull)]
+pub fn st_concave_hull(geom: &[u8], target_percent: f64) -> R<Vec<u8>> {
+    kenro::functions::hull::st_concave_hull(geom, target_percent).map_err(err)
+}
+
+#[cfg(feature = "delaunay")]
+#[wasm_bindgen(js_name = stDelaunayTriangles)]
+pub fn st_delaunay_triangles(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_delaunay_triangles(geom).map_err(err)
+}
+
 // ---- SRID ----
 
 #[wasm_bindgen(js_name = stSetSrid)]
@@ -1410,6 +1424,8 @@ mod tests {
             "stOrderingEquals",
             "stGeohash",
             "stGeohashChars",
+            "stConcaveHull",
+            "stDelaunayTriangles",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

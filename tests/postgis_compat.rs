@@ -984,3 +984,96 @@ fn extra_functions_are_null_strict() {
         assert!(v.is_none(), "{sql} was not NULL-strict");
     }
 }
+
+// ---- The two size-gated algorithms (functions::hull) ----
+
+#[test]
+#[cfg(feature = "concave-hull")]
+fn concave_hull_keeps_postgis_argument_contract() {
+    let conn = conn();
+    let ring = "ST_GeomFromText('MULTIPOINT(0 0,2 0,4 0,4 2,4 4,2 4,0 4,0 2,1 1,3 1,3 3,1 3)')";
+    let convex = real(&conn, &format!("SELECT ST_Area(ST_ConvexHull({ring}))"));
+    // PostGIS's argument is the fraction of the convex hull's area; 1.0 is
+    // the convex hull itself.
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_ConcaveHull({ring}, 1.0))")
+        ) - convex)
+            .abs()
+            < 1e-9
+    );
+    // Never larger than the convex hull, and monotone in the target.
+    let mut previous = convex;
+    for target in ["0.9", "0.5", "0.2"] {
+        let area = real(
+            &conn,
+            &format!("SELECT ST_Area(ST_ConcaveHull({ring}, {target}))"),
+        );
+        assert!(area <= previous + 1e-9, "{target}: {area} > {previous}");
+        previous = area;
+    }
+    // geo's own parameter is a concavity of ~2, out of PostGIS's range: the
+    // paste must fail loudly rather than return a different shape.
+    let err = conn
+        .query_row(&format!("SELECT ST_ConcaveHull({ring}, 2.0)"), [], |r| {
+            r.get::<_, Vec<u8>>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("between 0 and 1"), "{err}");
+}
+
+#[test]
+#[cfg(feature = "delaunay")]
+fn delaunay_triangulates_like_postgis_but_as_a_multipolygon() {
+    let conn = conn();
+    let square = "ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')";
+    // PostGIS 3.5: 2 triangles totalling area 16, in a GEOMETRYCOLLECTION.
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_NumGeometries(ST_DelaunayTriangles({square}))")
+        ),
+        Some(2)
+    );
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_DelaunayTriangles({square}))")
+        ) - 16.0)
+            .abs()
+            < 1e-9
+    );
+    // kenro never produces collections, so it is a MULTIPOLYGON.
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_GeometryType(ST_DelaunayTriangles({square}))")
+        )
+        .as_deref(),
+        Some("ST_MultiPolygon")
+    );
+}
+
+#[test]
+#[cfg(not(any(feature = "concave-hull", feature = "delaunay")))]
+fn the_size_gated_algorithms_name_their_feature_when_off() {
+    let conn = conn();
+    for (sql, feature) in [
+        (
+            "SELECT ST_ConcaveHull(ST_GeomFromText('MULTIPOINT(0 0,1 1)'), 0.5)",
+            "concave-hull",
+        ),
+        (
+            "SELECT ST_DelaunayTriangles(ST_GeomFromText('MULTIPOINT(0 0,1 1,2 0)'))",
+            "delaunay",
+        ),
+    ] {
+        let err = conn
+            .query_row(sql, [], |r| r.get::<_, Vec<u8>>(0))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(feature), "{err}");
+    }
+}

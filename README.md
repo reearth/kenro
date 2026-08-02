@@ -11,7 +11,7 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~160 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~161 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON and GeoPackage blobs in and out, MVT vector tiles out — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
@@ -250,12 +250,14 @@ GeoPackage triggers, measures/processing/affine, CRS transform, H3,
 GeoJSON, and MVT vector tiles (tile clipping uses dedicated rectangle
 algorithms, so MVT costs almost nothing).
 
-**`full`** adds the two features excluded from the default for size:
+**`full`** adds the four features excluded from the default for size:
 `overlay` (`ST_Intersection`/`ST_Union`/`ST_Difference`/`ST_SymDifference`/
 `ST_Buffer`/`ST_MakeValid` — pulls the [i_overlay] mesh, the largest
 single contributor to binary size) and `spheroid`
 (`ST_DistanceSpheroid`/`ST_LengthSpheroid` — pulls geographiclib for a 0.1%
-refinement over the always-available spherical `ST_DistanceSphere`). With overlay present, `ST_AsMVTGeom`
+refinement over the always-available spherical `ST_DistanceSphere`), plus
+`concave-hull` (+41 KB) and `delaunay` (+81 KB, pulling [spade]) — the two
+functions whose algorithms cost more than any other single entry. With overlay present, `ST_AsMVTGeom`
 also upgrades to PostGIS-grade validity repair (invalid input and
 snap-induced self-intersections are made valid before tiling). In wasm terms: standard 617 KB
 (251 KB gzip) vs full 946 KB (353 KB gzip); `--no-default-features`
@@ -292,4 +294,5 @@ MIT OR Apache-2.0, at your option.
 [h3-pg]: https://github.com/zachasme/h3-pg
 [modernc.org/sqlite]: https://pkg.go.dev/modernc.org/sqlite
 [wazero]: https://wazero.io
+[spade]: https://github.com/Stoeoef/spade
 [i_overlay]: https://github.com/iShape-Rust/iOverlay

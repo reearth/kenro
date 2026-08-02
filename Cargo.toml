@@ -43,7 +43,7 @@ exclude = [".github/"]
 # build small; `full` adds the overlay engine on top (MVT is already in the
 # default set — see the `mvt` feature's note below).
 default = ["transform", "h3", "geojson", "mvt"]
-full = ["transform", "h3", "geojson", "mvt", "overlay", "spheroid"]
+full = ["transform", "h3", "geojson", "mvt", "overlay", "spheroid", "concave-hull", "delaunay"]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
 h3 = ["dep:h3o"]
@@ -57,6 +57,12 @@ overlay = []
 # default set — it costs nothing extra and answers "how many metres apart" for
 # most callers; the ellipsoid buys the last 0.1%.
 spheroid = []
+# The two most expensive functions in the catalog, by measured wasm size on
+# the standard tier: ST_ConcaveHull (+41 KB) and ST_DelaunayTriangles
+# (+81 KB, pulling spade). Both are in `full`; neither is worth carrying in a
+# build that does not call them.
+concave-hull = []
+delaunay = []
 # Vector tiles: ST_AsMVTGeom + the ST_AsMVT aggregate. Clipping is done by
 # dedicated axis-aligned-rectangle algorithms, so this does NOT pull the
 # overlay engine and is cheap enough to sit in the default set.
