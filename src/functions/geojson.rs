@@ -26,7 +26,7 @@ pub mod decoded {
         if geom.has_zm {
             return Err(Error::Unsupported {
                 func: "ST_AsGeoJSON",
-                reason: "3D/M output is not supported in kenro 0.1; predicates and \
+                reason: "3D/M output is not supported in kenro; predicates and \
                          R-tree functions accept 3D input"
                     .into(),
             });
@@ -55,7 +55,7 @@ pub fn st_geom_from_geojson(s: &str) -> Result<Vec<u8>> {
     if value_has_third_dim(&g.value) {
         return Err(Error::Unsupported {
             func: "ST_GeomFromGeoJSON",
-            reason: "3D positions are not supported in kenro 0.1 (PostGIS keeps Z; kenro \
+            reason: "3D positions are not supported in kenro (PostGIS keeps Z; kenro \
                      refuses rather than silently dropping it)"
                 .into(),
         });

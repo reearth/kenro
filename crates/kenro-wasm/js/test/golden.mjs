@@ -985,11 +985,19 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_AsText(ST_MultiPolygonFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))",
     check: (v) => v.startsWith("MULTIPOLYGON"),
   },
-  "ST_PolygonFromWKB/1": {
+    "ST_PolygonFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_PolygonFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+"ST_PolygonFromWKB/1": {
     sql: "SELECT ST_AsText(ST_PolygonFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))))",
     check: (v) => v === "POLYGON((0 0,1 0,1 1,0 1,0 0))",
   },
-  "ST_LineStringFromWKB/1": {
+    "ST_LineStringFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_LineStringFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+"ST_LineStringFromWKB/1": {
     sql: "SELECT ST_AsText(ST_LineStringFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)'))))",
     check: (v) => v === "LINESTRING(0 0,1 1)",
   },
@@ -1017,15 +1025,27 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_SRID(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))')), 4326))",
     check: (v) => Number(v) === 4326,
   },
-  "ST_MultiPointFromWKB/1": {
+    "ST_MultiPointFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MultiPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+"ST_MultiPointFromWKB/1": {
     sql: "SELECT ST_AsText(ST_MultiPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2))'))))",
     check: (v) => v === "MULTIPOINT((1 2))",
   },
-  "ST_MultiLineFromWKB/1": {
+    "ST_MultiLineFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MultiLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+"ST_MultiLineFromWKB/1": {
     sql: "SELECT ST_AsText(ST_MultiLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))'))))",
     check: (v) => v === "MULTILINESTRING((0 0,1 1))",
   },
-  "ST_MultiPolyFromWKB/1": {
+    "ST_MultiPolyFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MultiPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+"ST_MultiPolyFromWKB/1": {
     sql: "SELECT ST_GeometryType(ST_MultiPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))))",
     check: (v) => v === "ST_MultiPolygon",
   },

@@ -18,5 +18,5 @@
 {"id":"fg_mpoly:fromgeojson","a":"{\"type\":\"MultiPolygon\",\"coordinates\":[[[[0,0],[1,0],[1,1],[0,1],[0,0]]]]}","fn":"fromgeojson","expected":"MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))","expected_srid":4326}
 {"id":"fg_poly:fromgeojson","a":"{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[4,0],[4,4],[0,4],[0,0]]]}","fn":"fromgeojson","expected":"POLYGON((0 0,4 0,4 4,0 4,0 0))","expected_srid":4326}
 {"id":"fg_pt:fromgeojson","a":"{\"type\":\"Point\",\"coordinates\":[139.7,35.7]}","fn":"fromgeojson","expected":"POINT(139.7 35.7)","expected_srid":4326}
-{"id":"fg_3d:fromgeojson","a":"{\"type\":\"Point\",\"coordinates\":[1,2,3]}","fn":"fromgeojson","expected":"POINT Z (1 2 3)","kenro_expected":{"error": true},"note":"PostGIS keeps Z; kenro 0.1 rejects 3D rather than silently dropping it"}
+{"id":"fg_3d:fromgeojson","a":"{\"type\":\"Point\",\"coordinates\":[1,2,3]}","fn":"fromgeojson","expected":"POINT Z (1 2 3)","kenro_expected":{"error": true},"note":"PostGIS keeps Z; kenro rejects 3D rather than silently dropping it"}
 {"id":"fg_feature:fromgeojson","a":"{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[1,2]},\"properties\":{}}","fn":"fromgeojson","expected":{"error": true},"note":"PostGIS raises on Feature input; kenro raises too"}

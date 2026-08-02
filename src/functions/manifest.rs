@@ -596,7 +596,20 @@ pub const FUNCTIONS: &[FnEntry] = &[
         OptBlob,
         None
     ),
+    // The typed WKB constructors, and PostGIS's longer spellings for them.
+    // Every one takes the optional srid — including `ST_MultiLineFromWKB`,
+    // where stock PostGIS happens to define only the one-argument form while
+    // defining both for its `ST_MLineFromWKB` synonym. Reproducing that
+    // oversight would only mean an argument-count error where the sibling
+    // spelling works.
     entry!("ST_PolygonFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_PolygonFromWKB",
+        "stPolyFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     entry!(
         "ST_LineStringFromWKB",
         "stLineFromWkb",
@@ -604,13 +617,48 @@ pub const FUNCTIONS: &[FnEntry] = &[
         OptBlob,
         None
     ),
+    entry!(
+        "ST_LineStringFromWKB",
+        "stLineFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     entry!("ST_MPointFromWKB", "stMPointFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_MPointFromWKB",
+        "stMPointFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     entry!("ST_MLineFromWKB", "stMLineFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_MLineFromWKB",
+        "stMLineFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     entry!("ST_MPolyFromWKB", "stMPolyFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_MPolyFromWKB",
+        "stMPolyFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
     entry!(
         "ST_MultiPointFromWKB",
         "stMPointFromWkb",
         [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiPointFromWKB",
+        "stMPointFromWkbSrid",
+        [Blob, Int],
         OptBlob,
         None
     ),
@@ -622,9 +670,23 @@ pub const FUNCTIONS: &[FnEntry] = &[
         None
     ),
     entry!(
+        "ST_MultiLineFromWKB",
+        "stMLineFromWkbSrid",
+        [Blob, Int],
+        OptBlob,
+        None
+    ),
+    entry!(
         "ST_MultiPolyFromWKB",
         "stMPolyFromWkb",
         [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiPolyFromWKB",
+        "stMPolyFromWkbSrid",
+        [Blob, Int],
         OptBlob,
         None
     ),

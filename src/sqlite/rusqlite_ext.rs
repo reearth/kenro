@@ -1484,6 +1484,18 @@ fn register_misc(conn: &Connection) -> rusqlite::Result<()> {
                 .map(|v| v.map(Value::Blob))
                 .map_err(sql_err)
         })?;
+        // The srid form, which these eight were missing while their three
+        // shorter siblings had it — the wasm and ABI layers had generated it
+        // all along, so it was unreachable code rather than absent code.
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(b), Some(srid)) = (blob_or_null(ctx, 0, name)?, int_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            compat::from_wkb_typed(b, Some(srid), expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
     }
 
     conn.create_scalar_function("ST_Polygon", 2, FLAGS, |ctx| {

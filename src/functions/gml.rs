@@ -38,7 +38,7 @@ pub fn st_as_gml(bytes: &[u8], version: i64, digits: Option<i64>) -> Result<Stri
     if g.has_zm {
         return Err(Error::Unsupported {
             func: FUNC_OUT,
-            reason: "3D/M output is not supported in kenro 0.1; use ST_Force2D".into(),
+            reason: "3D/M output is not supported in kenro; use ST_Force2D".into(),
         });
     }
     let digits = digits.unwrap_or(15).clamp(0, 15) as usize;

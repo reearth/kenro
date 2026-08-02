@@ -41,7 +41,7 @@ pub fn st_as_kml(bytes: &[u8], digits: Option<i64>, prefix: Option<&str>) -> Res
     if g.has_zm {
         return Err(Error::Unsupported {
             func: FUNC,
-            reason: "3D/M output is not supported in kenro 0.1; use ST_Force2D".into(),
+            reason: "3D/M output is not supported in kenro; use ST_Force2D".into(),
         });
     }
     let prefix = match prefix {

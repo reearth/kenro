@@ -21,7 +21,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~13× smaller**, measured); the wasm build starts at 560 KB (216 KB wire), and the everything-included tier is 2.1 MB (640 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
+- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~12× smaller**, measured); the wasm build starts at 560 KB (216 KB wire), and the everything-included tier is 2.1 MB (640 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -167,11 +167,12 @@ smaller feature tier.
 
 ## Function reference
 
-~80 SQL functions across geometry I/O (WKT/WKB/GeoJSON/GeoPackage), the
-full DE-9IM predicate family (`ST_Relate` included), measures, overlay &
-buffer, processing & affine transforms, accessors, constructors, GeoPackage
-trigger helpers, H3, and MVT vector tiles — plus two aggregates
-(`ST_Union(geom)`, `ST_AsMVT(…)`).
+203 SQL functions across geometry I/O (WKT/WKB/GeoJSON/GML/KML/SVG/GeoPackage),
+the full DE-9IM predicate family (`ST_Relate` included), measures, overlay &
+buffer, splitting and merging, processing & affine transforms, hulls and
+triangulation, accessors, constructors, GeoPackage trigger helpers, 3D and
+surface-collection pass-through, H3, and MVT vector tiles — plus three
+aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`).
 
 **The full table — every function with its PostGIS / DuckDB Spatial /
 SpatiaLite comparison and documented behavior differences — lives in
@@ -287,7 +288,7 @@ by default) enables `kenro::register`. The prebuilt loadable extension
 2. ✅ `ST_Transform` (proj4rs; accuracy [measured and documented](docs/accuracy.md)), H3 cell IDs, GeoJSON, accessors
 3. ✅ `kenro-ext`: loadable extension (`.so`/`.dylib`/`.dll`) for Python / Node / sqlite3 CLI
 4. ✅ `kenro-wasm`: browser builds (official SQLite WASM / sql.js / wa-sqlite, [details](docs/wasm.md)) + drag-and-drop GeoPackage demo
-5. ✅ v0.3: full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
+5. ✅ Full predicate family + `ST_Relate`, measures/processing/affine, pure-Rust overlay & `ST_Buffer`, SQL aggregates (`ST_Union`), MVT (`ST_AsMVTGeom` + `ST_AsMVT`), `GPKG_IsAssignable`
 6. ✅ Release pipeline: prebuilt extension binaries (Linux x86_64/arm64, macOS universal, Windows) + wasm bundle on every `v*` tag
 7. ✅ Public repository + [live demo on GitHub Pages](https://reearth.github.io/kenro/)
 8. ✅ v0.1.0 on [crates.io](https://crates.io/crates/kenro) + [npm as `kenro-wasm`](https://www.npmjs.com/package/kenro-wasm)

@@ -38,7 +38,7 @@ pub fn st_as_svg(bytes: &[u8], rel: Option<i64>, digits: Option<i64>) -> Result<
     if g.has_zm {
         return Err(Error::Unsupported {
             func: FUNC,
-            reason: "3D/M output is not supported in kenro 0.1; use ST_Force2D".into(),
+            reason: "3D/M output is not supported in kenro; use ST_Force2D".into(),
         });
     }
     // PostGIS treats any non-zero rel as relative.

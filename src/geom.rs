@@ -307,7 +307,7 @@ pub fn decode_wkt(wkt: &str, srid: i32) -> Result<Geom> {
     if wkt_has_zm(wkt) {
         return Err(Error::Unsupported {
             func: "ST_GeomFromText",
-            reason: "3D/M geometries are not supported in kenro 0.1".into(),
+            reason: "3D/M geometries are not supported in kenro".into(),
         });
     }
     let geometry = geozero::wkt::Wkt(wkt).to_geo().map_err(|e| {
@@ -438,7 +438,7 @@ fn reject_zm(geom: &Geom, func: &'static str) -> Result<()> {
     if geom.has_zm {
         return Err(Error::Unsupported {
             func,
-            reason: "3D/M output is not supported in kenro 0.1; predicates and \
+            reason: "3D/M output is not supported in kenro; predicates and \
                      R-tree functions accept 3D input"
                 .into(),
         });

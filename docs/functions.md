@@ -141,7 +141,7 @@ New in this group:
 | `ST_AsEWKB(geom)` | BLOB | ✅ | ❌ | ✅ | ISO WKB with PostGIS's `0x20000000` SRID flag; plain WKB when the SRID is 0 |
 | `ST_AsHexEWKB(geom)` | TEXT | ✅ | ❌ | ✅ | Upper-case hex of the above; byte-identical to PostGIS 3.5 (golden-tested) |
 | `ST_PointFromText` / `ST_LineFromText` / `ST_LineStringFromText` / `ST_PolyFromText` / `ST_PolygonFromText` / `ST_MPointFromText` / `ST_MLineFromText` / `ST_MPolyFromText` `(wkt [, srid])` | geometry / NULL | ✅ | ⚠️ partial | ✅ | Parse, then **NULL when the geometry is another type** — an error would be the intuitive choice, but PostGIS returns NULL and so does kenro |
-| `ST_PointFromWKB` / `ST_LineFromWKB` / `ST_PolyFromWKB` `(bytes [, srid])` | geometry / NULL | ✅ | ❌ | ✅ | Same contract over WKB/EWKB/GeoPackage input |
+| `ST_PointFromWKB` / `ST_LineFromWKB` / `ST_PolyFromWKB` / `ST_MPointFromWKB` / `ST_MLineFromWKB` / `ST_MPolyFromWKB` `(bytes [, srid])` | geometry / NULL | ✅ | ❌ | ✅ | Same contract over WKB/EWKB/GeoPackage input. kenro takes the srid on all six; stock PostGIS omits it from `ST_MultiLineFromWKB` alone, which looks like an oversight rather than a rule |
 
 ## Structural accessors and editing
 
@@ -286,7 +286,7 @@ written. Aliases share their original's implementation and wasm export.
 |---|---|
 | `ST_RotateZ(geom, radians)` | `ST_Rotate` — kenro is 2D, so Z *is* the rotation axis |
 | `ST_MultiPointFromText` / `ST_MultiLineStringFromText` / `ST_MultiPolygonFromText` | `ST_MPointFromText` / `ST_MLineFromText` / `ST_MPolyFromText` |
-| `ST_PolygonFromWKB` / `ST_LineStringFromWKB` / `ST_MultiPointFromWKB` / `ST_MultiLineFromWKB` / `ST_MultiPolyFromWKB` | the `ST_*FromWKB` typed constructors |
+| `ST_PolygonFromWKB` / `ST_LineStringFromWKB` / `ST_MultiPointFromWKB` / `ST_MultiLineFromWKB` / `ST_MultiPolyFromWKB` | the `ST_*FromWKB` typed constructors, srid form included |
 | `ST_Box2dFromGeoHash` | `ST_GeomFromGeoHash` |
 
 | Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |

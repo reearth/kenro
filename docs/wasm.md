@@ -30,7 +30,7 @@ naming the missing feature:
 |---|---|---|---|---|
 | minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 560 KB | 216 KB |
 | standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 755 KB | 296 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), and `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading) | 2105 KB | 640 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`/`ST_Split` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`; `ST_TriangulatePolygon` rides along on the same crate), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading), and `text-encodings` (`ST_AsKML`/`ST_AsSVG`, no library of their own) | 2105 KB | 640 KB |
 
 The full tier carries `crs-full`, so `ST_Transform` reaches every EPSG code
 in the registry — Japan's plane rectangular systems, the British National
@@ -40,15 +40,16 @@ the standard tier does not include it: a browser map that only ever touches
 4326 and 3857 should not pay for the registry.
 
 For comparison, DuckDB-WASM's spatial extension alone is ~23.5 MB
-(~6.3 MB wire) — kenro is **25–57× smaller** depending on the tier, at
-the cost of the GEOS/GDAL feature classes kenro doesn't cover.
+(~6.3 MB wire) — kenro is **11–43× smaller** raw, or **10–30× smaller**
+over the wire, depending on the tier, at the cost of the GEOS/GDAL feature
+classes kenro doesn't cover.
 
 ## Host support matrix
 
 | | [@sqlite.org/sqlite-wasm] (primary) | [wa-sqlite] | [sql.js] |
 |---|---|---|---|
-| All ~80 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
-| Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
+| All 203 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
 | GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ✅ | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
 | Arity overloads (`ST_GeomFromText/1,/2`, …) | ✅ | ✅ | ✅ via a registry shim (sql.js keys UDFs by name only; the adapter works around it — sql.js version pinned) |
