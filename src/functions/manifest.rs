@@ -503,6 +503,146 @@ pub const FUNCTIONS: &[FnEntry] = &[
     ),
     entry!("ST_GeoHash", "stGeohash", [Blob], OptText, None),
     entry!("ST_GeoHash", "stGeohashChars", [Blob, Int], OptText, None),
+    // The tail: alternative spellings and small constructors
+    // (functions::misc). Aliases reuse an existing export.
+    entry!("ST_RotateZ", "stRotate", [Blob, Real], Blob, None),
+    entry!(
+        "ST_MultiPointFromText",
+        "stMPointFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiLineStringFromText",
+        "stMLineFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiPolygonFromText",
+        "stMPolyFromText",
+        [Text],
+        OptBlob,
+        None
+    ),
+    entry!("ST_PolygonFromWKB", "stPolyFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_LineStringFromWKB",
+        "stLineFromWkb",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!("ST_MPointFromWKB", "stMPointFromWkb", [Blob], OptBlob, None),
+    entry!("ST_MLineFromWKB", "stMLineFromWkb", [Blob], OptBlob, None),
+    entry!("ST_MPolyFromWKB", "stMPolyFromWkb", [Blob], OptBlob, None),
+    entry!(
+        "ST_MultiPointFromWKB",
+        "stMPointFromWkb",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiLineFromWKB",
+        "stMLineFromWkb",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_MultiPolyFromWKB",
+        "stMPolyFromWkb",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!("ST_Polygon", "stPolygon", [Blob, Int], Blob, None),
+    entry!(
+        "ST_LineFromMultiPoint",
+        "stLineFromMultipoint",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!("ST_LineExtend", "stLineExtend", [Blob, Real], OptBlob, None),
+    entry!(
+        "ST_LineExtend",
+        "stLineExtendBoth",
+        [Blob, Real, Real],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_PointInsideCircle",
+        "stPointInsideCircle",
+        [Blob, Real, Real, Real],
+        Bool,
+        None
+    ),
+    entry!("ST_WrapX", "stWrapX", [Blob, Real, Real], Blob, None),
+    entry!("ST_MakeBox2D", "stMakeBox2d", [Blob, Blob], Blob, None),
+    entry!(
+        "ST_GeomFromGeoHash",
+        "stGeomFromGeohash",
+        [Text],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_GeomFromGeoHash",
+        "stGeomFromGeohashPrec",
+        [Text, Int],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_Box2dFromGeoHash",
+        "stGeomFromGeohash",
+        [Text],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_PointFromGeoHash",
+        "stPointFromGeohash",
+        [Text],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_PointFromGeoHash",
+        "stPointFromGeohashPrec",
+        [Text, Int],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_GeometricMedian",
+        "stGeometricMedian",
+        [Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_GeometricMedian",
+        "stGeometricMedianTol",
+        [Blob, Real],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_LineCrossingDirection",
+        "stLineCrossingDirection",
+        [Blob, Blob],
+        Int,
+        None
+    ),
+    entry!("ST_Summary", "stSummary", [Blob], Text, None),
+    entry!("ST_MemSize", "stMemSize", [Blob], Int, None),
+    entry!("ST_Normalize", "stNormalize", [Blob], Blob, None),
     // The two size-gated algorithms (functions::hull).
     entry!(
         "ST_ConcaveHull",

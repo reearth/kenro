@@ -52,8 +52,8 @@ use kenro::functions::hull;
 #[cfg(feature = "overlay")]
 use kenro::functions::overlay;
 use kenro::functions::{
-    accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, predicates,
-    processing, rtree,
+    accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, misc,
+    predicates, processing, rtree,
 };
 
 // ---------------------------------------------------------------- status
@@ -1559,6 +1559,182 @@ pub extern "C" fn k_stPolyFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i3
         s(v_p, v_l),
         Some(srid),
         compat::Expect::Polygon,
+    ))
+}
+
+// ---- the tail added after the T1-T4 phases ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPolygon(geom_p: *const u8, geom_l: u32, srid: i32) -> i32 {
+    blob(misc::st_polygon(s(geom_p, geom_l), srid))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineFromMultipoint(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_blob(misc::st_line_from_multipoint(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineExtend(geom_p: *const u8, geom_l: u32, forward: f64) -> i32 {
+    opt_blob(misc::st_line_extend(s(geom_p, geom_l), forward, 0.0))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineExtendBoth(
+    geom_p: *const u8,
+    geom_l: u32,
+    forward: f64,
+    backward: f64,
+) -> i32 {
+    opt_blob(misc::st_line_extend(s(geom_p, geom_l), forward, backward))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointInsideCircle(
+    geom_p: *const u8,
+    geom_l: u32,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+) -> i32 {
+    boolean(misc::st_point_inside_circle(
+        s(geom_p, geom_l),
+        cx,
+        cy,
+        radius,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stWrapX(geom_p: *const u8, geom_l: u32, wrap: f64, amount: f64) -> i32 {
+    blob(misc::st_wrap_x(s(geom_p, geom_l), wrap, amount))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMakeBox2d(
+    low_p: *const u8,
+    low_l: u32,
+    high_p: *const u8,
+    high_l: u32,
+) -> i32 {
+    blob(misc::st_make_box_2d(s(low_p, low_l), s(high_p, high_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeomFromGeohash(hash_p: *const u8, hash_l: u32) -> i32 {
+    blob(misc::st_geom_from_geohash(try_str!(hash_p, hash_l), None))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeomFromGeohashPrec(hash_p: *const u8, hash_l: u32, precision: i32) -> i32 {
+    blob(misc::st_geom_from_geohash(
+        try_str!(hash_p, hash_l),
+        Some(precision as i64),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromGeohash(hash_p: *const u8, hash_l: u32) -> i32 {
+    blob(misc::st_point_from_geohash(try_str!(hash_p, hash_l), None))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stPointFromGeohashPrec(hash_p: *const u8, hash_l: u32, precision: i32) -> i32 {
+    blob(misc::st_point_from_geohash(
+        try_str!(hash_p, hash_l),
+        Some(precision as i64),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeometricMedian(geom_p: *const u8, geom_l: u32) -> i32 {
+    opt_blob(misc::st_geometric_median(s(geom_p, geom_l), None))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stGeometricMedianTol(geom_p: *const u8, geom_l: u32, tolerance: f64) -> i32 {
+    opt_blob(misc::st_geometric_median(
+        s(geom_p, geom_l),
+        Some(tolerance),
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stLineCrossingDirection(
+    a_p: *const u8,
+    a_l: u32,
+    b_p: *const u8,
+    b_l: u32,
+) -> i32 {
+    int(misc::st_line_crossing_direction(s(a_p, a_l), s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stSummary(geom_p: *const u8, geom_l: u32) -> i32 {
+    text(misc::st_summary(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMemSize(geom_p: *const u8, geom_l: u32) -> i32 {
+    int(misc::st_mem_size(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stNormalize(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(misc::st_normalize(s(geom_p, geom_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPointFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::MultiPoint,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPointFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiPoint,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMLineFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::MultiLineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMLineFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiLineString,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPolyFromWkb(v_p: *const u8, v_l: u32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        None,
+        compat::Expect::MultiPolygon,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMPolyFromWkbSrid(v_p: *const u8, v_l: u32, srid: i32) -> i32 {
+    opt_blob(compat::from_wkb_typed(
+        s(v_p, v_l),
+        Some(srid),
+        compat::Expect::MultiPolygon,
     ))
 }
 

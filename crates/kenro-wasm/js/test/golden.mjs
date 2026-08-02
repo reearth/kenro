@@ -943,6 +943,141 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 2,
   },
 
+
+  // --- the tail (functions::misc) ---
+  "ST_RotateZ/2": {
+    sql: "SELECT ST_AsText(ST_RotateZ(ST_GeomFromText('POINT(1 0)'), 1.5707963267948966))",
+    check: (v) => v.startsWith("POINT(") && Math.abs(Number(v.slice(6).split(" ")[1].replace(")",""))-1) < 1e-9,
+  },
+  "ST_MultiPointFromText/1": {
+    sql: "SELECT ST_AsText(ST_MultiPointFromText('MULTIPOINT((1 2),(3 4))'))",
+    check: (v) => v === "MULTIPOINT((1 2),(3 4))",
+  },
+  "ST_MultiLineStringFromText/1": {
+    sql: "SELECT ST_AsText(ST_MultiLineStringFromText('MULTILINESTRING((0 0,1 1))'))",
+    check: (v) => v === "MULTILINESTRING((0 0,1 1))",
+  },
+  "ST_MultiPolygonFromText/1": {
+    sql: "SELECT ST_AsText(ST_MultiPolygonFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))",
+    check: (v) => v.startsWith("MULTIPOLYGON"),
+  },
+  "ST_PolygonFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_PolygonFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))))",
+    check: (v) => v === "POLYGON((0 0,1 0,1 1,0 1,0 0))",
+  },
+  "ST_LineStringFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_LineStringFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)'))))",
+    check: (v) => v === "LINESTRING(0 0,1 1)",
+  },
+  "ST_MPointFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_MPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2),(3 4))'))))",
+    check: (v) => v === "MULTIPOINT((1 2),(3 4))",
+  },
+  "ST_MPointFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MLineFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_MLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))'))))",
+    check: (v) => v === "MULTILINESTRING((0 0,1 1))",
+  },
+  "ST_MLineFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MPolyFromWKB/1": {
+    sql: "SELECT ST_GeometryType(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))))",
+    check: (v) => v === "ST_MultiPolygon",
+  },
+  "ST_MPolyFromWKB/2": {
+    sql: "SELECT ST_SRID(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))')), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_MultiPointFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_MultiPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2))'))))",
+    check: (v) => v === "MULTIPOINT((1 2))",
+  },
+  "ST_MultiLineFromWKB/1": {
+    sql: "SELECT ST_AsText(ST_MultiLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))'))))",
+    check: (v) => v === "MULTILINESTRING((0 0,1 1))",
+  },
+  "ST_MultiPolyFromWKB/1": {
+    sql: "SELECT ST_GeometryType(ST_MultiPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))))",
+    check: (v) => v === "ST_MultiPolygon",
+  },
+  "ST_Polygon/2": {
+    sql: "SELECT ST_SRID(ST_Polygon(ST_GeomFromText('LINESTRING(0 0,1 0,1 1,0 0)'), 4326))",
+    check: (v) => Number(v) === 4326,
+  },
+  "ST_LineFromMultiPoint/1": {
+    sql: "SELECT ST_AsText(ST_LineFromMultiPoint(ST_GeomFromText('MULTIPOINT((0 0),(1 1),(2 2))')))",
+    check: (v) => v === "LINESTRING(0 0,1 1,2 2)",
+  },
+  "ST_LineExtend/2": {
+    sql: "SELECT ST_AsText(ST_LineExtend(ST_GeomFromText('LINESTRING(0 0,1 0)'), 1))",
+    check: (v) => v === "LINESTRING(0 0,1 0,2 0)",
+  },
+  "ST_LineExtend/3": {
+    sql: "SELECT ST_AsText(ST_LineExtend(ST_GeomFromText('LINESTRING(0 0,1 0)'), 1, 0.5))",
+    check: (v) => v === "LINESTRING(-0.5 0,0 0,1 0,2 0)",
+  },
+  "ST_PointInsideCircle/4": {
+    sql: "SELECT ST_PointInsideCircle(ST_GeomFromText('POINT(1 1)'), 0, 0, 2)",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_WrapX/3": {
+    sql: "SELECT ST_AsText(ST_WrapX(ST_GeomFromText('LINESTRING(-170 0,170 0)'), 0, 360))",
+    check: (v) => v === "LINESTRING(190 0,170 0)",
+  },
+  "ST_MakeBox2D/2": {
+    sql: "SELECT ST_AsText(ST_MakeBox2D(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(3 4)')))",
+    check: (v) => v === "POLYGON((0 0,0 4,3 4,3 0,0 0))",
+  },
+  "ST_GeomFromGeoHash/1": {
+    sql: "SELECT ST_GeometryType(ST_GeomFromGeoHash('xn76f'))",
+    check: (v) => v === "ST_Polygon",
+  },
+  "ST_GeomFromGeoHash/2": {
+    sql: "SELECT ST_GeometryType(ST_GeomFromGeoHash('xn76fzq7', 5))",
+    check: (v) => v === "ST_Polygon",
+  },
+  "ST_Box2dFromGeoHash/1": {
+    sql: "SELECT ST_GeometryType(ST_Box2dFromGeoHash('xn76f'))",
+    check: (v) => v === "ST_Polygon",
+  },
+  "ST_PointFromGeoHash/1": {
+    sql: "SELECT ST_AsText(ST_PointFromGeoHash('xn76f'))",
+    check: (v) => v === "POINT(139.68017578125 35.66162109375)",
+  },
+  "ST_PointFromGeoHash/2": {
+    sql: "SELECT ST_GeometryType(ST_PointFromGeoHash('xn76fzq7', 5))",
+    check: (v) => v === "ST_Point",
+  },
+  "ST_GeometricMedian/1": {
+    sql: "SELECT ST_X(ST_GeometricMedian(ST_GeomFromText('MULTIPOINT((0 0),(4 0),(0 4),(4 4))')))",
+    check: (v) => Math.abs(Number(v) - 2) < 1e-6,
+  },
+  "ST_GeometricMedian/2": {
+    sql: "SELECT ST_X(ST_GeometricMedian(ST_GeomFromText('MULTIPOINT((0 0),(4 0),(0 4),(4 4))'), 1e-6))",
+    check: (v) => Math.abs(Number(v) - 2) < 1e-5,
+  },
+  "ST_LineCrossingDirection/2": {
+    sql: "SELECT ST_LineCrossingDirection(ST_GeomFromText('LINESTRING(0 0,2 2)'), ST_GeomFromText('LINESTRING(0 2,2 0)'))",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Summary/1": {
+    sql: "SELECT ST_Summary(ST_GeomFromText('POINT(1 2)', 4326))",
+    check: (v) => v.startsWith("Point[S]"),
+  },
+  "ST_MemSize/1": {
+    sql: "SELECT ST_MemSize(ST_GeomFromText('POINT(1 2)')) > 0",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_Normalize/1": {
+    sql: "SELECT ST_IsPolygonCW(ST_Normalize(ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))')))",
+    check: (v) => Number(v) === 1,
+  },
+
 };
 
 /**

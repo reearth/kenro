@@ -260,9 +260,52 @@ whole group of ordinary functions. Each has its own feature, both are in
 | `ST_ConcaveHull(geom, target_percent)` | geometry | ✅ | ✅ | ✅ | `concave-hull` feature. Keeps **PostGIS's argument contract** — the fraction of the convex hull's area to aim for, 1.0 being the convex hull — by searching `geo`'s differently-scaled "concavity" parameter for it, at a few hull computations per call. A value outside [0,1] is an error, so pasting geo's own concavity (~2) fails loudly instead of returning a very different shape. ⚠️ The hull family differs from GEOS's, so the vertices are not PostGIS's; what holds is the contract (never exceeds the convex hull, monotone in the target) |
 | `ST_DelaunayTriangles(geom)` | geometry | ✅ | ✅ | ❌ | `delaunay` feature. ⚠️ returns a **MULTIPOLYGON** where PostGIS returns a GEOMETRYCOLLECTION — kenro never produces collections. The `tolerance` and `flags` arguments are not implemented; `geo`'s triangulator has no snapping tolerance, and the edge output is `ST_Boundary` of this |
 
+## The tail
+
+Alternative spellings and the small functions that had simply never been
+written. Aliases share their original's implementation and wasm export.
+
+| Alias | Same as |
+|---|---|
+| `ST_RotateZ(geom, radians)` | `ST_Rotate` — kenro is 2D, so Z *is* the rotation axis |
+| `ST_MultiPointFromText` / `ST_MultiLineStringFromText` / `ST_MultiPolygonFromText` | `ST_MPointFromText` / `ST_MLineFromText` / `ST_MPolyFromText` |
+| `ST_PolygonFromWKB` / `ST_LineStringFromWKB` / `ST_MultiPointFromWKB` / `ST_MultiLineFromWKB` / `ST_MultiPolyFromWKB` | the `ST_*FromWKB` typed constructors |
+| `ST_Box2dFromGeoHash` | `ST_GeomFromGeoHash` |
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_Polygon(line, srid)` | geometry | ✅ | ✅ | ✅ | `ST_MakePolygon` with an SRID |
+| `ST_LineFromMultiPoint(multipoint)` | geometry / NULL | ✅ | ❌ | ✅ | The points in order |
+| `ST_LineExtend(line, forward [, backward])` | geometry / NULL | ✅ | ❌ | ❌ | Extends along the end segments; the original vertices survive |
+| `ST_PointInsideCircle(point, cx, cy, radius)` | INTEGER | ✅ | ❌ | ✅ | Planar |
+| `ST_WrapX(geom, wrap, move)` | geometry | ✅ | ❌ | ❌ | ⚠️ kenro shifts **whole vertices**; PostGIS cuts segments that span the meridian. `ST_Segmentize` first if that matters |
+| `ST_MakeBox2D(low, high)` | geometry | ✅ | ❌ | ✅ | ⚠️ POLYGON, not `box2d` (as with `ST_Extent`, `ST_Expand`) |
+| `ST_GeomFromGeoHash(hash [, precision])` | geometry | ✅ | ❌ | ✅ | The cell as a POLYGON, SRID 4326 |
+| `ST_PointFromGeoHash(hash [, precision])` | geometry | ✅ | ❌ | ✅ | Its centre; round-trips with `ST_GeoHash` |
+| `ST_GeometricMedian(geom [, tolerance])` | geometry / NULL | ✅ | ❌ | ❌ | Weiszfeld iteration over the vertices |
+| `ST_LineCrossingDirection(a, b)` | INTEGER | ✅ | ❌ | ✅ | PostGIS's codes: 0 none, ±1 single, ±2 multiple same-side, ±3 multiple ending that way |
+| `ST_Summary(geom)` | TEXT | ✅ | ❌ | ✅ | ⚠️ PostGIS prints a tree with byte offsets; kenro keeps the leading token (`Point[S]`) and adds its vertex count |
+| `ST_MemSize(geom)` | INTEGER | ✅ | ❌ | ✅ | ⚠️ the length of the GeoPackage blob kenro would store — the number that means something for a SQLite column, not PostGIS's in-memory size |
+| `ST_Normalize(geom)` | geometry | ✅ | ❌ | ❌ | Rings oriented, parts ordered by bounding box. ⚠️ PostGIS orders by its own internal comparison, so the two agree on orientation but not always on part order |
+
 ## Deliberately out of scope
 
 - **Raster** — kenro is vector-only.
+- **Binary interchange formats** — no FlatGeobuf/Geobuf (`ST_AsFlatGeobuf`,
+  `ST_AsGeobuf`, `ST_FromFlatGeobuf`): those are file formats, and kenro
+  operates on geometry values.
+- **The `geography` type** — no `ST_GeogFromText` and friends; kenro has one
+  geometry type. Measurements on the ellipsoid are `ST_DistanceSphere`,
+  `ST_DistanceSpheroid` and `ST_LengthSpheroid` instead.
+- **TIN and polyhedral surfaces** — no `ST_PatchN`/`ST_NumPatches`, and no
+  `POLYHEDRALSURFACE`/`TIN` types.
+- **`ST_QuantizeCoordinates`** — PostGIS's `prec` maps to mantissa bits by an
+  internal rule we could not reproduce (its results for `prec` 2 and 3 are
+  identical), and a same-named function that rounds differently is worse than
+  none. `ST_ReducePrecision` and `ST_SnapToGrid` give a predictable grid.
+- **PostGIS's Topology extension** — none of the ~18 `ST_AddEdge*` /
+  `ST_CreateTopoGeo` / `ST_ModEdge*` family: that is a topology store, not a
+  function set.
 - **Topology / network analysis** — no `ST_Node`/`ST_Polygonize`/`ST_Split`/
   `ST_LineMerge`/`ST_Snap`, no routing (SpatiaLite's librttopo topology and
   VirtualRouting). These need a noding engine kenro does not carry.

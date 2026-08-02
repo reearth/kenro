@@ -11,7 +11,7 @@
 use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
-    accessors, compat, edit, extra, geodesic, io, linear, manifest, predicates, rtree,
+    accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree,
 };
 use kenro::geom;
 
@@ -302,6 +302,27 @@ typed_ctor_wkb!(
     st_poly_from_wkb_srid,
     "stPolyFromWkbSrid",
     Polygon
+);
+typed_ctor_wkb!(
+    st_mpoint_from_wkb,
+    "stMPointFromWkb",
+    st_mpoint_from_wkb_srid,
+    "stMPointFromWkbSrid",
+    MultiPoint
+);
+typed_ctor_wkb!(
+    st_mline_from_wkb,
+    "stMLineFromWkb",
+    st_mline_from_wkb_srid,
+    "stMLineFromWkbSrid",
+    MultiLineString
+);
+typed_ctor_wkb!(
+    st_mpoly_from_wkb,
+    "stMPolyFromWkb",
+    st_mpoly_from_wkb_srid,
+    "stMPolyFromWkbSrid",
+    MultiPolygon
 );
 
 // ---- Structural accessors and editing (functions::edit) ----
@@ -644,6 +665,95 @@ pub fn st_concave_hull(geom: &[u8], target_percent: f64) -> R<Vec<u8>> {
 #[wasm_bindgen(js_name = stDelaunayTriangles)]
 pub fn st_delaunay_triangles(geom: &[u8]) -> R<Vec<u8>> {
     kenro::functions::hull::st_delaunay_triangles(geom).map_err(err)
+}
+
+// ---- The tail (functions::misc) ----
+
+#[wasm_bindgen(js_name = stPolygon)]
+pub fn st_polygon(geom: &[u8], srid: i32) -> R<Vec<u8>> {
+    misc::st_polygon(geom, srid).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineFromMultipoint)]
+pub fn st_line_from_multipoint(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    misc::st_line_from_multipoint(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineExtend)]
+pub fn st_line_extend(geom: &[u8], forward: f64) -> R<Option<Vec<u8>>> {
+    misc::st_line_extend(geom, forward, 0.0).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineExtendBoth)]
+pub fn st_line_extend_both(geom: &[u8], forward: f64, backward: f64) -> R<Option<Vec<u8>>> {
+    misc::st_line_extend(geom, forward, backward).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointInsideCircle)]
+pub fn st_point_inside_circle(geom: &[u8], cx: f64, cy: f64, radius: f64) -> R<bool> {
+    misc::st_point_inside_circle(geom, cx, cy, radius).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stWrapX)]
+pub fn st_wrap_x(geom: &[u8], wrap: f64, amount: f64) -> R<Vec<u8>> {
+    misc::st_wrap_x(geom, wrap, amount).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMakeBox2d)]
+pub fn st_make_box_2d(low: &[u8], high: &[u8]) -> R<Vec<u8>> {
+    misc::st_make_box_2d(low, high).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeomFromGeohash)]
+pub fn st_geom_from_geohash(hash: &str) -> R<Vec<u8>> {
+    misc::st_geom_from_geohash(hash, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeomFromGeohashPrec)]
+pub fn st_geom_from_geohash_prec(hash: &str, precision: i32) -> R<Vec<u8>> {
+    misc::st_geom_from_geohash(hash, Some(precision as i64)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointFromGeohash)]
+pub fn st_point_from_geohash(hash: &str) -> R<Vec<u8>> {
+    misc::st_point_from_geohash(hash, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stPointFromGeohashPrec)]
+pub fn st_point_from_geohash_prec(hash: &str, precision: i32) -> R<Vec<u8>> {
+    misc::st_point_from_geohash(hash, Some(precision as i64)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeometricMedian)]
+pub fn st_geometric_median(geom: &[u8]) -> R<Option<Vec<u8>>> {
+    misc::st_geometric_median(geom, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stGeometricMedianTol)]
+pub fn st_geometric_median_tol(geom: &[u8], tolerance: f64) -> R<Option<Vec<u8>>> {
+    misc::st_geometric_median(geom, Some(tolerance)).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stLineCrossingDirection)]
+pub fn st_line_crossing_direction(a: &[u8], b: &[u8]) -> R<i32> {
+    misc::st_line_crossing_direction(a, b)
+        .map(|v| v as i32)
+        .map_err(err)
+}
+
+#[wasm_bindgen(js_name = stSummary)]
+pub fn st_summary(geom: &[u8]) -> R<String> {
+    misc::st_summary(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stMemSize)]
+pub fn st_mem_size(geom: &[u8]) -> R<i32> {
+    misc::st_mem_size(geom).map(|v| v as i32).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stNormalize)]
+pub fn st_normalize(geom: &[u8]) -> R<Vec<u8>> {
+    misc::st_normalize(geom).map_err(err)
 }
 
 // ---- SRID ----
@@ -1368,6 +1478,12 @@ mod tests {
             "stLineFromWkbSrid",
             "stPolyFromWkb",
             "stPolyFromWkbSrid",
+            "stMPointFromWkb",
+            "stMPointFromWkbSrid",
+            "stMLineFromWkb",
+            "stMLineFromWkbSrid",
+            "stMPolyFromWkb",
+            "stMPolyFromWkbSrid",
             "stExteriorRing",
             "stInteriorRingN",
             "stNumInteriorRings",
@@ -1426,6 +1542,23 @@ mod tests {
             "stGeohashChars",
             "stConcaveHull",
             "stDelaunayTriangles",
+            "stPolygon",
+            "stLineFromMultipoint",
+            "stLineExtend",
+            "stLineExtendBoth",
+            "stPointInsideCircle",
+            "stWrapX",
+            "stMakeBox2d",
+            "stGeomFromGeohash",
+            "stGeomFromGeohashPrec",
+            "stPointFromGeohash",
+            "stPointFromGeohashPrec",
+            "stGeometricMedian",
+            "stGeometricMedianTol",
+            "stLineCrossingDirection",
+            "stSummary",
+            "stMemSize",
+            "stNormalize",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

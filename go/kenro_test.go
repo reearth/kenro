@@ -241,6 +241,34 @@ var smokeCases = []smokeCase{
 	{"ST_YMin", `ST_YMin(ST_GeomFromText('LINESTRING(1 2,3 4)'))`, int64(2)},
 	// ST_Extent is an aggregate, so it needs a table rather than one row.
 	{"ST_Extent", `(SELECT ST_AsText(ST_Extent(g)) FROM (SELECT ST_GeomFromText('POINT(1 2)') AS g UNION ALL SELECT ST_GeomFromText('POINT(5 0)')))`, "POLYGON((1 0,1 2,5 2,5 0,1 0))"},
+
+	// --- the tail (functions::misc) ---
+	{"ST_Box2dFromGeoHash", `ST_GeometryType(ST_Box2dFromGeoHash('xn76f'))`, "ST_Polygon"},
+	{"ST_GeomFromGeoHash", `ST_GeometryType(ST_GeomFromGeoHash('xn76f'))`, "ST_Polygon"},
+	{"ST_GeometricMedian", `ST_X(ST_GeometricMedian(ST_GeomFromText('MULTIPOINT((0 0),(4 0),(0 4),(4 4))')))`, nil},
+	{"ST_LineCrossingDirection", `ST_LineCrossingDirection(ST_GeomFromText('LINESTRING(0 0,2 2)'), ST_GeomFromText('LINESTRING(0 2,2 0)'))`, int64(1)},
+	{"ST_LineExtend", `ST_AsText(ST_LineExtend(ST_GeomFromText('LINESTRING(0 0,1 0)'), 1))`, "LINESTRING(0 0,1 0,2 0)"},
+	{"ST_LineFromMultiPoint", `ST_AsText(ST_LineFromMultiPoint(ST_GeomFromText('MULTIPOINT((0 0),(1 1),(2 2))')))`, "LINESTRING(0 0,1 1,2 2)"},
+	{"ST_LineStringFromWKB", `ST_AsText(ST_LineStringFromWKB(ST_AsBinary(ST_GeomFromText('LINESTRING(0 0,1 1)'))))`, "LINESTRING(0 0,1 1)"},
+	{"ST_MLineFromWKB", `ST_AsText(ST_MLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))'))))`, "MULTILINESTRING((0 0,1 1))"},
+	{"ST_MPointFromWKB", `ST_AsText(ST_MPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2),(3 4))'))))`, "MULTIPOINT((1 2),(3 4))"},
+	{"ST_MPolyFromWKB", `ST_GeometryType(ST_MPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))))`, "ST_MultiPolygon"},
+	{"ST_MakeBox2D", `ST_AsText(ST_MakeBox2D(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(3 4)')))`, "POLYGON((0 0,0 4,3 4,3 0,0 0))"},
+	{"ST_MemSize", `ST_MemSize(ST_GeomFromText('POINT(1 2)')) > 0`, int64(1)},
+	{"ST_MultiLineFromWKB", `ST_AsText(ST_MultiLineFromWKB(ST_AsBinary(ST_GeomFromText('MULTILINESTRING((0 0,1 1))'))))`, "MULTILINESTRING((0 0,1 1))"},
+	{"ST_MultiLineStringFromText", `ST_AsText(ST_MultiLineStringFromText('MULTILINESTRING((0 0,1 1))'))`, "MULTILINESTRING((0 0,1 1))"},
+	{"ST_MultiPointFromText", `ST_AsText(ST_MultiPointFromText('MULTIPOINT((1 2),(3 4))'))`, "MULTIPOINT((1 2),(3 4))"},
+	{"ST_MultiPointFromWKB", `ST_AsText(ST_MultiPointFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOINT((1 2))'))))`, "MULTIPOINT((1 2))"},
+	{"ST_MultiPolyFromWKB", `ST_GeometryType(ST_MultiPolyFromWKB(ST_AsBinary(ST_GeomFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))))`, "ST_MultiPolygon"},
+	{"ST_MultiPolygonFromText", `ST_AsText(ST_MultiPolygonFromText('MULTIPOLYGON(((0 0,1 0,1 1,0 1,0 0)))'))`, nil},
+	{"ST_Normalize", `ST_IsPolygonCW(ST_Normalize(ST_GeomFromText('POLYGON((0 0,2 0,2 2,0 2,0 0))')))`, int64(1)},
+	{"ST_PointFromGeoHash", `ST_AsText(ST_PointFromGeoHash('xn76f'))`, "POINT(139.68017578125 35.66162109375)"},
+	{"ST_PointInsideCircle", `ST_PointInsideCircle(ST_GeomFromText('POINT(1 1)'), 0, 0, 2)`, int64(1)},
+	{"ST_Polygon", `ST_SRID(ST_Polygon(ST_GeomFromText('LINESTRING(0 0,1 0,1 1,0 0)'), 4326))`, int64(4326)},
+	{"ST_PolygonFromWKB", `ST_AsText(ST_PolygonFromWKB(ST_AsBinary(ST_GeomFromText('POLYGON((0 0,1 0,1 1,0 1,0 0))'))))`, "POLYGON((0 0,1 0,1 1,0 1,0 0))"},
+	{"ST_RotateZ", `ST_AsText(ST_RotateZ(ST_GeomFromText('POINT(1 0)'), 1.5707963267948966))`, nil},
+	{"ST_Summary", `ST_Summary(ST_GeomFromText('POINT(1 2)', 4326))`, nil},
+	{"ST_WrapX", `ST_AsText(ST_WrapX(ST_GeomFromText('LINESTRING(-170 0,170 0)'), 0, 360))`, "LINESTRING(190 0,170 0)"},
 }
 
 func TestSmoke(t *testing.T) {

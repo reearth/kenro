@@ -19,6 +19,7 @@ pub mod io;
 pub mod linear;
 pub mod manifest;
 pub mod measures;
+pub mod misc;
 #[cfg(feature = "mvt")]
 pub mod mvt;
 #[cfg(feature = "overlay")]

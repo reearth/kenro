@@ -1141,3 +1141,95 @@ fn builds_without_crs_full_name_the_feature() {
         .to_string();
     assert!(err.contains("6677") && err.contains("crs-full"), "{err}");
 }
+
+// ---- The tail (functions::misc) ----
+
+#[test]
+fn the_tail_matches_postgis_through_sql() {
+    let conn = conn();
+    // Aliases resolve to the same code.
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_MultiPointFromText('MULTIPOINT((1 2),(3 4))'))"
+        )
+        .as_deref(),
+        Some("MULTIPOINT((1 2),(3 4))")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_RotateZ(ST_GeomFromText('POINT(1 0)'), 0))"
+        )
+        .as_deref(),
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_Rotate(ST_GeomFromText('POINT(1 0)'), 0))"
+        )
+        .as_deref()
+    );
+    // PostGIS 3.5, one by one.
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_LineFromMultiPoint(ST_GeomFromText('MULTIPOINT((0 0),(1 1),(2 2))')))").as_deref(),
+        Some("LINESTRING(0 0,1 1,2 2)")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_AsText(ST_LineExtend(ST_GeomFromText('LINESTRING(0 0,1 0)'), 1, 0.5))"
+        )
+        .as_deref(),
+        Some("LINESTRING(-0.5 0,0 0,1 0,2 0)")
+    );
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_MakeBox2D(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('POINT(3 4)')))").as_deref(),
+        Some("POLYGON((0 0,0 4,3 4,3 0,0 0))")
+    );
+    assert_eq!(
+        text(&conn, "SELECT ST_AsText(ST_PointFromGeoHash('xn76f'))").as_deref(),
+        Some("POINT(139.68017578125 35.66162109375)")
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_PointInsideCircle(ST_GeomFromText('POINT(1 1)'), 0, 0, 2)"
+        ),
+        Some(1)
+    );
+    assert_eq!(
+        int(
+            &conn,
+            "SELECT ST_LineCrossingDirection(ST_GeomFromText('LINESTRING(0 0,2 2)'), ST_GeomFromText('LINESTRING(0 2,2 0)'))"
+        ),
+        Some(1)
+    );
+    // The geohash pair round-trips against kenro's own encoder.
+    assert_eq!(
+        text(&conn, "SELECT ST_GeoHash(ST_PointFromGeoHash('xn76f'), 5)").as_deref(),
+        Some("xn76f")
+    );
+}
+
+#[test]
+fn the_tail_is_null_strict() {
+    let conn = conn();
+    for sql in [
+        "SELECT ST_RotateZ(NULL, 1.0)",
+        "SELECT ST_Polygon(NULL, 4326)",
+        "SELECT ST_LineFromMultiPoint(NULL)",
+        "SELECT ST_LineExtend(NULL, 1.0)",
+        "SELECT ST_PointInsideCircle(NULL, 0, 0, 1)",
+        "SELECT ST_WrapX(NULL, 0, 360)",
+        "SELECT ST_MakeBox2D(NULL, NULL)",
+        "SELECT ST_GeomFromGeoHash(NULL)",
+        "SELECT ST_PointFromGeoHash(NULL)",
+        "SELECT ST_GeometricMedian(NULL)",
+        "SELECT ST_LineCrossingDirection(NULL, NULL)",
+        "SELECT ST_Summary(NULL)",
+        "SELECT ST_MemSize(NULL)",
+        "SELECT ST_Normalize(NULL)",
+    ] {
+        let v: Option<Vec<u8>> = conn.query_row(sql, [], |r| r.get(0)).unwrap();
+        assert!(v.is_none(), "{sql} was not NULL-strict");
+    }
+}

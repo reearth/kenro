@@ -11,7 +11,7 @@ use rusqlite::functions::{Context, FunctionFlags};
 use rusqlite::types::{Value, ValueRef};
 
 use crate::error::Error;
-use crate::functions::{io, predicates, rtree, stubs};
+use crate::functions::{compat, io, predicates, rtree, stubs};
 
 /// `SQLITE_INNOCUOUS` is load-bearing, not cosmetic: it lets these functions
 /// run inside triggers under `PRAGMA trusted_schema=off`, which the
@@ -488,6 +488,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_geodesic_and_linear(conn)?;
     register_extra(conn)?;
     register_hull(conn)?;
+    register_misc(conn)?;
 
     // Stubs: known-but-unimplemented ST_ functions fail with a helpful
     // message instead of `no such function`.
@@ -784,7 +785,7 @@ fn register_stubs(conn: &Connection, list: &'static [stubs::Stub]) -> rusqlite::
 /// spellings for functions already registered above, plus the EWKT/EWKB pair
 /// and the typed constructors.
 fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
-    use crate::functions::compat::{self, Expect};
+    use crate::functions::compat::Expect;
 
     // Same code, PostGIS's spelling.
     register_rtree_minmax(conn, "ST_XMin", rtree::st_min_x)?;
@@ -1387,6 +1388,204 @@ fn register_hull(conn: &Connection) -> rusqlite::Result<()> {
         "ST_DelaunayTriangles",
         crate::functions::hull::st_delaunay_triangles,
     )?;
+    Ok(())
+}
+
+/// The tail of the PostGIS surface (see `functions::misc`).
+fn register_misc(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::misc;
+
+    // Aliases: same code, PostGIS's other spelling.
+    conn.create_scalar_function("ST_RotateZ", 2, FLAGS, |ctx| {
+        let (Some(g), Some(rad)) = (
+            blob_or_null(ctx, 0, "ST_RotateZ")?,
+            real_or_null(ctx, 1, "ST_RotateZ")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(crate::functions::affine::st_rotate(g, rad))
+    })?;
+    for (name, expect) in [
+        ("ST_MultiPointFromText", compat::Expect::MultiPoint),
+        (
+            "ST_MultiLineStringFromText",
+            compat::Expect::MultiLineString,
+        ),
+        ("ST_MultiPolygonFromText", compat::Expect::MultiPolygon),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(t) = text_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            compat::from_text_typed(t, None, expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+    }
+    for (name, expect) in [
+        ("ST_PolygonFromWKB", compat::Expect::Polygon),
+        ("ST_LineStringFromWKB", compat::Expect::LineString),
+        ("ST_MPointFromWKB", compat::Expect::MultiPoint),
+        ("ST_MLineFromWKB", compat::Expect::MultiLineString),
+        ("ST_MPolyFromWKB", compat::Expect::MultiPolygon),
+        ("ST_MultiPointFromWKB", compat::Expect::MultiPoint),
+        ("ST_MultiLineFromWKB", compat::Expect::MultiLineString),
+        ("ST_MultiPolyFromWKB", compat::Expect::MultiPolygon),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(b) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            compat::from_wkb_typed(b, None, expect)
+                .map(|v| v.map(Value::Blob))
+                .map_err(sql_err)
+        })?;
+    }
+
+    conn.create_scalar_function("ST_Polygon", 2, FLAGS, |ctx| {
+        let (Some(g), Some(srid)) = (
+            blob_or_null(ctx, 0, "ST_Polygon")?,
+            int_or_null(ctx, 1, "ST_Polygon")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(misc::st_polygon(g, srid))
+    })?;
+    register_geom_to_opt_blob(conn, "ST_LineFromMultiPoint", misc::st_line_from_multipoint)?;
+    conn.create_scalar_function("ST_LineExtend", 2, FLAGS, |ctx| {
+        let (Some(g), Some(f)) = (
+            blob_or_null(ctx, 0, "ST_LineExtend")?,
+            real_or_null(ctx, 1, "ST_LineExtend")?,
+        ) else {
+            return Ok(None);
+        };
+        misc::st_line_extend(g, f, 0.0)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_LineExtend", 3, FLAGS, |ctx| {
+        let (Some(g), Some(f), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_LineExtend")?,
+            real_or_null(ctx, 1, "ST_LineExtend")?,
+            real_or_null(ctx, 2, "ST_LineExtend")?,
+        ) else {
+            return Ok(None);
+        };
+        misc::st_line_extend(g, f, b)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_PointInsideCircle", 4, FLAGS, |ctx| {
+        let (Some(g), Some(cx), Some(cy), Some(r)) = (
+            blob_or_null(ctx, 0, "ST_PointInsideCircle")?,
+            real_or_null(ctx, 1, "ST_PointInsideCircle")?,
+            real_or_null(ctx, 2, "ST_PointInsideCircle")?,
+            real_or_null(ctx, 3, "ST_PointInsideCircle")?,
+        ) else {
+            return Ok(None);
+        };
+        misc::st_point_inside_circle(g, cx, cy, r)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_WrapX", 3, FLAGS, |ctx| {
+        let (Some(g), Some(wrap), Some(amount)) = (
+            blob_or_null(ctx, 0, "ST_WrapX")?,
+            real_or_null(ctx, 1, "ST_WrapX")?,
+            real_or_null(ctx, 2, "ST_WrapX")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(misc::st_wrap_x(g, wrap, amount))
+    })?;
+    conn.create_scalar_function("ST_MakeBox2D", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_MakeBox2D")?,
+            blob_or_null(ctx, 1, "ST_MakeBox2D")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(misc::st_make_box_2d(a, b))
+    })?;
+    for name in ["ST_GeomFromGeoHash", "ST_Box2dFromGeoHash"] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(h) = text_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            blob(misc::st_geom_from_geohash(h, None))
+        })?;
+    }
+    conn.create_scalar_function("ST_GeomFromGeoHash", 2, FLAGS, |ctx| {
+        let (Some(h), Some(p)) = (
+            text_or_null(ctx, 0, "ST_GeomFromGeoHash")?,
+            i64_or_null(ctx, 1, "ST_GeomFromGeoHash")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(misc::st_geom_from_geohash(h, Some(p)))
+    })?;
+    conn.create_scalar_function("ST_PointFromGeoHash", 1, FLAGS, |ctx| {
+        let Some(h) = text_or_null(ctx, 0, "ST_PointFromGeoHash")? else {
+            return Ok(None);
+        };
+        blob(misc::st_point_from_geohash(h, None))
+    })?;
+    conn.create_scalar_function("ST_PointFromGeoHash", 2, FLAGS, |ctx| {
+        let (Some(h), Some(p)) = (
+            text_or_null(ctx, 0, "ST_PointFromGeoHash")?,
+            i64_or_null(ctx, 1, "ST_PointFromGeoHash")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(misc::st_point_from_geohash(h, Some(p)))
+    })?;
+    conn.create_scalar_function("ST_GeometricMedian", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_GeometricMedian")? else {
+            return Ok(None);
+        };
+        misc::st_geometric_median(g, None)
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_GeometricMedian", 2, FLAGS, |ctx| {
+        let (Some(g), Some(tol)) = (
+            blob_or_null(ctx, 0, "ST_GeometricMedian")?,
+            real_or_null(ctx, 1, "ST_GeometricMedian")?,
+        ) else {
+            return Ok(None);
+        };
+        misc::st_geometric_median(g, Some(tol))
+            .map(|v| v.map(Value::Blob))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_LineCrossingDirection", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_LineCrossingDirection")?,
+            blob_or_null(ctx, 1, "ST_LineCrossingDirection")?,
+        ) else {
+            return Ok(None);
+        };
+        misc::st_line_crossing_direction(a, b)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_Summary", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_Summary")? else {
+            return Ok(None);
+        };
+        misc::st_summary(g)
+            .map(|v| Some(Value::Text(v)))
+            .map_err(sql_err)
+    })?;
+    conn.create_scalar_function("ST_MemSize", 1, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_MemSize")? else {
+            return Ok(None);
+        };
+        misc::st_mem_size(g)
+            .map(|v| Some(Value::Integer(v)))
+            .map_err(sql_err)
+    })?;
+    register_geom_to_blob(conn, "ST_Normalize", misc::st_normalize)?;
     Ok(())
 }
 
