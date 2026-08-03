@@ -7,10 +7,67 @@ use crate::geom::{self, Geom};
 /// `ST_Transform(geom, to_srid)` — PostGIS-exact two-argument form: the
 /// source CRS is the geometry's embedded SRID. (PostGIS has no
 /// `(geom, from, to)` integer overload, so neither does kenro.)
+///
+/// Runs on the **encoding**, not on a decoded `geo_types` value, which is what
+/// lets a 3D column and a surface collection through — the two things a
+/// CityGML workflow reprojects most. Measured on PostGIS 3.5:
+/// `ST_Transform(POINT Z (139.7 35.7 100), 32654)` keeps the 100, and a
+/// `POLYHEDRALSURFACE Z` comes back reprojected rather than rejected.
+///
+/// The Z is not merely carried: proj4rs takes `(x, y, z)` per coordinate, so a
+/// datum shift routed through geocentric coordinates reads the height, as PROJ
+/// does. Same-datum pairs leave it exactly as it was.
 pub fn st_transform(bytes: &[u8], to_srid: i32) -> Result<Vec<u8>> {
-    let mut geom = geom::decode_auto(bytes)?;
-    decoded::st_transform_in_place(&mut geom, to_srid)?;
-    geom::encode_canonical_gpb(&geom, "ST_Transform")
+    const FUNC: &str = "ST_Transform";
+    // Read the SRID from the header: `decode_auto` would refuse a surface
+    // collection before we ever got to the CRS.
+    let from_srid = geom::srid_of(bytes)?;
+    if from_srid <= 0 {
+        return Err(unknown_srid(from_srid));
+    }
+    if from_srid == to_srid {
+        // Nothing moves, but the blob is still normalized to canonical GPB —
+        // the same shape every other kenro function returns.
+        return crate::coords::map_coords(bytes, &mut |_| {});
+    }
+    let reprojection = crate::crs::Reprojection::new(FUNC, from_srid, to_srid)?;
+    let mut out = None;
+    let mut walk_err = None;
+    reprojection.run(|step| {
+        // One proj4rs call drives the whole walk: it hands `step` each
+        // coordinate, and `step` is what the rewriter applies.
+        match crate::coords::map_coords_relabelled(bytes, to_srid, &mut |p| {
+            if let Some((x, y, z)) = step(p.x, p.y, p.z.unwrap_or(0.0)) {
+                p.x = x;
+                p.y = y;
+                if let Some(pz) = p.z.as_mut() {
+                    *pz = z;
+                }
+            }
+        }) {
+            Ok(v) => out = Some(v),
+            Err(e) => walk_err = Some(e),
+        }
+    })?;
+    if let Some(e) = walk_err {
+        return Err(e);
+    }
+    out.ok_or_else(|| Error::Unsupported {
+        func: FUNC,
+        reason: "the reprojection produced nothing".into(),
+    })
+}
+
+fn unknown_srid(srid: i32) -> Error {
+    // Mirrors PostGIS's "Input geometry has unknown (0) SRID".
+    Error::Unsupported {
+        func: "ST_Transform",
+        reason: format!(
+            "Input geometry has unknown ({}) SRID; set one with ST_SetSRID, \
+             ST_GeomFromText(wkt, srid), or read it from a GeoPackage blob",
+            srid.max(0)
+        ),
+    }
 }
 
 /// Reprojection for a geometry that is already decoded — see

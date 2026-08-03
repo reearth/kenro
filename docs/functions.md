@@ -30,7 +30,7 @@ geometry-accepting function also auto-detects raw WKB input, so
 | **SRID & CRS transform** | | | | | |
 | `ST_SRID(geom)` | INT | ✅ | ❌ | ✅ | 0 = unknown. DuckDB's `GEOMETRY` carries no SRID at all — CRS bookkeeping is manual there |
 | `ST_SetSRID(geom, srid)` | geometry | ✅ | ❌ | ⚠️ named `SetSRID` | Relabel only, no reprojection |
-| `ST_Transform(geom, to_srid)` | geometry | ✅ 4 overloads, full PROJ | ⚠️ `(geom, source_crs, target_crs [, always_xy])` | ✅ | kenro: PostGIS-exact 2-arg form, source = embedded SRID, curated EPSG table (see [Supported CRS](../README.md#supported-crs), [accuracy](accuracy.md)). DuckDB must be told the source CRS on every call |
+| `ST_Transform(geom, to_srid)` | geometry | ✅ 4 overloads, full PROJ | ⚠️ `(geom, source_crs, target_crs [, always_xy])` | ✅ | kenro: PostGIS-exact 2-arg form, source = embedded SRID, curated EPSG table (see [Supported CRS](../README.md#supported-crs), [accuracy](accuracy.md)). DuckDB must be told the source CRS on every call. **Z and surface collections ride through** — see [3D affine transforms](#3d-affine-transforms) |
 | **Constructors** | | | | | |
 | `ST_MakePoint(x, y)` | geometry | ✅ | ✅ | ⚠️ named `MakePoint` | 2D only |
 | `ST_Point(x, y [, srid])` | geometry | ✅ | ⚠️ no srid arg | ✅ | The srid form is PostGIS 3.2+ |
@@ -294,6 +294,7 @@ Every function whose whole job is to move coordinates, and no others:
 | `ST_TransScale` | |
 | `ST_FlipCoordinates` | |
 | `ST_ShiftLongitude`, `ST_WrapX` | |
+| `ST_Transform` | |
 
 The split is not about effort — it is what PostGIS does. Measured on 3.5, the
 left column all preserve Z and (except `ST_WrapX`) all accept a surface
@@ -355,8 +356,32 @@ Two details worth knowing:
 
 `ST_Project` is the one exception that asserts a Z for a coordinate no input
 occupied: sliding a point along the ground does not change its elevation, which
-is what PostGIS does too. `ST_Transform` still refuses 3D input — it is
-coordinate-wise and could join the list above, and has not yet.
+is what PostGIS does too.
+
+### `ST_Transform`
+
+Reprojection is coordinate-wise, so it takes the encoding-level path as well —
+which matters more here than anywhere else, because reprojecting is the
+operation a 3D city model needs most and it used to refuse 3D outright.
+Measured on PostGIS 3.5:
+
+- `ST_Transform(POINT Z (139.7 35.7 100), 32654)` moves x and y and returns
+  `z = 100` untouched.
+- A `POLYHEDRALSURFACE Z` comes back a `POLYHEDRALSURFACE`, patch structure and
+  roof heights intact, rather than being rejected.
+
+The Z is not merely carried past the projection: proj4rs takes `(x, y, z)` per
+coordinate, so a datum shift routed through geocentric coordinates *reads* the
+height, exactly as PROJ does. Same-datum pairs (`4326 → 32654` among them)
+leave it exactly as it was — verified by moving the height and watching x and y
+not move.
+
+The byte-level I/O functions came along for the ride, because a reprojected
+building has to be storable: `ST_SetSRID`, `ST_GeomFromGPB`, `ST_AsGPB` and
+`ST_SRID` all used to validate by *decoding*, which refused surface
+collections — breaking the pass-through promise for exactly the geometries it
+was written for. They now walk the encoding instead, and `ST_AsGPB` builds a
+surface's R-tree envelope from its patches.
 
 ### `ST_3DExtent`
 
@@ -448,8 +473,10 @@ read* anyway, which is what a CityGML-style workflow needs even when the
 analysis itself is planar.
 
 The route in is the practical one: a GeoPackage written by GDAL or QGIS.
-`ST_GeomFromGPB` and `ST_SetSRID` copy the WKB payload byte-for-byte, so the
-Z survives; `ST_GeomFromWKB` does **not**, because it re-encodes.
+`ST_GeomFromGPB`, `ST_SetSRID` and `ST_AsGPB` carry the WKB payload across
+byte-for-byte, so the Z survives — and so do surface collections, which those
+three used to refuse because they validated by decoding. `ST_GeomFromWKB` still
+re-encodes and so still flattens.
 
 | Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
 |---|---|---|---|---|---|

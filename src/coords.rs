@@ -58,6 +58,28 @@ pub struct Coord3 {
 /// verbatim and re-wrapped, which is what lets a 3D or surface payload
 /// survive a round trip that the 2D encoders would refuse.
 pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8>> {
+    rewrite_blob(bytes, None, f)
+}
+
+/// As [`map_coords`], but labelling the result with a different SRID.
+///
+/// That is what a reprojection is: every coordinate moves *and* the CRS it is
+/// expressed in changes. Splitting it out keeps `map_coords` honest — a
+/// transform that only moved coordinates would leave the blob claiming its old
+/// CRS.
+pub fn map_coords_relabelled(
+    bytes: &[u8],
+    srid: i32,
+    f: &mut dyn FnMut(&mut Coord3),
+) -> Result<Vec<u8>> {
+    rewrite_blob(bytes, Some(srid), f)
+}
+
+fn rewrite_blob(
+    bytes: &[u8],
+    srid_override: Option<i32>,
+    f: &mut dyn FnMut(&mut Coord3),
+) -> Result<Vec<u8>> {
     if gpb::is_gpb(bytes) {
         let header = GpbHeader::parse(bytes)?;
         let mut wkb = bytes[header.wkb_offset..].to_vec();
@@ -65,11 +87,21 @@ pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8
         // Envelope dropped rather than recomputed: `write_gpb` emits the
         // canonical (envelope-free) form, which is what constructors already
         // return. `ST_AsGPB` is the way to a storage-grade blob.
-        Ok(gpb::write_gpb(&wkb, header.srid, None, header.empty))
+        Ok(gpb::write_gpb(
+            &wkb,
+            srid_override.unwrap_or(header.srid),
+            None,
+            header.empty,
+        ))
     } else {
         let mut wkb = bytes.to_vec();
         let scan = rewrite(&mut wkb, f)?;
-        Ok(gpb::write_gpb(&wkb, scan.srid, None, scan.is_empty()))
+        Ok(gpb::write_gpb(
+            &wkb,
+            srid_override.unwrap_or(scan.srid),
+            None,
+            scan.is_empty(),
+        ))
     }
 }
 

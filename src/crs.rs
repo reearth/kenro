@@ -93,6 +93,98 @@ fn from_full_registry(func: &'static str, epsg: i32) -> Result<Proj> {
     Err(unknown_epsg(func, epsg))
 }
 
+/// A reprojection, ready to be driven coordinate by coordinate.
+///
+/// [`transform_geometry`] hands proj4rs a whole `geo_types` value, which means
+/// it cannot see a Z (there is nowhere in `geo_types` for one) and cannot touch
+/// a surface collection at all. This is the same transform expressed so the
+/// caller supplies the coordinates instead — the encoding-level path in
+/// `functions::transform` walks the WKB and feeds them through.
+///
+/// proj4rs is coordinate-oriented underneath: its `Transform` trait hands each
+/// coordinate to a closure as `(x, y, z)`. So a Z is not merely *preserved*
+/// here, it participates — a datum shift routed through geocentric coordinates
+/// reads the height, exactly as PROJ does. (For same-datum pairs it comes back
+/// untouched; measured on PostGIS 3.5, `4326 → 32654` returns z = 100 for
+/// z = 100 in, and moving the height does not move x or y.)
+pub struct Reprojection {
+    src: Rc<Proj>,
+    dst: Rc<Proj>,
+    func: &'static str,
+    from: i32,
+    to: i32,
+}
+
+impl Reprojection {
+    pub fn new(func: &'static str, from_epsg: i32, to_epsg: i32) -> Result<Self> {
+        Ok(Self {
+            src: cached_proj(func, from_epsg)?,
+            dst: cached_proj(func, to_epsg)?,
+            func,
+            from: from_epsg,
+            to: to_epsg,
+        })
+    }
+
+    /// Run the transform, letting `drive` present every coordinate.
+    ///
+    /// `drive` receives a closure that takes and returns `(x, y, z)` in kenro's
+    /// units — degrees for a geographic CRS, with the radian conversion proj4rs
+    /// wants applied on both sides here so no caller has to remember it.
+    pub fn run<D>(&self, drive: D) -> Result<()>
+    where
+        D: FnOnce(&mut dyn FnMut(f64, f64, f64) -> Option<(f64, f64, f64)>),
+    {
+        let (src_ll, dst_ll) = (self.src.is_latlong(), self.dst.is_latlong());
+        let mut failed = false;
+        let mut step = |x: f64, y: f64, z: f64| -> Option<(f64, f64, f64)> {
+            let (x, y) = if src_ll {
+                (x.to_radians(), y.to_radians())
+            } else {
+                (x, y)
+            };
+            let mut point = OneCoord(x, y, z);
+            if proj4rs::transform::transform(&self.src, &self.dst, &mut point).is_err() {
+                failed = true;
+                return None;
+            }
+            let (x, y) = if dst_ll {
+                (point.0.to_degrees(), point.1.to_degrees())
+            } else {
+                (point.0, point.1)
+            };
+            Some((x, y, point.2))
+        };
+        drive(&mut step);
+        if failed {
+            return Err(Error::Unsupported {
+                func: self.func,
+                reason: format!(
+                    "transform from EPSG:{} to EPSG:{} failed",
+                    self.from, self.to
+                ),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// One coordinate, so proj4rs can be asked to transform exactly one.
+struct OneCoord(f64, f64, f64);
+
+impl proj4rs::transform::Transform for OneCoord {
+    fn transform_coordinates<F>(&mut self, f: &mut F) -> proj4rs::errors::Result<()>
+    where
+        F: proj4rs::transform::TransformClosure,
+    {
+        f(self.0, self.1, self.2).map(|(x, y, z)| {
+            self.0 = x;
+            self.1 = y;
+            self.2 = z;
+        })
+    }
+}
+
 /// Reproject a geometry in place. Geographic CRS coordinates are degrees on
 /// the kenro side; proj4rs works in radians for lat/long CRS, so conversion
 /// happens exactly here.

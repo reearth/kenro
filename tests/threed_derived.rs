@@ -264,6 +264,140 @@ fn two_heights_at_one_plan_position_are_ambiguous_not_a_coin_flip() {
     assert_eq!(ndims(&conn, &format!("ST_Reverse({flat})")).unwrap(), 3);
 }
 
+/// `POLYHEDRALSURFACE Z` with one triangle near Tokyo, in EPSG:4326 — the
+/// shape a CityGML building arrives as.
+fn surface_z() -> String {
+    let mut v = vec![0x01u8];
+    v.extend_from_slice(&1015u32.to_le_bytes());
+    v.extend_from_slice(&1u32.to_le_bytes()); // one patch
+    v.push(0x01);
+    v.extend_from_slice(&1003u32.to_le_bytes()); // Polygon Z
+    v.extend_from_slice(&1u32.to_le_bytes()); // one ring
+    v.extend_from_slice(&4u32.to_le_bytes());
+    for c in [
+        [139.7f64, 35.7, 0.],
+        [139.7, 35.71, 0.],
+        [139.71, 35.71, 10.],
+        [139.7, 35.7, 0.],
+    ] {
+        for o in c {
+            v.extend_from_slice(&o.to_le_bytes());
+        }
+    }
+    wkb_literal(&v)
+}
+
+/// Reprojecting is the operation a 3D city model needs most, and it used to be
+/// the one function that refused 3D outright. PostGIS 3.5, measured:
+/// `ST_Transform(POINT Z (139.7 35.7 100), 32654)` is
+/// `POINT(382388.69405900664 3951453.5737444377 100)` — x and y move, the
+/// height does not.
+#[test]
+fn reprojection_keeps_the_height() {
+    let conn = conn();
+    let pt = point_z(139.7, 35.7, 100.0);
+    let t = format!("ST_Transform(ST_SetSRID({pt}, 4326), 32654)");
+    assert_eq!(ndims(&conn, &t).unwrap(), 3);
+    let (x, z, srid): (f64, f64, i64) = conn
+        .query_row(
+            &format!("SELECT ST_MinX({t}), ST_Z({t}), ST_SRID({t})"),
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap();
+    // kenro's projection math is gridless; docs/accuracy.md documents the
+    // tolerance. The height is exact because nothing touches it here.
+    assert!((x - 382_388.694_059_006_64).abs() < 1e-5, "x = {x}");
+    assert_eq!(z, 100.0);
+    assert_eq!(srid, 32654);
+}
+
+/// The other half of the CityGML case: a building is a surface collection, and
+/// reprojecting one has to keep it a surface collection. PostGIS returns a
+/// `POLYHEDRALSURFACE` here; kenro used to refuse the input.
+#[test]
+fn reprojection_moves_a_building_and_it_stays_storable() {
+    let conn = conn();
+    let s = surface_z();
+    let t = format!("ST_Transform(ST_SetSRID({s}, 4326), 32654)");
+    let ty: String = conn
+        .query_row(&format!("SELECT ST_GeometryType({t})"), [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(ty, "ST_PolyhedralSurface");
+    let (patches, minx, zmax, srid): (i64, f64, f64, i64) = conn
+        .query_row(
+            &format!("SELECT ST_NumPatches({t}), ST_MinX({t}), ST_ZMax({t}), ST_SRID({t})"),
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )
+        .unwrap();
+    assert_eq!(patches, 1);
+    assert!(
+        (minx - 382_388.694_059_006_64).abs() < 1e-5,
+        "minx = {minx}"
+    );
+    assert_eq!(zmax, 10.0); // the roof height rides through untouched
+    assert_eq!(srid, 32654);
+
+    // And the result can be written back to a GeoPackage column: ST_AsGPB
+    // takes the byte-level route for a surface, and names the extension row
+    // the file needs before it may hold one.
+    let ext: String = conn
+        .query_row(
+            &format!("SELECT kenro_gpkg_extension_required(ST_AsGPB({t}))"),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(ext, "gpkg_geom_POLYHEDRALSURFACE");
+}
+
+/// The byte-level I/O functions promise to carry a payload across untouched.
+/// They validated by decoding, which refused surface collections — breaking the
+/// promise for exactly the geometries it was written for.
+#[test]
+fn the_byte_level_io_functions_accept_a_surface() {
+    let conn = conn();
+    let s = surface_z();
+    for expr in [
+        format!("ST_NumPatches(ST_SetSRID({s}, 4326))"),
+        format!("ST_NumPatches(ST_GeomFromGPB(ST_SetSRID({s}, 4326)))"),
+        format!("ST_NumPatches(ST_AsGPB(ST_SetSRID({s}, 4326)))"),
+    ] {
+        let n: i64 = conn
+            .query_row(&format!("SELECT {expr}"), [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 1, "{expr}");
+    }
+    // ST_SRID reads the header, so it answers for a surface too.
+    let srid: i64 = conn
+        .query_row(&format!("SELECT ST_SRID(ST_SetSRID({s}, 6697))"), [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(srid, 6697);
+}
+
+#[test]
+fn reprojection_refuses_an_unlabelled_geometry_as_postgis_does() {
+    let conn = conn();
+    let pt = point_z(139.7, 35.7, 100.0);
+    let err = conn
+        .query_row(&format!("SELECT ST_Transform({pt}, 32654)"), [], |r| {
+            r.get::<_, Vec<u8>>(0)
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("unknown (0) SRID"), "{err}");
+    // Transforming to the SRID it already has is a normalization, not a move.
+    let same = format!("ST_Transform(ST_SetSRID({pt}, 4326), 4326)");
+    assert_eq!(ndims(&conn, &same).unwrap(), 3);
+    let z: f64 = conn
+        .query_row(&format!("SELECT ST_Z({same})"), [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(z, 100.0);
+}
+
 #[test]
 fn nothing_changed_for_2d_input() {
     let conn = conn();

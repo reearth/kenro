@@ -29,13 +29,11 @@ pub fn st_geom_from_wkb(bytes: &[u8], srid: Option<i32>) -> Result<Vec<u8>> {
 /// envelope stripped). The WKB payload is passed through byte-for-byte after
 /// being validated, so 3D payloads survive losslessly.
 pub fn st_geom_from_gpb(bytes: &[u8]) -> Result<Vec<u8>> {
-    let (header, _geom) = geom::decode_gpb(bytes)?;
-    Ok(gpb::write_gpb(
-        &bytes[header.wkb_offset..],
-        header.srid,
-        None,
-        header.empty,
-    ))
+    // Validated by walking the encoding rather than decoding it. Both routes
+    // check that every element count is backed by real bytes; only this one
+    // also accepts a surface collection, which `decode_gpb` refuses — and a
+    // byte-level normalizer has no business refusing it.
+    crate::coords::map_coords(bytes, &mut |_| {})
 }
 
 /// `ST_AsText(geom)` → WKT.
@@ -51,6 +49,28 @@ pub fn st_as_binary(bytes: &[u8]) -> Result<Vec<u8>> {
 /// `ST_AsGPB(geom)` → storage-grade GPB (XY envelope for non-point
 /// geometries), preserving srid.
 pub fn st_as_gpb(bytes: &[u8]) -> Result<Vec<u8>> {
+    // A surface collection cannot be decoded, but it can still be stored: the
+    // envelope its R-tree needs is the 2D box over its patches, which
+    // `functions::surface` reads straight from the encoding.
+    if let Some(env) = crate::functions::surface::envelope(bytes)? {
+        let (payload, srid) = if gpb::is_gpb(bytes) {
+            let header = GpbHeader::parse(bytes)?;
+            (&bytes[header.wkb_offset..], header.srid)
+        } else {
+            (bytes, geom::srid_of(bytes)?)
+        };
+        return Ok(gpb::write_gpb(
+            payload,
+            srid,
+            Some(gpb::Envelope {
+                min_x: env.0,
+                min_y: env.1,
+                max_x: env.2,
+                max_y: env.3,
+            }),
+            false,
+        ));
+    }
     decoded::st_as_gpb(&geom::decode_auto(bytes)?)
 }
 
@@ -86,19 +106,20 @@ pub fn st_set_srid(bytes: &[u8], srid: i32) -> Result<Vec<u8>> {
             header.empty,
         ))
     } else {
-        let geom = geom::decode_wkb(bytes, None)?; // validates the WKB
-        Ok(gpb::write_gpb(
-            bytes,
-            srid,
-            None,
-            geom::is_empty(&geom.geometry),
-        ))
+        // Structural validation without decoding, so relabelling a surface
+        // collection works too. `threed.rs` promises that ST_SetSRID carries a
+        // payload across byte-for-byte; decoding to validate broke that promise
+        // for exactly the geometries the promise was written for.
+        crate::coords::map_coords_relabelled(bytes, srid, &mut |_| {})
     }
 }
 
 /// `ST_SRID(geom)` — 0 means unknown, as in PostGIS/GeoPackage.
 pub fn st_srid(bytes: &[u8]) -> Result<i32> {
-    Ok(geom::decode_auto(bytes)?.srid)
+    // From the header, not from a decoded value: a surface collection carries
+    // an SRID like anything else, and asking for it should not require a
+    // geometry model that cannot hold it.
+    geom::srid_of(bytes)
 }
 
 /// `ST_MakePoint(x, y)` — POINT with unknown SRID. (The 3/4-arg z/m forms

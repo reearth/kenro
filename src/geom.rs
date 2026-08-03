@@ -85,6 +85,19 @@ pub fn surface_kind(bytes: &[u8]) -> Option<SurfaceKind> {
     }
 }
 
+/// The SRID a blob carries, without decoding it.
+///
+/// Needed by the encoding-level path: a surface collection has an SRID like
+/// anything else, but [`decode_auto`] refuses it, so the SRID has to be
+/// readable from the header alone. 0 means unknown, the GeoPackage convention.
+pub fn srid_of(bytes: &[u8]) -> Result<i32> {
+    if gpb::is_gpb(bytes) {
+        Ok(GpbHeader::parse(bytes)?.srid)
+    } else {
+        Ok(ewkb_srid(bytes).unwrap_or(0))
+    }
+}
+
 /// Decode ISO WKB or EWKB. An EWKB-embedded SRID populates `srid` unless
 /// `srid_override` is given (PostGIS behavior for `ST_GeomFromWKB(wkb, srid)`).
 pub fn decode_wkb(bytes: &[u8], srid_override: Option<i32>) -> Result<Geom> {
