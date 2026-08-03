@@ -1475,6 +1475,70 @@ pub extern "C" fn k_stTriangulatePolygon(geom_p: *const u8, geom_l: u32) -> i32 
     blob(hull::st_triangulate_polygon(s(geom_p, geom_l)))
 }
 
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiPolygons(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(hull::st_voronoi_polygons(s(geom_p, geom_l), None, None))
+}
+
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiPolygonsTol(geom_p: *const u8, geom_l: u32, tolerance: f64) -> i32 {
+    blob(hull::st_voronoi_polygons(
+        s(geom_p, geom_l),
+        Some(tolerance),
+        None,
+    ))
+}
+
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiPolygonsExtend(
+    geom_p: *const u8,
+    geom_l: u32,
+    tolerance: f64,
+    e_p: *const u8,
+    e_l: u32,
+) -> i32 {
+    blob(hull::st_voronoi_polygons(
+        s(geom_p, geom_l),
+        Some(tolerance),
+        Some(s(e_p, e_l)),
+    ))
+}
+
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiLines(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(hull::st_voronoi_lines(s(geom_p, geom_l), None, None))
+}
+
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiLinesTol(geom_p: *const u8, geom_l: u32, tolerance: f64) -> i32 {
+    blob(hull::st_voronoi_lines(
+        s(geom_p, geom_l),
+        Some(tolerance),
+        None,
+    ))
+}
+
+#[cfg(feature = "voronoi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stVoronoiLinesExtend(
+    geom_p: *const u8,
+    geom_l: u32,
+    tolerance: f64,
+    e_p: *const u8,
+    e_l: u32,
+) -> i32 {
+    blob(hull::st_voronoi_lines(
+        s(geom_p, geom_l),
+        Some(tolerance),
+        Some(s(e_p, e_l)),
+    ))
+}
+
 // ---- Line structure (functions::lines) ----
 
 #[unsafe(no_mangle)]

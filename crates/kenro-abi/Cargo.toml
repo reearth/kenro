@@ -26,9 +26,11 @@ full = [
     "crs-full",
     "gml",
     "text-encodings",
+    "voronoi",
 ]
 transform = ["kenro/transform"]
 text-encodings = ["kenro/text-encodings"]
+voronoi = ["kenro/voronoi"]
 h3 = ["kenro/h3"]
 geojson = ["kenro/geojson"]
 overlay = ["kenro/overlay"]

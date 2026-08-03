@@ -156,6 +156,19 @@ pub static DELAUNAY_OFF: &[Stub] = &[
     },
 ];
 
+/// Registered when `voronoi` is off. The cells need `delaunay` (spade) *and*
+/// `overlay` (i_overlay clips them), which is why the feature names both.
+pub static VORONOI_OFF: &[Stub] = &[
+    Stub {
+        name: "ST_VoronoiPolygons",
+        hint: "kenro was built without the `voronoi` cargo feature.",
+    },
+    Stub {
+        name: "ST_VoronoiLines",
+        hint: "kenro was built without the `voronoi` cargo feature.",
+    },
+];
+
 /// Registered when `text-encodings` is off. Both are pure string formatting;
 /// the feature exists because `ST_AsKML` reprojects to WGS84 and so pulls
 /// `transform` in with it.

@@ -513,6 +513,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::CONCAVE_HULL_OFF)?;
     #[cfg(not(feature = "text-encodings"))]
     register_stubs(conn, stubs::TEXT_ENCODINGS_OFF)?;
+    #[cfg(not(feature = "voronoi"))]
+    register_stubs(conn, stubs::VORONOI_OFF)?;
     #[cfg(not(feature = "delaunay"))]
     register_stubs(conn, stubs::DELAUNAY_OFF)?;
     #[cfg(not(feature = "gml"))]
@@ -1457,6 +1459,39 @@ fn register_hull(conn: &Connection) -> rusqlite::Result<()> {
         "ST_TriangulatePolygon",
         crate::functions::hull::st_triangulate_polygon,
     )?;
+    #[cfg(feature = "voronoi")]
+    for (name, f) in [
+        (
+            "ST_VoronoiPolygons",
+            crate::functions::hull::st_voronoi_polygons
+                as fn(&[u8], Option<f64>, Option<&[u8]>) -> crate::error::Result<Vec<u8>>,
+        ),
+        ("ST_VoronoiLines", crate::functions::hull::st_voronoi_lines),
+    ] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(g) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            blob(f(g, None, None))
+        })?;
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(g), Some(tol)) = (blob_or_null(ctx, 0, name)?, real_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            blob(f(g, Some(tol), None))
+        })?;
+        conn.create_scalar_function(name, 3, FLAGS, move |ctx| {
+            let (Some(g), Some(tol), Some(e)) = (
+                blob_or_null(ctx, 0, name)?,
+                real_or_null(ctx, 1, name)?,
+                blob_or_null(ctx, 2, name)?,
+            ) else {
+                return Ok(None);
+            };
+            blob(f(g, Some(tol), Some(e)))
+        })?;
+    }
     Ok(())
 }
 

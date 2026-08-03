@@ -20,7 +20,7 @@ not by preference:
 ## Size
 
 Measured on release builds (`wasm-pack build --target web --release`,
-`wasm-opt -Oz`); enforced by a CI size gate (fails above 2.2 MB raw /
+`wasm-opt -Oz`); enforced by a CI size gate (fails above 2.3 MB raw /
 700 KB gzip). Three tiers are built and attached to every GitHub Release
 (`kenro-wasm-minimal.tar.gz` / `kenro-wasm-standard.tar.gz` /
 `kenro-wasm-full.tar.gz`); functions outside a tier register as stubs
@@ -28,9 +28,9 @@ naming the missing feature:
 
 | tier | cargo flags | adds | raw | gzipped (wire) |
 |---|---|---|---|---|
-| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 560 KB | 216 KB |
-| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 755 KB | 296 KB |
-| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`/`ST_Split` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`; `ST_TriangulatePolygon` rides along on the same crate), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading), and `text-encodings` (`ST_AsKML`/`ST_AsSVG`, no library of their own) | 2105 KB | 640 KB |
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 568 KB | 222 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 766 KB | 304 KB |
+| full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`/`ST_Split` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`; `ST_TriangulatePolygon` rides along on the same crate), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading), `text-encodings` (`ST_AsKML`/`ST_AsSVG`, no library of their own), and `voronoi` (+52 KB raw / +11 KB wire — it needs both `delaunay` for the triangulation and `overlay` to clip the cells) | 2170 KB | 659 KB |
 
 The full tier carries `crs-full`, so `ST_Transform` reaches every EPSG code
 in the registry — Japan's plane rectangular systems, the British National
@@ -48,8 +48,8 @@ classes kenro doesn't cover.
 
 | | [@sqlite.org/sqlite-wasm] (primary) | [wa-sqlite] | [sql.js] |
 |---|---|---|---|
-| All 203 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
-| Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
+| All 205 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`, `ST_3DExtent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
 | GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ✅ | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
 | Arity overloads (`ST_GeomFromText/1,/2`, …) | ✅ | ✅ | ✅ via a registry shim (sql.js keys UDFs by name only; the adapter works around it — sql.js version pinned) |

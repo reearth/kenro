@@ -761,6 +761,42 @@ pub fn st_triangulate_polygon(geom: &[u8]) -> R<Vec<u8>> {
     kenro::functions::hull::st_triangulate_polygon(geom).map_err(err)
 }
 
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiPolygons)]
+pub fn st_voronoi_polygons(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_polygons(geom, None, None).map_err(err)
+}
+
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiPolygonsTol)]
+pub fn st_voronoi_polygons_tol(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_polygons(geom, Some(tolerance), None).map_err(err)
+}
+
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiPolygonsExtend)]
+pub fn st_voronoi_polygons_extend(geom: &[u8], tolerance: f64, extend_to: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_polygons(geom, Some(tolerance), Some(extend_to)).map_err(err)
+}
+
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiLines)]
+pub fn st_voronoi_lines(geom: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_lines(geom, None, None).map_err(err)
+}
+
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiLinesTol)]
+pub fn st_voronoi_lines_tol(geom: &[u8], tolerance: f64) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_lines(geom, Some(tolerance), None).map_err(err)
+}
+
+#[cfg(feature = "voronoi")]
+#[wasm_bindgen(js_name = stVoronoiLinesExtend)]
+pub fn st_voronoi_lines_extend(geom: &[u8], tolerance: f64, extend_to: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::hull::st_voronoi_lines(geom, Some(tolerance), Some(extend_to)).map_err(err)
+}
+
 // ---- Line structure (functions::lines) ----
 
 #[wasm_bindgen(js_name = stIsSimple)]
@@ -1745,6 +1781,12 @@ mod tests {
             "stConcaveHull",
             "stDelaunayTriangles",
             "stTriangulatePolygon",
+            "stVoronoiPolygons",
+            "stVoronoiPolygonsTol",
+            "stVoronoiPolygonsExtend",
+            "stVoronoiLines",
+            "stVoronoiLinesTol",
+            "stVoronoiLinesExtend",
             "stIsSimple",
             "stLineMerge",
             "stLineMergeDirected",

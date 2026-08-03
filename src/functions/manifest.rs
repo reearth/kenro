@@ -801,6 +801,48 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Some("delaunay")
     ),
     entry!(
+        "ST_VoronoiPolygons",
+        "stVoronoiPolygons",
+        [Blob],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
+        "ST_VoronoiPolygons",
+        "stVoronoiPolygonsTol",
+        [Blob, Real],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
+        "ST_VoronoiPolygons",
+        "stVoronoiPolygonsExtend",
+        [Blob, Real, Blob],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
+        "ST_VoronoiLines",
+        "stVoronoiLines",
+        [Blob],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
+        "ST_VoronoiLines",
+        "stVoronoiLinesTol",
+        [Blob, Real],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
+        "ST_VoronoiLines",
+        "stVoronoiLinesExtend",
+        [Blob, Real, Blob],
+        Blob,
+        Some("voronoi")
+    ),
+    entry!(
         "ST_TriangulatePolygon",
         "stTriangulatePolygon",
         [Blob],
@@ -1154,6 +1196,7 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("delaunay") => cfg!(feature = "delaunay"),
         Some("gml") => cfg!(feature = "gml"),
         Some("text-encodings") => cfg!(feature = "text-encodings"),
+        Some("voronoi") => cfg!(feature = "voronoi"),
         // An unrecognized name disables the function everywhere at once,
         // which is the safe direction but easy to do by accident — see
         // `every_feature_name_is_known` for the guard that makes a typo loud.
@@ -1180,6 +1223,8 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_ConcaveHull", &[2]),
     ("ST_DelaunayTriangles", &[1]),
     ("ST_TriangulatePolygon", &[1]),
+    ("ST_VoronoiPolygons", &[1, 2, 3]),
+    ("ST_VoronoiLines", &[1, 2, 3]),
     ("ST_IsSimple", &[1]),
     ("ST_LineMerge", &[1, 2]),
     ("ST_Split", &[2]),
@@ -1225,6 +1270,7 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("delaunay") => cfg!(feature = "delaunay"),
         Some("gml") => cfg!(feature = "gml"),
         Some("text-encodings") => cfg!(feature = "text-encodings"),
+        Some("voronoi") => cfg!(feature = "voronoi"),
         // An unrecognized name disables the function everywhere at once,
         // which is the safe direction but easy to do by accident — see
         // `every_feature_name_is_known` for the guard that makes a typo loud.
@@ -1246,6 +1292,7 @@ const KNOWN_FEATURES: &[&str] = &[
     "delaunay",
     "gml",
     "text-encodings",
+    "voronoi",
 ];
 
 /// The stub entries active under the current feature set: the permanent
@@ -1269,6 +1316,9 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "text-encodings") {
         stubs.extend(super::stubs::TEXT_ENCODINGS_OFF.iter());
+    }
+    if !cfg!(feature = "voronoi") {
+        stubs.extend(super::stubs::VORONOI_OFF.iter());
     }
     if !cfg!(feature = "h3") {
         stubs.extend(super::stubs::H3_OFF.iter());

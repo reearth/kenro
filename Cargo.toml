@@ -55,6 +55,7 @@ full = [
     "crs-full",
     "gml",
     "text-encodings",
+    "voronoi",
 ]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
@@ -82,6 +83,11 @@ spheroid = []
 # build that does not call them.
 concave-hull = []
 delaunay = []
+# ST_VoronoiPolygons / ST_VoronoiLines. The cells are the dual of the Delaunay
+# triangulation (`delaunay`, spade) and geo clips them with BooleanOps, which
+# is i_overlay (`overlay`). Naming both keeps a `delaunay`-only build from
+# quietly acquiring the overlay mesh — the single largest size contributor.
+voronoi = ["delaunay", "overlay"]
 # Vector tiles: ST_AsMVTGeom + the ST_AsMVT aggregate. Clipping is done by
 # dedicated axis-aligned-rectangle algorithms, so this does NOT pull the
 # overlay engine and is cheap enough to sit in the default set.
@@ -140,6 +146,10 @@ required-features = ["rusqlite"]
 [[test]]
 name = "postgis_compat"
 required-features = ["rusqlite"]
+
+[[test]]
+name = "threed_derived"
+required-features = ["rusqlite", "overlay", "transform"]
 
 [[test]]
 name = "golden_predicates"

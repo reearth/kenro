@@ -27,6 +27,22 @@ fn out(
     geom::encode_derived(geometry, srid, func, sources)
 }
 
+/// Encode a derived geometry as 2D **on purpose**, for the Voronoi pair: a
+/// cell corner is a circumcentre, never an input vertex, so there is no Z to
+/// carry — and PostGIS answers in 2D here too (`ST_Zmflag` = 0, measured,
+/// unlike its `ST_DelaunayTriangles`, which is 3).
+#[cfg(feature = "voronoi")]
+fn out_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+    geom::encode_canonical_gpb(
+        &crate::geom::Geom {
+            geometry,
+            srid,
+            has_zm: false,
+        },
+        func,
+    )
+}
+
 /// `ST_ConcaveHull(geom, target_percent)` — a hull whose area is the given
 /// fraction of the convex hull's; 1.0 *is* the convex hull.
 ///
@@ -214,6 +230,194 @@ pub fn st_triangulate_polygon(bytes: &[u8]) -> Result<Vec<u8>> {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Voronoi — the dual of the Delaunay triangulation above
+// ---------------------------------------------------------------------------
+
+/// PostGIS's default clip box, measured rather than taken from a doc comment.
+///
+/// GEOS expands the sites' envelope by **`max(width, height)` on all four
+/// sides** — not by a percentage, and not per-axis. Measured on PostGIS 3.5:
+/// sites spanning `0..10 × 0..2` come back clipped to `-10..20 × -10..12`,
+/// so the *height* is padded by the *width*. `geo`'s `VoronoiClip::Padded`
+/// documents itself as "matching PostGIS" at 50% padding; it does not, which
+/// is why kenro computes the box itself and passes `VoronoiClip::Polygon`.
+///
+/// `extend_to` is **unioned** with that box rather than replacing it (also
+/// measured: an `extend_to` smaller than the default leaves the result
+/// unchanged), and only its envelope matters, not its shape.
+#[cfg(feature = "voronoi")]
+fn voronoi_clip(
+    geometry: &Geometry<f64>,
+    extend_to: Option<&Geometry<f64>>,
+) -> Option<geo_types::Polygon<f64>> {
+    use geo::BoundingRect;
+    let rect = geometry.bounding_rect()?;
+    let pad = rect.width().max(rect.height());
+    let (mut min_x, mut min_y) = (rect.min().x - pad, rect.min().y - pad);
+    let (mut max_x, mut max_y) = (rect.max().x + pad, rect.max().y + pad);
+    if let Some(e) = extend_to.and_then(|e| e.bounding_rect()) {
+        min_x = min_x.min(e.min().x);
+        min_y = min_y.min(e.min().y);
+        max_x = max_x.max(e.max().x);
+        max_y = max_y.max(e.max().y);
+    }
+    Some(
+        geo_types::Rect::new(
+            geo_types::coord! { x: min_x, y: min_y },
+            geo_types::coord! { x: max_x, y: max_y },
+        )
+        .to_polygon(),
+    )
+}
+
+/// `ST_VoronoiPolygons(geom [, tolerance [, extend_to]])` — one cell per input
+/// vertex.
+///
+/// Unlike `ST_Dump` and the grid generators, this one is **not** set-returning
+/// in PostGIS either — it returns a single geometry — so kenro can use the
+/// real name rather than inventing one.
+///
+/// ⚠️ **Divergences.** PostGIS returns a GEOMETRYCOLLECTION; kenro returns a
+/// **MULTIPOLYGON**, as `ST_DelaunayTriangles` and `ST_Subdivide` already do.
+/// The output is 2D even for 3D input — PostGIS's is too (`ST_Zmflag` = 0,
+/// measured), because a cell's corners are circumcentres and never input
+/// vertices, so there is no Z to carry. **Collinear input is an error here**
+/// where PostGIS produces cells: `geo` reports `CollinearInput` and offers
+/// the perpendicular bisectors instead, which is `ST_VoronoiLines`.
+#[cfg(feature = "voronoi")]
+pub fn st_voronoi_polygons(
+    bytes: &[u8],
+    tolerance: Option<f64>,
+    extend_to: Option<&[u8]>,
+) -> Result<Vec<u8>> {
+    use geo::algorithm::voronoi::{Voronoi, VoronoiClip, VoronoiError, VoronoiParams};
+    const FUNC: &str = "ST_VoronoiPolygons";
+
+    let g = geom::decode_auto(bytes)?;
+    let extend = extend_to.map(geom::decode_auto).transpose()?;
+    let empty = || {
+        out_2d(
+            Geometry::MultiPolygon(geo_types::MultiPolygon::new(vec![])),
+            g.srid,
+            FUNC,
+        )
+    };
+    let Some(clip) = voronoi_clip(&g.geometry, extend.as_ref().map(|e| &e.geometry)) else {
+        return empty();
+    };
+    let params = VoronoiParams::new()
+        .tolerance(tolerance.unwrap_or(0.0))
+        .clip(VoronoiClip::Polygon(&clip));
+
+    let cells = match &g.geometry {
+        Geometry::MultiPoint(mp) => mp.voronoi_cells_with_params(params),
+        Geometry::Point(p) => p.voronoi_cells_with_params(params),
+        Geometry::LineString(l) => l.voronoi_cells_with_params(params),
+        Geometry::MultiLineString(mls) => mls.voronoi_cells_with_params(params),
+        Geometry::Polygon(p) => p.voronoi_cells_with_params(params),
+        Geometry::MultiPolygon(mp) => mp.voronoi_cells_with_params(params),
+        _ => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: "unsupported geometry type".into(),
+            });
+        }
+    };
+    let cells = match cells {
+        Ok(c) => c,
+        // PostGIS answers GEOMETRYCOLLECTION EMPTY for one point or none;
+        // kenro answers an empty MULTIPOLYGON, which is the same statement.
+        Err(VoronoiError::InsufficientVertices) => return empty(),
+        Err(VoronoiError::CollinearInput) => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: "the input vertices are collinear, so they bound no cells; PostGIS \
+                         returns degenerate ones here, kenro does not — use ST_VoronoiLines \
+                         for the perpendicular bisectors"
+                    .into(),
+            });
+        }
+        Err(e) => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: format!("voronoi failed: {e:?}"),
+            });
+        }
+    };
+    out_2d(
+        Geometry::MultiPolygon(geo_types::MultiPolygon::new(cells)),
+        g.srid,
+        FUNC,
+    )
+}
+
+/// `ST_VoronoiLines(geom [, tolerance [, extend_to]])` — the cell boundaries.
+///
+/// PostGIS returns a MULTILINESTRING here, so this is the one function in the
+/// pair with **no return-type divergence at all**. It also works on collinear
+/// input, where `ST_VoronoiPolygons` cannot.
+#[cfg(feature = "voronoi")]
+pub fn st_voronoi_lines(
+    bytes: &[u8],
+    tolerance: Option<f64>,
+    extend_to: Option<&[u8]>,
+) -> Result<Vec<u8>> {
+    use geo::algorithm::voronoi::{Voronoi, VoronoiClip, VoronoiError, VoronoiParams};
+    const FUNC: &str = "ST_VoronoiLines";
+
+    let g = geom::decode_auto(bytes)?;
+    let extend = extend_to.map(geom::decode_auto).transpose()?;
+    let empty = || {
+        out_2d(
+            Geometry::MultiLineString(geo_types::MultiLineString::new(vec![])),
+            g.srid,
+            FUNC,
+        )
+    };
+    let Some(clip) = voronoi_clip(&g.geometry, extend.as_ref().map(|e| &e.geometry)) else {
+        return empty();
+    };
+    let params = VoronoiParams::new()
+        .tolerance(tolerance.unwrap_or(0.0))
+        .clip(VoronoiClip::Polygon(&clip));
+
+    let edges = match &g.geometry {
+        Geometry::MultiPoint(mp) => mp.voronoi_edges_with_params(params),
+        Geometry::Point(p) => p.voronoi_edges_with_params(params),
+        Geometry::LineString(l) => l.voronoi_edges_with_params(params),
+        Geometry::MultiLineString(mls) => mls.voronoi_edges_with_params(params),
+        Geometry::Polygon(p) => p.voronoi_edges_with_params(params),
+        Geometry::MultiPolygon(mp) => mp.voronoi_edges_with_params(params),
+        _ => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: "unsupported geometry type".into(),
+            });
+        }
+    };
+    let edges = match edges {
+        Ok(e) => e,
+        Err(VoronoiError::InsufficientVertices) => return empty(),
+        Err(e) => {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: format!("voronoi failed: {e:?}"),
+            });
+        }
+    };
+    out_2d(
+        Geometry::MultiLineString(geo_types::MultiLineString::new(
+            edges
+                .into_iter()
+                .map(|l| geo_types::LineString::new(vec![l.start, l.end]))
+                .collect(),
+        )),
+        g.srid,
+        FUNC,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(any(feature = "concave-hull", feature = "delaunay"))]
@@ -283,6 +487,113 @@ mod tests {
             crate::functions::accessors::st_geometry_type(&triangles).unwrap(),
             "ST_MultiPolygon"
         );
+    }
+
+    /// The clip box is the part worth pinning: `geo`'s own `Padded` mode
+    /// claims to match PostGIS and does not, so these numbers come from a
+    /// live PostGIS 3.5 session.
+    #[cfg(feature = "voronoi")]
+    #[test]
+    fn voronoi_clips_the_way_postgis_does() {
+        use crate::functions::accessors::{st_area, st_geometry_type, st_num_geometries};
+        use crate::functions::io::st_as_text;
+
+        let square = g("MULTIPOINT(0 0,4 0,4 4,0 4)");
+        let v = st_voronoi_polygons(&square, None, None).unwrap();
+        // PostGIS: 4 cells, total area 144 — the sites' 4×4 envelope padded
+        // by 4 on every side, so 12×12.
+        assert_eq!(st_num_geometries(&v).unwrap(), 4);
+        assert!(
+            (st_area(&v).unwrap() - 144.0).abs() < 1e-9,
+            "{}",
+            st_area(&v).unwrap()
+        );
+        // kenro returns a MULTIPOLYGON where PostGIS returns a collection.
+        assert_eq!(st_geometry_type(&v).unwrap(), "ST_MultiPolygon");
+
+        // The padding is max(width, height) on all four sides, not per-axis:
+        // sites over 0..10 × 0..2 clip to -10..20 × -10..12 in PostGIS, so
+        // the *height* is padded by the *width*. This is the assertion that
+        // fails if anyone swaps in geo's `Padded`.
+        let wide = g("MULTIPOINT(0 0,10 0,10 2,0 2)");
+        let v = st_voronoi_polygons(&wide, None, None).unwrap();
+        assert!(
+            (st_area(&v).unwrap() - 30.0 * 22.0).abs() < 1e-9,
+            "{}",
+            st_area(&v).unwrap()
+        );
+
+        // extend_to is unioned with that box and only its envelope counts —
+        // one smaller than the default changes nothing.
+        let big = st_voronoi_polygons(
+            &square,
+            Some(0.0),
+            Some(&g("POLYGON((-10 -10,10 -10,10 10,-10 10,-10 -10))")),
+        )
+        .unwrap();
+        assert!(
+            (st_area(&big).unwrap() - 400.0).abs() < 1e-9,
+            "{}",
+            st_area(&big).unwrap()
+        );
+        let small = st_voronoi_polygons(
+            &square,
+            Some(0.0),
+            Some(&g("POLYGON((1 1,3 1,3 3,1 3,1 1))")),
+        )
+        .unwrap();
+        assert!(
+            (st_area(&small).unwrap() - 144.0).abs() < 1e-9,
+            "{}",
+            st_area(&small).unwrap()
+        );
+
+        // One vertex bounds nothing: PostGIS says GEOMETRYCOLLECTION EMPTY,
+        // kenro says MULTIPOLYGON EMPTY.
+        assert_eq!(
+            st_as_text(&st_voronoi_polygons(&g("POINT(0 0)"), None, None).unwrap()).unwrap(),
+            "MULTIPOLYGON EMPTY"
+        );
+
+        // The lines form is the one with no divergence at all — PostGIS
+        // returns a MULTILINESTRING here too.
+        let l = st_voronoi_lines(&square, None, None).unwrap();
+        assert_eq!(st_geometry_type(&l).unwrap(), "ST_MultiLineString");
+        assert!(st_num_geometries(&l).unwrap() >= 4);
+
+        // Collinear sites: PostGIS returns degenerate cells, kenro refuses
+        // and names the alternative — which does work.
+        let line = g("MULTIPOINT(0 0,1 1,2 2)");
+        let err = st_voronoi_polygons(&line, None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("ST_VoronoiLines"), "{err}");
+        assert!(st_voronoi_lines(&line, None, None).is_ok());
+
+        // 2D out for 3D in, as PostGIS does here — and the contrast with
+        // ST_DelaunayTriangles, whose vertices *are* input vertices and so
+        // keeps Z, is the whole reason this pair uses a different encoder.
+        // Built as WKB because ST_GeomFromText refuses 3D by design.
+        let mut z = vec![0x01];
+        z.extend_from_slice(&1004u32.to_le_bytes()); // MultiPoint Z
+        z.extend_from_slice(&4u32.to_le_bytes());
+        for xyz in [
+            [0.0_f64, 0.0, 5.0],
+            [4.0, 0.0, 6.0],
+            [4.0, 4.0, 7.0],
+            [0.0, 4.0, 8.0],
+        ] {
+            z.push(0x01);
+            z.extend_from_slice(&1001u32.to_le_bytes()); // Point Z
+            for v in xyz {
+                z.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        use crate::functions::threed::st_has_z;
+        assert!(st_has_z(&z).unwrap(), "the fixture itself must be 3D");
+        assert!(!st_has_z(&st_voronoi_polygons(&z, None, None).unwrap()).unwrap());
+        assert!(!st_has_z(&st_voronoi_lines(&z, None, None).unwrap()).unwrap());
+        assert!(st_has_z(&st_delaunay_triangles(&z).unwrap()).unwrap());
     }
 
     /// The constrained triangulation's whole point is what it *doesn't*

@@ -9,7 +9,14 @@ import { gzipSync } from "node:zlib";
 // grid works without a rebuild; that is ~155 KB of the gzip budget. Raised
 // deliberately, with the measured table in docs/wasm.md — still an order of
 // magnitude under mod_spatialite's ~25 MB chain.
-const MAX_RAW_BYTES = 2_200_000;
+//
+// Raised again for `voronoi`, which measured +52 KB raw / +11 KB gzip — the
+// same class as `concave-hull` (+41 KB) and `delaunay` (+81 KB), and behind
+// its own feature, so no build that does not ask for it pays. Note which
+// number moved: the **wire** size is what a browser downloads and it still
+// has headroom, so the gzip cap is deliberately left where it was. If a
+// change ever needs the gzip cap raised, that is the one to argue about.
+const MAX_RAW_BYTES = 2_300_000;
 const MAX_GZIP_BYTES = 700_000;
 
 const wasmPath = new URL("../pkg/kenro_wasm_bg.wasm", import.meta.url);

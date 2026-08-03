@@ -949,6 +949,32 @@ export const SMOKE_SQL = {
     check: (v) => Number(v) === 2,
   },
   // The constrained triangulation leaves the hole uncovered: 96, not 100.
+  // Voronoi: the clip box is the sites' envelope padded by max(w,h) a side,
+  // so a 4x4 input gives 12x12 = 144.
+  "ST_VoronoiPolygons/1": {
+    sql: "SELECT ST_Area(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))",
+    check: (v) => Math.abs(Number(v) - 144) < 1e-9,
+  },
+  "ST_VoronoiPolygons/2": {
+    sql: "SELECT ST_NumGeometries(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)'), 0))",
+    check: (v) => Number(v) === 4,
+  },
+  "ST_VoronoiPolygons/3": {
+    sql: "SELECT ST_Area(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)'), 0, ST_GeomFromText('POLYGON((-10 -10,10 -10,10 10,-10 10,-10 -10))')))",
+    check: (v) => Math.abs(Number(v) - 400) < 1e-9,
+  },
+  "ST_VoronoiLines/1": {
+    sql: "SELECT ST_GeometryType(ST_VoronoiLines(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))",
+    check: (v) => v === "ST_MultiLineString",
+  },
+  "ST_VoronoiLines/2": {
+    sql: "SELECT ST_GeometryType(ST_VoronoiLines(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)'), 0))",
+    check: (v) => v === "ST_MultiLineString",
+  },
+  "ST_VoronoiLines/3": {
+    sql: "SELECT ST_GeometryType(ST_VoronoiLines(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)'), 0, ST_GeomFromText('POLYGON((-10 -10,10 -10,10 10,-10 10,-10 -10))')))",
+    check: (v) => v === "ST_MultiLineString",
+  },
   "ST_TriangulatePolygon/1": {
     sql: "SELECT ST_Area(ST_TriangulatePolygon(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))')))",
     check: (v) => Math.abs(Number(v) - 96) < 1e-9,

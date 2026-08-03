@@ -1853,3 +1853,89 @@ fn kml_and_svg_output_matches_postgis() {
         .to_string();
     assert!(err.contains("SRID"), "{err}");
 }
+
+/// `ST_VoronoiPolygons` and `ST_VoronoiLines` are the one pair in this family
+/// PostGIS does *not* make set-returning, so kenro can use the real names.
+/// The clip box is the interesting part — see `functions::hull`.
+#[test]
+#[cfg(feature = "voronoi")]
+fn voronoi_matches_postgis_where_it_can_and_says_where_it_cannot() {
+    let conn = conn();
+    let square = "ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')";
+    // PostGIS: 4 cells, area 144 — the 4×4 envelope padded by 4 a side.
+    assert_eq!(
+        int(
+            &conn,
+            &format!("SELECT ST_NumGeometries(ST_VoronoiPolygons({square}))")
+        ),
+        Some(4)
+    );
+    assert!(
+        (real(
+            &conn,
+            &format!("SELECT ST_Area(ST_VoronoiPolygons({square}))")
+        ) - 144.0)
+            .abs()
+            < 1e-9
+    );
+    // kenro's MULTI* instead of PostGIS's collection, for the polygons —
+    // but ST_VoronoiLines is a MULTILINESTRING in PostGIS too, so that one
+    // matches outright.
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_GeometryType(ST_VoronoiPolygons({square}))")
+        )
+        .as_deref(),
+        Some("ST_MultiPolygon")
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!("SELECT ST_GeometryType(ST_VoronoiLines({square}))")
+        )
+        .as_deref(),
+        Some("ST_MultiLineString")
+    );
+    // The padding is max(width, height) on every side, so a 10×2 input pads
+    // its height by 10: 30 × 22 = 660.
+    assert!(
+        (real(
+            &conn,
+            "SELECT ST_Area(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,10 0,10 2,0 2)')))"
+        ) - 660.0)
+            .abs()
+            < 1e-9
+    );
+    // extend_to is unioned with that box, and only its envelope counts.
+    assert!(
+        (real(
+            &conn,
+            &format!(
+                "SELECT ST_Area(ST_VoronoiPolygons({square}, 0, \
+                 ST_GeomFromText('POLYGON((-10 -10,10 -10,10 10,-10 10,-10 -10))')))"
+            )
+        ) - 400.0)
+            .abs()
+            < 1e-9
+    );
+    // Collinear sites: PostGIS returns degenerate cells, kenro refuses and
+    // names ST_VoronoiLines, which does work.
+    let err = conn
+        .query_row(
+            "SELECT ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,1 1,2 2)'))",
+            [],
+            |r| r.get::<_, Vec<u8>>(0),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("ST_VoronoiLines"), "{err}");
+    assert_eq!(
+        text(
+            &conn,
+            "SELECT ST_GeometryType(ST_VoronoiLines(ST_GeomFromText('MULTIPOINT(0 0,1 1,2 2)')))"
+        )
+        .as_deref(),
+        Some("ST_MultiLineString")
+    );
+}

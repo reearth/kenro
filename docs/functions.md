@@ -7,7 +7,7 @@ mod_spatialite 5.1 session, July–August 2026). ✅ = present with the same
 name and compatible semantics; deviations are spelled out.
 
 Functions marked with the `overlay`, `spheroid`, `concave-hull`,
-`delaunay`, `gml` or `text-encodings` feature need a `full` build (default builds register them as stubs naming the feature); everything
+`delaunay`, `gml`, `text-encodings` or `voronoi` feature need a `full` build (default builds register them as stubs naming the feature); everything
 else, including MVT, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
@@ -419,6 +419,8 @@ whole group of ordinary functions. Each has its own feature, both are in
 | `ST_ConcaveHull(geom, target_percent)` | geometry | ✅ | ✅ | ✅ | `concave-hull` feature. Keeps **PostGIS's argument contract** — the fraction of the convex hull's area to aim for, 1.0 being the convex hull — by searching `geo`'s differently-scaled "concavity" parameter for it, at a few hull computations per call. A value outside [0,1] is an error, so pasting geo's own concavity (~2) fails loudly instead of returning a very different shape. ⚠️ The hull family differs from GEOS's, so the vertices are not PostGIS's; what holds is the contract (never exceeds the convex hull, monotone in the target) |
 | `ST_DelaunayTriangles(geom)` | geometry | ✅ | ✅ | ❌ | `delaunay` feature. ⚠️ returns a **MULTIPOLYGON** where PostGIS returns a GEOMETRYCOLLECTION — kenro never produces collections. The `tolerance` and `flags` arguments are not implemented; `geo`'s triangulator has no snapping tolerance, and the edge output is `ST_Boundary` of this |
 | `ST_TriangulatePolygon(geom)` | geometry | ✅ | ❌ | ❌ | `delaunay` feature. The **constrained** triangulation: the triangles tile the polygon exactly, so holes and concavities stay uncovered — a square with a 2×2 hole triangulates to area 96, where `ST_DelaunayTriangles` spans the convex hull and gives 100. ⚠️ MULTIPOLYGON, not a GEOMETRYCOLLECTION; a triangulation is not unique, so the individual triangles are not GEOS's. Non-areal input is an error rather than PostGIS's empty collection |
+| `ST_VoronoiPolygons(geom [, tolerance [, extend_to]])` | geometry | ✅ | ❌ | ❌ | `voronoi` feature. The dual of the triangulation above: one cell per input vertex. Uniquely in this family, PostGIS's version is **not** set-returning either, so kenro uses the real name. The clip box is PostGIS's, measured rather than assumed: the sites' envelope padded by **max(width, height) on all four sides** — so a 10×2 input pads its *height* by 10 — and `extend_to` is **unioned** with that box, envelope only, so one smaller than the default changes nothing. (`geo`'s own `Padded` mode documents itself as matching PostGIS at 50%; it does not.) ⚠️ MULTIPOLYGON, not a GEOMETRYCOLLECTION. 2D even for 3D input, as in PostGIS — a cell corner is a circumcentre, never an input vertex, so there is no Z to carry. **Collinear sites are an error** where PostGIS returns degenerate cells; use `ST_VoronoiLines` |
+| `ST_VoronoiLines(geom [, tolerance [, extend_to]])` | geometry | ✅ | ❌ | ❌ | `voronoi` feature. The cell boundaries — the one function in the pair with **no return-type divergence**, since PostGIS returns a MULTILINESTRING here too. Also works on collinear sites, where the polygons cannot |
 
 ## Line structure
 
@@ -609,11 +611,21 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   VirtualRouting). These need a noding engine kenro does not carry.
   (`ST_Split` and `ST_LineMerge` were once on this list and are now
   implemented — see "Line structure" above; neither actually needed one.)
-- **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`, no grid
-  generators (`ST_SquareGrid`, `ST_HexagonGrid`), no `ST_VoronoiPolygons`:
-  they would need SQLite table-valued functions, and kenro registers scalars
-  and aggregates only. Where the shape allows it, kenro returns a MULTI\*
-  instead (see `ST_Subdivide`).
+- **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`/`ST_DumpRings`,
+  and no grid generators (`ST_SquareGrid`, `ST_HexagonGrid`). kenro registers
+  scalars and aggregates, not table-valued functions. Two things this does
+  *not* mean, both worth stating because the earlier wording implied
+  otherwise:
+  - It does not mean the results are unreachable. Where the shape allows it
+    kenro returns a MULTI\* (`ST_Subdivide`, `ST_DelaunayTriangles`,
+    `ST_Split`), and a MULTI\* can be walked with `ST_NumGeometries` +
+    `ST_GeometryN` over a recursive CTE. ⚠️ That walk is **quadratic** —
+    `ST_GeometryN` re-decodes the whole blob per call, measured at 0.4 s for
+    1,600 parts and 104 s for 25,600, against 11 ms for a single call that
+    touches every part once. Fine for tens of parts; use it knowingly.
+  - It does not cover `ST_VoronoiPolygons`, which was on this list by mistake:
+    PostGIS's version returns one geometry rather than a set, and kenro
+    implements it (see [Hulls and triangulation](#hulls-and-triangulation)).
 - **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
 - **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
