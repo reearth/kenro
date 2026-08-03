@@ -165,6 +165,9 @@ pub fn st_affine_3d(
 
 /// `ST_TransScale(geom, dx, dy, xfactor, yfactor)` — translate **then**
 /// scale: `x' = (x + dx)·xfactor`. (PostGIS's order, verified live.)
+///
+/// Z and M ride through, and a surface collection transforms: measured on
+/// PostGIS 3.5, `ST_TransScale(POINT Z (1 2 3), 1,2,3,4)` is `POINT(6 16 3)`.
 pub fn st_trans_scale(
     bytes: &[u8],
     dx: f64,
@@ -172,9 +175,9 @@ pub fn st_trans_scale(
     x_factor: f64,
     y_factor: f64,
 ) -> Result<Vec<u8>> {
-    map_geometry(bytes, "ST_TransScale", |c| Coord {
-        x: (c.x + dx) * x_factor,
-        y: (c.y + dy) * y_factor,
+    crate::coords::map_coords(bytes, &mut |p| {
+        p.x = (p.x + dx) * x_factor;
+        p.y = (p.y + dy) * y_factor;
     })
 }
 
@@ -183,6 +186,15 @@ pub fn st_trans_scale(
 /// ⚠️ PostGIS also repairs the result (its precision reducer can collapse
 /// slivers); kenro only rounds, which is `ST_SnapToGrid`'s behavior. Follow
 /// it with `ST_MakeValid` if you need the repair.
+///
+/// That difference is **why this one stays on the 2D path** while `ST_Affine`
+/// and the other coordinate transforms moved to `coords`: PostGIS's version is
+/// not coordinate-wise. Measured on 3.5,
+/// `ST_ReducePrecision(LINESTRING(0 0,0.1 0.1,1 1,1.1 1.1), 1)` is
+/// `LINESTRING(0 0,1 1)` — four vertices become two — where kenro answers
+/// `LINESTRING(0 0,0 0,1 1,1 1)`. Rewriting coordinates in place would give
+/// it 3D support while deepening that divergence, so it keeps refusing 3D
+/// input until the vertex-collapse behavior is implemented too.
 pub fn st_reduce_precision(bytes: &[u8], gridsize: f64) -> Result<Vec<u8>> {
     if gridsize <= 0.0 {
         return Err(Error::Unsupported {
@@ -203,7 +215,11 @@ fn map_geometry(
 ) -> Result<Vec<u8>> {
     let mut g = geom::decode_auto(bytes)?;
     crate::functions::edit::map_coords_pub(&mut g.geometry, &mut f);
-    out(g.geometry, g.srid, func)
+    // Not `out(g.geometry, …)`: that rebuilds a `Geom` with `has_zm: false`,
+    // so 3D input would be silently flattened instead of refused. The only
+    // caller left is `ST_ReducePrecision`, which stays on the 2D path on
+    // purpose (see its doc comment) and therefore has to say so.
+    geom::encode_canonical_gpb(&g, func)
 }
 
 /// `ST_Angle(p1, p2, p3, p4)` — the angle between vectors p1→p2 and p3→p4,
@@ -775,6 +791,54 @@ mod tests {
         .unwrap();
         assert_eq!(wkt(&flat), "POINT(15 34)");
         assert!(!threed::st_has_z(&flat).unwrap());
+    }
+
+    /// The rest of the coordinate-wise family, and the two that deliberately
+    /// stayed behind. All expectations measured on PostGIS 3.5.
+    #[test]
+    fn the_coordinate_wise_family_carries_z_and_the_others_do_not() {
+        use crate::functions::{edit, misc, rtree, surface, threed};
+
+        // ST_TransScale(POINT Z (1 2 3), 1,2,3,4) → POINT(6 16 3)
+        let out = st_trans_scale(&point_z(1.0, 2.0, 3.0), 1.0, 2.0, 3.0, 4.0).unwrap();
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(6.0));
+        assert_eq!(rtree::st_min_y(&out).unwrap(), Some(16.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(3.0));
+
+        // ST_FlipCoordinates(POINT Z (1 2 3)) → POINT(2 1 3): x/y only.
+        let out = edit::st_flip_coordinates(&point_z(1.0, 2.0, 3.0)).unwrap();
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(2.0));
+        assert_eq!(rtree::st_min_y(&out).unwrap(), Some(1.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(3.0));
+
+        // ST_ShiftLongitude(POINT Z (-170 2 3)) → POINT(190 2 3)
+        let out = edit::st_shift_longitude(&point_z(-170.0, 2.0, 3.0)).unwrap();
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(190.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(3.0));
+
+        // ST_WrapX(POINT Z (-170 2 3), 0, 360) → POINT(190 2 3)
+        let out = misc::st_wrap_x(&point_z(-170.0, 2.0, 3.0), 0.0, 360.0).unwrap();
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(190.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(3.0));
+
+        // Surfaces: the first three transform, ST_WrapX refuses — PostGIS
+        // says "Wrapping of PolyhedralSurface geometries is unsupported".
+        let cube = surface::fixtures::cube(6);
+        for out in [
+            st_trans_scale(&cube, 0.0, 0.0, 2.0, 2.0).unwrap(),
+            edit::st_flip_coordinates(&cube).unwrap(),
+            edit::st_shift_longitude(&cube).unwrap(),
+        ] {
+            assert_eq!(surface::st_num_patches(&out).unwrap(), Some(6));
+        }
+        let err = misc::st_wrap_x(&cube, 5.0, 360.0).unwrap_err().to_string();
+        assert!(err.contains("POLYHEDRALSURFACE"), "{err}");
+
+        // …and the two that stayed on the 2D path, because PostGIS's versions
+        // drop the vertices that collapse together — not coordinate-wise, so
+        // moving them would have deepened the divergence, not fixed it.
+        assert!(st_reduce_precision(&point_z(1.0, 2.0, 3.0), 0.1).is_err());
+        assert!(edit::st_snap_to_grid(&point_z(1.0, 2.0, 3.0), 0.1, 0.1).is_err());
     }
 
     #[test]

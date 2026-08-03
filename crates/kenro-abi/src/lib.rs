@@ -809,8 +809,16 @@ pub extern "C" fn k_stSimplify(p: *const u8, l: u32, tolerance: f64) -> i32 {
 // the host can key them off whatever aggregate context it has. The browser
 // adapters hold a JS object instead; the shape is otherwise identical.
 
-/// Aggregate kind, as passed to [`k_agg_new`].
+/// Aggregate kind, as passed to [`k_agg_new`]. The numbers are the wire
+/// contract with every host, so they must match `Extent3DAgg => "3"` and
+/// friends in the manifest emitter below.
+///
+/// Two of them are cfg-gated to match the `Agg` variant they select: under
+/// `-D warnings` an unreachable constant is an error, and the tiers below
+/// `full` are now built in CI.
+#[cfg(feature = "overlay")]
 const AGG_UNION: i32 = 0;
+#[cfg(feature = "mvt")]
 const AGG_MVT: i32 = 1;
 const AGG_EXTENT: i32 = 2;
 const AGG_EXTENT_3D: i32 = 3;
@@ -1970,8 +1978,13 @@ pub extern "C" fn k_stGeomFromGmlSrid(text_p: *const u8, text_l: u32, srid: i32)
     blob(gml::st_geom_from_gml(try_str!(text_p, text_l), Some(srid)))
 }
 
-#[cfg(feature = "overlay")]
 // ---- surface collections ----
+//
+// Ungated: `functions::surface` has no cargo feature and the manifest lists
+// these three unconditionally. An `#[cfg(feature = "overlay")]` used to sit
+// above the section comment, where it silently applied to `k_stNumPatches`
+// alone — so a standard-tier module failed registration outright, which CI
+// never saw because it only ever built `full`.
 #[unsafe(no_mangle)]
 pub extern "C" fn k_stNumPatches(geom_p: *const u8, geom_l: u32) -> i32 {
     opt_int(surface::st_num_patches(s(geom_p, geom_l)))

@@ -433,6 +433,51 @@ func TestAffine3DThroughTheWasmBinding(t *testing.T) {
 	}
 }
 
+// The tier gate. Every assertion here uses only functions the manifest lists
+// unconditionally, so this test is valid against a module built at *any*
+// feature tier — which is what lets CI run it over `minimal` and `standard`
+// builds, where the rest of this file (ST_Buffer, ST_Union, …) legitimately
+// sees stub errors instead.
+//
+// It exists because three separate `overlay` cfgs had been copy-pasted onto
+// things that do not depend on overlay, and CI only ever built `full`:
+// kenro-abi did not compile below `full` at all, `k_agg_extent_step` went
+// missing so ST_Extent registered without a way to step it, and a stray cfg
+// above a section comment took `k_stNumPatches` with it — which made a
+// standard-tier module fail registration outright.
+func TestEveryTierRegistersAndRuns(t *testing.T) {
+	db := open(t) // registration verifies the manifest against real exports
+
+	// Surface collections: ungated, and the one a stray cfg removed.
+	// POLYHEDRALSURFACE Z with one patch, as PostGIS encodes it.
+	const phs = `x'01f70300000100000001eb0300000100000005000000` +
+		`0000000000000000000000000000000000000000000000000000000000000000` +
+		`0000000000000000000000000000f03f0000000000000000` +
+		`000000000000f03f000000000000f03f0000000000000000` +
+		`000000000000f03f00000000000000000000000000000000` +
+		`0000000000000000000000000000000000000000000000000000000000000000'`
+	if got := value(t, db, `ST_NumPatches(`+phs+`)`); got != int64(1) {
+		t.Errorf("ST_NumPatches = %v, want 1", got)
+	}
+	if got := value(t, db, `kenro_gpkg_extension_required(`+phs+`)`); got != "gpkg_geom_POLYHEDRALSURFACE" {
+		t.Errorf("kenro_gpkg_extension_required = %v", got)
+	}
+
+	// Both aggregates are ungated, and each needs its own step export.
+	const rows = `(SELECT ST_GeomFromText('POINT(1 2)') AS g UNION ALL SELECT ST_GeomFromText('POINT(5 0)'))`
+	if got := value(t, db, `(SELECT ST_AsText(ST_Extent(g)) FROM `+rows+`)`); got != "POLYGON((1 0,1 2,5 2,5 0,1 0))" {
+		t.Errorf("ST_Extent = %v", got)
+	}
+	if got := value(t, db, `(SELECT ST_3DExtent(g) FROM `+rows+`)`); got != "BOX3D(1 0 0,5 2 0)" {
+		t.Errorf("ST_3DExtent = %v", got)
+	}
+
+	// And the coordinate rewriter, which is ungated too.
+	if got := value(t, db, `ST_AsText(ST_Affine(ST_GeomFromText('POINT(1 2)'), 1,2,3, 4,5,6, 7,8,9, 10,20,30))`); got != "POINT(15 34)" {
+		t.Errorf("ST_Affine 3D form = %v", got)
+	}
+}
+
 func TestAggregateOverEmptySetIsNull(t *testing.T) {
 	db := open(t)
 	var v any

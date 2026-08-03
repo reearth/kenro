@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -139,14 +140,45 @@ func (b *binding) manifest(ctx context.Context) (*manifest, error) {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return nil, errf("kenro: decoding the function manifest: %w", err)
 	}
-	names := make([]string, 0, len(m.Functions))
+	names := make([]string, 0, len(m.Functions)+len(m.Aggregates))
 	for _, e := range m.Functions {
 		names = append(names, e.Export)
+	}
+	// Aggregates too. They were left out, and that is exactly how a module
+	// advertising ST_Extent without `k_agg_extent_step` got past registration
+	// and failed on first use instead: an aggregate's step function is not one
+	// of m.Functions, so nothing checked it.
+	for _, e := range m.Aggregates {
+		export := aggStepExport(e.AggKind)
+		if export == "" {
+			return nil, errf("kenro: the manifest advertises %s with unknown aggregate kind %d", e.SQLName, e.AggKind)
+		}
+		if !slices.Contains(names, export) {
+			names = append(names, export)
+		}
 	}
 	if missing := describeExports(in, names); missing != "" {
 		return nil, errf("kenro: the wasm module is missing exports named by its own manifest (%s) — rebuild it with scripts/build-go-wasm.sh", missing)
 	}
 	return &m, nil
+}
+
+// aggStepExport maps an aggregate kind to the export that steps it, or "" for
+// a kind this binding does not know. Kept next to the manifest check so the
+// two cannot disagree about which export an aggregate needs.
+func aggStepExport(kind int) string {
+	switch kind {
+	case aggUnion:
+		return "k_agg_union_step"
+	case aggMVT:
+		return "k_agg_mvt_step"
+	case aggExtent:
+		return "k_agg_extent_step"
+	case aggExtent3D:
+		return "k_agg_extent3d_step"
+	default:
+		return ""
+	}
 }
 
 // registerScalar installs one variadic SQL function per name and dispatches

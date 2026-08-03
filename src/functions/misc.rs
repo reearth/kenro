@@ -109,18 +109,25 @@ pub fn st_point_inside_circle(bytes: &[u8], cx: f64, cy: f64, radius: f64) -> Re
 /// ⚠️ kenro splits **at vertices only**: a segment that spans the meridian is
 /// assigned to the side its first vertex is on, where PostGIS cuts the
 /// segment. Densify first (`ST_Segmentize`) if the difference matters.
+///
+/// Because kenro's version *is* coordinate-wise, it goes through `coords` and
+/// so keeps Z and M (measured on PostGIS 3.5:
+/// `ST_WrapX(POINT Z (-170 2 3), 0, 360)` is `POINT(190 2 3)`). Surface
+/// collections are refused rather than wrapped, which is PostGIS's answer too
+/// — "Wrapping of PolyhedralSurface geometries is unsupported".
 pub fn st_wrap_x(bytes: &[u8], wrap: f64, amount: f64) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_WrapX";
-    let mut g = geom::decode_auto(bytes)?;
-    crate::functions::edit::map_coords_pub(&mut g.geometry, &mut |c| Coord {
-        x: if (amount > 0.0 && c.x < wrap) || (amount < 0.0 && c.x > wrap) {
-            c.x + amount
-        } else {
-            c.x
-        },
-        y: c.y,
-    });
-    out(g.geometry, g.srid, FUNC)
+    if let Some(kind) = geom::surface_kind(bytes) {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: format!("wrapping a {} is unsupported, as in PostGIS", kind.name()),
+        });
+    }
+    crate::coords::map_coords(bytes, &mut |p| {
+        if (amount > 0.0 && p.x < wrap) || (amount < 0.0 && p.x > wrap) {
+            p.x += amount;
+        }
+    })
 }
 
 /// `ST_MakeBox2D(low, high)` — the rectangle between two corner points.

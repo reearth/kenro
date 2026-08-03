@@ -70,9 +70,9 @@ geometry-accepting function also auto-detects raw WKB input, so
 | `ST_ChaikinSmoothing(geom [, iterations])` | geometry | ✅ | ❌ | ❌ | PostGIS variant (endpoints preserved on open lines); iterations capped at 5 |
 | `ST_RemoveRepeatedPoints(geom)` | geometry | ✅ + tolerance arg | ✅ | ❌ | kenro: exact duplicates only (no tolerance form) |
 | `ST_OrientedEnvelope(geom)` | geometry | ✅ | ⚠️ named `ST_MinimumRotatedRectangle` | ✅ | Minimum rotated rectangle; equal-area alternates possible (rotation-normalized comparison in goldens) |
-| `ST_Rotate(geom, radians [, x0, y0])` | geometry | ✅ | ✅ | ⚠️ named `RotateCoords` | About the origin (or the given point) — PostGIS semantics, **not** geo's centroid default |
-| `ST_Translate(geom, dx, dy)` | geometry | ✅ | ✅ | ✅ | |
-| `ST_Scale(geom, xf, yf)` | geometry | ✅ | ✅ | ⚠️ named `ScaleCoords` | About the origin, like PostGIS |
+| `ST_Rotate(geom, radians [, x0, y0])` | geometry | ✅ | ✅ | ⚠️ named `RotateCoords` | About the origin (or the given point) — PostGIS semantics, **not** geo's centroid default. Z/M and surface collections ride through — [3D affine transforms](#3d-affine-transforms) |
+| `ST_Translate(geom, dx, dy)` | geometry | ✅ | ✅ | ✅ | Z/M and surface collections ride through — [3D affine transforms](#3d-affine-transforms) |
+| `ST_Scale(geom, xf, yf)` | geometry | ✅ | ✅ | ⚠️ named `ScaleCoords` | About the origin, like PostGIS. Z is **not** scaled by this arity (measured); the 3-argument form is not implemented |
 | **GeoPackage triggers** | | | | | |
 | `ST_MinX` / `ST_MaxX` / `ST_MinY` / `ST_MaxY` | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | ✅ | kenro uses the GeoPackage spec's R-tree trigger names — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin` |
 | `ST_IsEmpty(geom)` | 0/1 | ✅ | ✅ | ✅ | gpkg R-tree contract; NULL on NULL |
@@ -170,9 +170,9 @@ so each was read off a live PostGIS 3.5 and is golden-tested:
 | `ST_MakeLine(a, b)` | geometry | ✅ | ✅ | ✅ | Two-geometry form; points and lines concatenate. The aggregate form is not implemented |
 | `ST_MakePolygon(line)` | geometry | ✅ | ❌ | ✅ | Shell must be closed; the with-holes arity is not implemented |
 | `ST_Multi(geom)` | geometry | ✅ | ❌ | ✅ | Already-multi input passes through |
-| `ST_SnapToGrid(geom, size)` / `(geom, sizex, sizey)` | geometry | ✅ | ❌ | ✅ | Grid anchored at the origin; size 0 leaves that axis alone. The origin-offset arities are not implemented |
-| `ST_FlipCoordinates(geom)` | geometry | ✅ | ✅ | ✅ | The lat/lon-order fix |
-| `ST_ShiftLongitude(geom)` | geometry | ✅ | ❌ | ✅ | x from [-180,180) into [0,360) |
+| `ST_SnapToGrid(geom, size)` / `(geom, sizex, sizey)` | geometry | ✅ | ❌ | ✅ | Grid anchored at the origin; size 0 leaves that axis alone. The origin-offset arities are not implemented. ⚠️ **PostGIS also drops the vertices that collapse together** — `ST_SnapToGrid(LINESTRING(0 0,0.1 0.1,1 1,1.1 1.1), 1)` is `LINESTRING(0 0,1 1)` there against kenro's `LINESTRING(0 0,0 0,1 1,1 1)`, and a fully-collapsing polygon is `POLYGON EMPTY` against kenro's degenerate ring (measured). `ST_RemoveRepeatedPoints` after, for the vertex behavior. 2D only, and 3D input is an error rather than a silent flatten |
+| `ST_FlipCoordinates(geom)` | geometry | ✅ | ✅ | ✅ | The lat/lon-order fix. x and y only: Z/M stay put, and surface collections flip — [3D affine transforms](#3d-affine-transforms) |
+| `ST_ShiftLongitude(geom)` | geometry | ✅ | ❌ | ✅ | x from [-180,180) into [0,360). Z/M and surface collections ride through |
 | `ST_Expand(geom, units)` | geometry / NULL | ✅ | ❌ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for |
 
 ## Measures on a sphere and an ellipsoid
@@ -282,11 +282,31 @@ y' = d·x + e·y + f·z + yoff
 z' = g·x + h·y + i·z + zoff
 ```
 
-⚠️ **The sibling transforms have not moved yet.** `ST_Translate`, `ST_Scale`,
-`ST_Rotate`, `ST_TransScale` and `ST_ReducePrecision` still decode into the 2D
-value, so they still refuse 3D input and surface collections. Only `ST_Affine`
-takes the encoding-level path so far; the others are mechanical to follow and
-have not been done.
+### Which functions take this path
+
+Every function whose whole job is to move coordinates, and no others:
+
+| On the encoding-level path | 2D only, deliberately |
+|---|---|
+| `ST_Affine` (both arities) | `ST_SnapToGrid` |
+| `ST_Translate`, `ST_Scale` | `ST_ReducePrecision` |
+| `ST_Rotate`, `ST_RotateZ` | |
+| `ST_TransScale` | |
+| `ST_FlipCoordinates` | |
+| `ST_ShiftLongitude`, `ST_WrapX` | |
+
+The split is not about effort — it is what PostGIS does. Measured on 3.5, the
+left column all preserve Z and (except `ST_WrapX`) all accept a surface
+collection. The right column **is not coordinate-wise there**: PostGIS drops
+the vertices that collapse onto each other, so
+`ST_SnapToGrid(LINESTRING(0 0,0.1 0.1,1 1,1.1 1.1), 1)` is `LINESTRING(0 0,1 1)`
+and a fully-collapsing polygon is `POLYGON EMPTY`. kenro only rounds. Rewriting
+coordinates in place would have handed those two 3D support while deepening
+that divergence, so they keep to the 2D value — and now **raise an error on 3D
+input instead of silently dropping the Z**, which is what they used to do.
+
+`ST_WrapX` is on the left column but refuses surface collections, matching
+PostGIS's own "Wrapping of PolyhedralSurface geometries is unsupported".
 
 ### `ST_3DExtent`
 
@@ -359,7 +379,7 @@ written. Aliases share their original's implementation and wasm export.
 | `ST_LineFromMultiPoint(multipoint)` | geometry / NULL | ✅ | ❌ | ✅ | The points in order |
 | `ST_LineExtend(line, forward [, backward])` | geometry / NULL | ✅ | ❌ | ❌ | Extends along the end segments; the original vertices survive |
 | `ST_PointInsideCircle(point, cx, cy, radius)` | INTEGER | ✅ | ❌ | ✅ | Planar |
-| `ST_WrapX(geom, wrap, move)` | geometry | ✅ | ❌ | ❌ | ⚠️ kenro shifts **whole vertices**; PostGIS cuts segments that span the meridian. `ST_Segmentize` first if that matters |
+| `ST_WrapX(geom, wrap, move)` | geometry | ✅ | ❌ | ❌ | ⚠️ kenro shifts **whole vertices**; PostGIS cuts segments that span the meridian. `ST_Segmentize` first if that matters. Z/M ride through; a surface collection is an error, as in PostGIS |
 | `ST_MakeBox2D(low, high)` | geometry | ✅ | ❌ | ✅ | ⚠️ POLYGON, not `box2d` (as with `ST_Extent`, `ST_Expand`) |
 | `ST_GeomFromGeoHash(hash [, precision])` | geometry | ✅ | ❌ | ✅ | The cell as a POLYGON, SRID 4326 |
 | `ST_PointFromGeoHash(hash [, precision])` | geometry | ✅ | ❌ | ✅ | Its centre; round-trips with `ST_GeoHash` |
@@ -520,9 +540,9 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
 - **3D geometry operations** — no `ST_3DIntersects`/`ST_3DDistance`, no
   volumes, no SOLID type (which is SFCGAL's, not stock PostGIS's). Surface
-  collections are read and measured, never computed with, and `ST_Affine`
-  moves coordinates without decoding them; the design note behind that split
-  is `tmp/3d-geometry-design.md`.
+  collections are read and measured, never computed with, and the
+  [coordinate transforms](#3d-affine-transforms) move them without decoding
+  them; the design note behind that split is `tmp/3d-geometry-design.md`.
 - **Creating a Z** — no `ST_Force3D`, no `ST_MakePoint(x, y, z)`. Reading,
   measuring and *transforming* 3D input all work on the encoding; raising a
   2D geometry to 3D is the one thing that genuinely needs a 3D value to put

@@ -379,6 +379,18 @@ pub fn st_multi(bytes: &[u8]) -> Result<Vec<u8>> {
 /// `ST_SnapToGrid(geom, size)` / `(geom, sizex, sizey)` — round every
 /// ordinate onto a grid anchored at the origin. A size of 0 leaves that axis
 /// untouched (PostGIS behavior).
+///
+/// ⚠️ **PostGIS also drops the vertices that collapse together**, which kenro
+/// does not. Measured on 3.5:
+/// `ST_SnapToGrid(LINESTRING(0 0,0.1 0.1,1 1,1.1 1.1), 1)` is
+/// `LINESTRING(0 0,1 1)` where kenro answers `LINESTRING(0 0,0 0,1 1,1 1)`,
+/// and a polygon that collapses entirely becomes `POLYGON EMPTY` in PostGIS
+/// against kenro's degenerate ring. Follow with `ST_RemoveRepeatedPoints` for
+/// the vertex behavior.
+///
+/// It is also why this stays on the 2D path while the coordinate transforms
+/// moved to `coords`: it is not coordinate-wise, and PostGIS refuses surface
+/// collections here (`lwgeom_grid_in_place: Unsupported geometry type`).
 pub fn st_snap_to_grid(bytes: &[u8], size_x: f64, size_y: f64) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_SnapToGrid";
     let mut g = geom::decode_auto(bytes)?;
@@ -393,24 +405,32 @@ pub fn st_snap_to_grid(bytes: &[u8], size_x: f64, size_y: f64) -> Result<Vec<u8>
         x: snap(c.x, size_x),
         y: snap(c.y, size_y),
     });
-    out(g.geometry, g.srid, FUNC)
+    // `encode_canonical_gpb` on the decoded value, not `out(g.geometry, …)`:
+    // `out` rebuilds a `Geom` with `has_zm: false`, which turns "kenro refuses
+    // 3D output" into "kenro silently drops the Z". Since this function stays
+    // on the 2D path deliberately, it has to say so rather than flatten.
+    geom::encode_canonical_gpb(&g, FUNC)
 }
 
 /// `ST_FlipCoordinates(geom)` — swap x and y, the fix for lat/lon-ordered data.
+///
+/// Only x and y: Z and M stay where they are, and a surface collection flips.
+/// Measured on PostGIS 3.5 — `ST_FlipCoordinates(POINT Z (1 2 3))` is
+/// `POINT(2 1 3)`, and `POINT M (1 2 99)` gives `POINTM(2 1 99)`.
 pub fn st_flip_coordinates(bytes: &[u8]) -> Result<Vec<u8>> {
-    let mut g = geom::decode_auto(bytes)?;
-    map_coords(&mut g.geometry, &mut |c| Coord { x: c.y, y: c.x });
-    out(g.geometry, g.srid, "ST_FlipCoordinates")
+    crate::coords::map_coords(bytes, &mut |p| std::mem::swap(&mut p.x, &mut p.y))
 }
 
 /// `ST_ShiftLongitude(geom)` — move x from [-180,180) into [0,360).
+///
+/// Z and M ride through, and a surface collection shifts (measured on 3.5:
+/// `ST_ShiftLongitude(POINT Z (-170 2 3))` is `POINT(190 2 3)`).
 pub fn st_shift_longitude(bytes: &[u8]) -> Result<Vec<u8>> {
-    let mut g = geom::decode_auto(bytes)?;
-    map_coords(&mut g.geometry, &mut |c| Coord {
-        x: if c.x < 0.0 { c.x + 360.0 } else { c.x },
-        y: c.y,
-    });
-    out(g.geometry, g.srid, "ST_ShiftLongitude")
+    crate::coords::map_coords(bytes, &mut |p| {
+        if p.x < 0.0 {
+            p.x += 360.0;
+        }
+    })
 }
 
 /// `ST_Expand(geom, units)` — the bounding box grown on every side, as a

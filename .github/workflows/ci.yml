@@ -92,8 +92,13 @@ jobs:
           # tests with it.
           node-version: 24
       # Separate cargo invocations, per the workspace warning in Cargo.toml.
-      - name: Clippy (kenro-wasm, wasm target)
+      # No --features: this is the standard tier. The full tier is covered by
+      # the wasm-pack build below, and minimal gets its own line — the three
+      # tiers docs/wasm.md quotes sizes for are the three that must compile.
+      - name: Clippy (kenro-wasm, standard tier)
         run: cargo clippy -p kenro-wasm --target wasm32-unknown-unknown -- -D warnings
+      - name: Clippy (kenro-wasm, minimal tier)
+        run: cargo clippy -p kenro-wasm --no-default-features --target wasm32-unknown-unknown -- -D warnings
       - name: Manifest consistency (rusqlite registration == manifest)
         run: cargo test --all-features --test manifest_consistency
       - name: Install wasm-pack
@@ -148,6 +153,14 @@ jobs:
       # Separate cargo invocations, per the workspace warning in Cargo.toml.
       - name: Clippy (kenro-abi, wasm target)
         run: cargo clippy -p kenro-abi --features full --target wasm32-wasip1 -- -D warnings
+      # The tiers below `full` had rotted unnoticed: kenro-abi did not compile
+      # at all without `overlay` (a step function outlived its cfg-gated enum
+      # variant). Only `full` is shipped, so a compile check is the right depth
+      # here — the runtime half of the gate is the tier matrix at the end.
+      - name: Clippy (kenro-abi, standard tier)
+        run: cargo clippy -p kenro-abi --target wasm32-wasip1 -- -D warnings
+      - name: Clippy (kenro-abi, minimal tier)
+        run: cargo clippy -p kenro-abi --no-default-features --target wasm32-wasip1 -- -D warnings
       - name: Test (kenro-abi, native)
         run: cargo test -p kenro-abi --features full
       - name: Vet
@@ -165,3 +178,20 @@ jobs:
       - name: Test (freshly built wasm module)
         working-directory: go
         run: go test ./...
+      # A compile check cannot see a *missing export*: the cfg'd-out function
+      # compiles fine, and the module only fails when something calls it. So
+      # build the other two tiers the script offers and register against each.
+      # TestEveryTierRegistersAndRuns uses only functions the manifest lists
+      # unconditionally — the rest of the Go suite legitimately sees stub
+      # errors below `full`, which is why this is a filtered run.
+      #
+      # Runs last: it overwrites the committed artifact, and the steps above
+      # need that artifact intact.
+      - name: Non-full tiers register and run
+        run: |
+          for tier in minimal standard; do
+            echo "::group::$tier tier"
+            scripts/build-go-wasm.sh "$tier"
+            (cd go && go test -run TestEveryTierRegistersAndRuns ./...)
+            echo "::endgroup::"
+          done

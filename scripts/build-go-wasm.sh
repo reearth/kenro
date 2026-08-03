@@ -32,7 +32,11 @@ esac
 rustup target add wasm32-wasip1 >/dev/null 2>&1 || true
 
 echo "building kenro-abi ($TIER) for wasm32-wasip1"
-cargo build -p kenro-abi --release --target wasm32-wasip1 "${FEATURES[@]}"
+# ${FEATURES[@]+…} rather than a bare "${FEATURES[@]}": the standard tier's
+# array is empty, and under `set -u` bash 3.2 (macOS's /bin/bash) calls an
+# empty array expansion an unbound variable. So `build-go-wasm.sh standard`
+# failed there while working fine on CI's bash 5.
+cargo build -p kenro-abi --release --target wasm32-wasip1 ${FEATURES[@]+"${FEATURES[@]}"}
 
 mkdir -p "$(dirname "$OUT")"
 BUILT="target/wasm32-wasip1/release/kenro_abi.wasm"
