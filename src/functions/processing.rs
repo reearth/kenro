@@ -7,7 +7,20 @@ use geo_types::{Geometry, LineString, Point, Polygon};
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
-fn encode(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn encode(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: either PostGIS answers in
+/// 2D here too (measured), or there was no geometry input to carry a Z.
+fn encode_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -42,10 +55,10 @@ pub fn st_convex_hull(bytes: &[u8]) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_ConvexHull";
     let geom = geom::decode_auto(bytes)?;
     if geom::is_empty(&geom.geometry) {
-        return encode(geom.geometry.clone(), geom.srid, FUNC);
+        return encode(geom.geometry.clone(), geom.srid, FUNC, &[bytes]);
     }
     let hull = geom.geometry.convex_hull();
-    encode(collapse_ring_polygon(hull), geom.srid, FUNC)
+    encode(collapse_ring_polygon(hull), geom.srid, FUNC, &[bytes])
 }
 
 /// `ST_PointOnSurface(geom)` — a point guaranteed on the geometry;
@@ -59,7 +72,7 @@ pub fn st_point_on_surface(bytes: &[u8]) -> Result<Vec<u8>> {
         .geometry
         .interior_point()
         .unwrap_or_else(|| Point::new(f64::NAN, f64::NAN));
-    encode(Geometry::Point(point), geom.srid, FUNC)
+    encode_2d(Geometry::Point(point), geom.srid, FUNC)
 }
 
 /// `ST_SimplifyVW(geom, tolerance)` — Visvalingam-Whyatt; the tolerance is
@@ -81,7 +94,12 @@ pub fn st_simplify_vw(bytes: &[u8], tolerance: f64) -> Result<Vec<u8>> {
             other => other.clone(),
         }
     }
-    encode(simplify(&geom.geometry, tolerance), geom.srid, FUNC)
+    encode(
+        simplify(&geom.geometry, tolerance),
+        geom.srid,
+        FUNC,
+        &[bytes],
+    )
 }
 
 /// `ST_ChaikinSmoothing(geom [, nIterations])` — PostGIS caps iterations
@@ -169,7 +187,7 @@ pub fn st_chaikin_smoothing(bytes: &[u8], iterations: i64) -> Result<Vec<u8>> {
     }
     let geom = geom::decode_auto(bytes)?;
     let smoothed = smooth(&geom.geometry, iterations);
-    encode(smoothed, geom.srid, FUNC)
+    encode(smoothed, geom.srid, FUNC, &[bytes])
 }
 
 /// `ST_RemoveRepeatedPoints(geom)` — exact consecutive-duplicate removal
@@ -179,7 +197,7 @@ pub fn st_remove_repeated_points(bytes: &[u8]) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_RemoveRepeatedPoints";
     let geom = geom::decode_auto(bytes)?;
     let cleaned = geom.geometry.remove_repeated_points();
-    encode(cleaned, geom.srid, FUNC)
+    encode(cleaned, geom.srid, FUNC, &[bytes])
 }
 
 /// `ST_OrientedEnvelope(geom)` — minimum rotated rectangle; degenerates to
@@ -190,15 +208,15 @@ pub fn st_oriented_envelope(bytes: &[u8]) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_OrientedEnvelope";
     let geom = geom::decode_auto(bytes)?;
     if geom::is_empty(&geom.geometry) {
-        return encode(geom.geometry.clone(), geom.srid, FUNC);
+        return encode_2d(geom.geometry.clone(), geom.srid, FUNC);
     }
     match MinimumRotatedRect::minimum_rotated_rect(&geom.geometry) {
-        Some(rect) => encode(collapse_ring_polygon(rect), geom.srid, FUNC),
+        Some(rect) => encode_2d(collapse_ring_polygon(rect), geom.srid, FUNC),
         None => {
             // Degenerate input (single point, collinear): fall back to the
             // axis-aligned collapse, which is exact for those cases.
             let hull = geom.geometry.convex_hull();
-            encode(collapse_ring_polygon(hull), geom.srid, FUNC)
+            encode_2d(collapse_ring_polygon(hull), geom.srid, FUNC)
         }
     }
 }

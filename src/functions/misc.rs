@@ -10,7 +10,20 @@ use geo_types::{Coord, Geometry, LineString, MultiLineString, Point, Polygon};
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: PostGIS answers in 2D here
+/// too (measured), so there is no Z to preserve and nothing to refuse.
+fn out_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -39,6 +52,7 @@ pub fn st_line_from_multipoint(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
         Geometry::LineString(LineString::new(mp.iter().map(|p| p.0).collect())),
         g.srid,
         "ST_LineFromMultiPoint",
+        &[bytes],
     )
     .map(Some)
 }
@@ -60,7 +74,7 @@ pub fn st_line_extend(bytes: &[u8], forward: f64, backward: f64) -> Result<Optio
     };
     let mut coords = line.0.clone();
     if coords.len() < 2 {
-        return out(g.geometry.clone(), g.srid, FUNC).map(Some);
+        return out(g.geometry.clone(), g.srid, FUNC, &[bytes]).map(Some);
     }
     if backward > 0.0 {
         let (a, b) = (coords[1], coords[0]);
@@ -75,7 +89,13 @@ pub fn st_line_extend(bytes: &[u8], forward: f64, backward: f64) -> Result<Optio
             coords.push(p);
         }
     }
-    out(Geometry::LineString(LineString::new(coords)), g.srid, FUNC).map(Some)
+    out(
+        Geometry::LineString(LineString::new(coords)),
+        g.srid,
+        FUNC,
+        &[bytes],
+    )
+    .map(Some)
 }
 
 /// A point `distance` beyond `tip`, continuing away from `from`.
@@ -144,7 +164,7 @@ pub fn st_make_box_2d(low: &[u8], high: &[u8]) -> Result<Vec<u8>> {
         });
     };
     let srid = if a.srid > 0 { a.srid } else { b.srid };
-    out(rect(p1.x(), p1.y(), p2.x(), p2.y()), srid, FUNC)
+    out_2d(rect(p1.x(), p1.y(), p2.x(), p2.y()), srid, FUNC)
 }
 
 fn rect(minx: f64, miny: f64, maxx: f64, maxy: f64) -> Geometry<f64> {
@@ -174,13 +194,13 @@ fn rect(minx: f64, miny: f64, maxx: f64, maxy: f64) -> Geometry<f64> {
 /// POLYGON. `ST_Box2dFromGeoHash` is the same function in PostGIS.
 pub fn st_geom_from_geohash(hash: &str, precision: Option<i64>) -> Result<Vec<u8>> {
     let (minx, miny, maxx, maxy) = decode_geohash(hash, precision)?;
-    out(rect(minx, miny, maxx, maxy), 4326, "ST_GeomFromGeoHash")
+    out_2d(rect(minx, miny, maxx, maxy), 4326, "ST_GeomFromGeoHash")
 }
 
 /// `ST_PointFromGeoHash(hash [, precision])` — the centre of that cell.
 pub fn st_point_from_geohash(hash: &str, precision: Option<i64>) -> Result<Vec<u8>> {
     let (minx, miny, maxx, maxy) = decode_geohash(hash, precision)?;
-    out(
+    out_2d(
         Geometry::Point(Point::new((minx + maxx) / 2.0, (miny + maxy) / 2.0)),
         4326,
         "ST_PointFromGeoHash",
@@ -273,7 +293,13 @@ pub fn st_geometric_median(bytes: &[u8], tolerance: Option<f64>) -> Result<Optio
             break;
         }
     }
-    out(Geometry::Point(Point::from(current)), g.srid, FUNC).map(Some)
+    out(
+        Geometry::Point(Point::from(current)),
+        g.srid,
+        FUNC,
+        &[bytes],
+    )
+    .map(Some)
 }
 
 /// `ST_LineCrossingDirection(a, b)` — how line `b` crosses line `a`, in
@@ -416,7 +442,7 @@ pub fn st_normalize(bytes: &[u8]) -> Result<Vec<u8>> {
         _ => {}
     }
     let _ = MultiLineString::<f64>::new(vec![]); // keep the import honest
-    out(og.geometry, g.srid, FUNC)
+    out(og.geometry, g.srid, FUNC, &[bytes])
 }
 
 #[cfg(test)]

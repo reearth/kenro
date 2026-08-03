@@ -17,7 +17,20 @@ use geo_types::{Coord, Geometry, LineString, MultiLineString, MultiPoint, Point,
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: PostGIS answers in 2D here
+/// too (measured), so there is no Z to preserve and nothing to refuse.
+fn out_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -52,6 +65,7 @@ pub fn st_exterior_ring(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
         Geometry::LineString(poly.exterior().clone()),
         g.srid,
         "ST_ExteriorRing",
+        &[bytes],
     )
     .map(Some)
 }
@@ -73,6 +87,7 @@ pub fn st_interior_ring_n(bytes: &[u8], n: i64) -> Result<Option<Vec<u8>>> {
         Geometry::LineString(ring.clone()),
         g.srid,
         "ST_InteriorRingN",
+        &[bytes],
     )
     .map(Some)
 }
@@ -149,7 +164,7 @@ pub fn st_boundary(bytes: &[u8]) -> Result<Vec<u8>> {
             });
         }
     };
-    out(boundary, g.srid, FUNC)
+    out(boundary, g.srid, FUNC, &[bytes])
 }
 
 /// The two endpoints of an open line; none at all when it is closed.
@@ -229,6 +244,7 @@ pub fn st_add_point(line: &[u8], point: &[u8], position: Option<i64>) -> Result<
         Geometry::LineString(LineString::new(coords)),
         g.srid,
         "ST_AddPoint",
+        &[line, point],
     )
     .map(Some)
 }
@@ -248,6 +264,7 @@ pub fn st_set_point(line: &[u8], index: i64, point: &[u8]) -> Result<Option<Vec<
         Geometry::LineString(LineString::new(coords)),
         g.srid,
         "ST_SetPoint",
+        &[line, point],
     )
     .map(Some)
 }
@@ -268,6 +285,7 @@ pub fn st_remove_point(line: &[u8], index: i64) -> Result<Option<Vec<u8>>> {
         Geometry::LineString(LineString::new(coords)),
         g.srid,
         "ST_RemovePoint",
+        &[line],
     )
     .map(Some)
 }
@@ -328,7 +346,12 @@ pub fn st_make_line(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
         }
     }
     let srid = if ga.srid > 0 { ga.srid } else { gb.srid };
-    out(Geometry::LineString(LineString::new(coords)), srid, FUNC)
+    out(
+        Geometry::LineString(LineString::new(coords)),
+        srid,
+        FUNC,
+        &[a, b],
+    )
 }
 
 /// `ST_MakePolygon(linestring)` — the shell must be closed, as in PostGIS.
@@ -351,6 +374,7 @@ pub fn st_make_polygon(bytes: &[u8]) -> Result<Vec<u8>> {
         Geometry::Polygon(Polygon::new(line.clone(), vec![])),
         g.srid,
         FUNC,
+        &[bytes],
     )
 }
 
@@ -373,7 +397,7 @@ pub fn st_multi(bytes: &[u8]) -> Result<Vec<u8>> {
             });
         }
     };
-    out(multi, g.srid, FUNC)
+    out(multi, g.srid, FUNC, &[bytes])
 }
 
 /// `ST_SnapToGrid(geom, size)` / `(geom, sizex, sizey)` — round every
@@ -451,7 +475,7 @@ pub fn st_expand(bytes: &[u8], units: f64) -> Result<Option<Vec<u8>>> {
         Coord { x: maxx, y: miny },
         Coord { x: minx, y: miny },
     ]);
-    out(Geometry::Polygon(Polygon::new(ring, vec![])), g.srid, FUNC).map(Some)
+    out_2d(Geometry::Polygon(Polygon::new(ring, vec![])), g.srid, FUNC).map(Some)
 }
 
 /// Apply `f` to every coordinate in place, without pulling geo's MapCoords
@@ -547,7 +571,7 @@ fn orient(
         // Non-areal input passes through, as in PostGIS.
         other => other,
     };
-    out(oriented, g.srid, func)
+    out(oriented, g.srid, func, &[bytes])
 }
 
 /// `ST_IsPolygonCW(geom)` — true when every exterior ring is clockwise (and

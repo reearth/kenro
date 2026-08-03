@@ -16,7 +16,20 @@ use geo_types::{Coord, Geometry, LineString, MultiPoint, Point};
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: PostGIS answers in 2D here
+/// too (measured), so there is no Z to preserve and nothing to refuse.
+fn out_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -280,7 +293,13 @@ pub fn st_line_interpolate_points(bytes: &[u8], fraction: f64) -> Result<Option<
         }
         t += fraction;
     }
-    out(Geometry::MultiPoint(MultiPoint::new(points)), g.srid, FUNC).map(Some)
+    out(
+        Geometry::MultiPoint(MultiPoint::new(points)),
+        g.srid,
+        FUNC,
+        &[bytes],
+    )
+    .map(Some)
 }
 
 fn interpolate(line: &LineString<f64>, t: f64) -> Option<Coord<f64>> {
@@ -322,6 +341,7 @@ pub fn st_points(bytes: &[u8]) -> Result<Vec<u8>> {
         Geometry::MultiPoint(MultiPoint::new(points)),
         g.srid,
         "ST_Points",
+        &[bytes],
     )
 }
 
@@ -333,7 +353,7 @@ pub fn st_bounding_diagonal(bytes: &[u8]) -> Result<Option<Vec<u8>>> {
     let Some(env) = geom::envelope(&g.geometry) else {
         return Ok(None);
     };
-    out(
+    out_2d(
         Geometry::LineString(LineString::new(vec![
             Coord {
                 x: env.min_x,
@@ -490,7 +510,7 @@ impl ExtentAggregate {
             Coord { x: maxx, y: miny },
             Coord { x: minx, y: miny },
         ]);
-        out(
+        out_2d(
             Geometry::Polygon(geo_types::Polygon::new(ring, vec![])),
             self.srid.unwrap_or(0),
             "ST_Extent",

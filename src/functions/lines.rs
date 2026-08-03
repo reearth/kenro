@@ -32,17 +32,17 @@ use geo_types::MultiPolygon;
 use geo_types::{Coord, Geometry, Line, LineString, MultiLineString, Polygon};
 
 use crate::error::{Error, Result};
-use crate::geom::{self, Geom};
+use crate::geom;
 
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry,
-            srid,
-            has_zm: false,
-        },
-        func,
-    )
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
 }
 
 /// Coordinates are compared by bit pattern, not by epsilon.
@@ -241,7 +241,7 @@ fn line_merge(bytes: &[u8], directed: bool) -> Result<Vec<u8>> {
             merged.into_iter().map(LineString::new).collect(),
         )),
     };
-    out(geometry, g.srid, FUNC)
+    out(geometry, g.srid, FUNC, &[bytes])
 }
 
 /// Join the parts at every node where exactly two line ends meet.
@@ -384,7 +384,7 @@ pub fn st_split(input: &[u8], blade: &[u8]) -> Result<Vec<u8>> {
             });
         }
     };
-    out(geometry, g.srid, FUNC)
+    out(geometry, g.srid, FUNC, &[input, blade])
 }
 
 #[cfg(feature = "overlay")]

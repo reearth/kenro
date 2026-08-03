@@ -308,6 +308,56 @@ input instead of silently dropping the Z**, which is what they used to do.
 `ST_WrapX` is on the left column but refuses surface collections, matching
 PostGIS's own "Wrapping of PolyhedralSurface geometries is unsupported".
 
+## Derived geometries and the Z
+
+A coordinate transform is not the only thing that can keep a height. Anything
+whose output coordinates *came from* its input's — `ST_Reverse`,
+`ST_ExteriorRing`, `ST_Simplify`, `ST_ConvexHull` — could carry the Z along too,
+and PostGIS does. kenro now does as well, and the rule is decided **per call
+from the data** rather than from a list of function names:
+
+1. No input carried a Z → nothing changes, and nothing costs.
+2. Every coordinate of the result was a vertex of some input → the result is
+   written with those heights.
+3. Some coordinate was **invented** — a segment midpoint, an intersection, a
+   buffer arc — and there is no honest Z for it → **error**, naming
+   `ST_Force2D`.
+
+That third case is the point. PostGIS interpolates a Z there; kenro cannot, and
+the alternative it used to take was to return a 2D geometry without saying so.
+`UPDATE buildings SET geom = ST_AsGPB(ST_Simplify(ST_GeomFromGPB(geom), 0.1))`
+would flatten a whole table in silence. It now either keeps the heights or
+refuses.
+
+Deciding from the data also gets cases a hand-written list would have got
+wrong: `ST_ConvexHull`'s output vertices *are* input vertices, so its Z
+survives, while `ST_Segmentize`'s midpoints cannot — and the same
+`ST_Intersection` call refuses or succeeds depending on whether the operands
+actually cross.
+
+| | |
+|---|---|
+| **Keeps the Z** (output reuses input vertices) | `ST_StartPoint` `ST_EndPoint` `ST_PointN` `ST_GeometryN` `ST_ExteriorRing` `ST_InteriorRingN` `ST_Boundary` `ST_Multi` `ST_Normalize` `ST_Reverse` `ST_ForcePolygonCW` `ST_ForcePolygonCCW` `ST_ForceRHR` `ST_AddPoint` `ST_SetPoint` `ST_RemovePoint` `ST_MakePolygon` `ST_MakeLine` `ST_LineFromMultiPoint` `ST_Points` `ST_RemoveRepeatedPoints` `ST_Simplify` `ST_SimplifyVW` `ST_ConvexHull` `ST_ConcaveHull` `ST_DelaunayTriangles` `ST_TriangulatePolygon` `ST_LineMerge` `ST_UnaryUnion` `ST_Subdivide` `ST_Split` `ST_MakeValid` `ST_Intersection` `ST_Difference` `ST_SymDifference` `ST_Union` — *when* the operation happens not to invent a vertex |
+| **Refuses on 3D input** (the Z would have to be invented) | the same overlay and interpolation functions when they do: `ST_Segmentize` `ST_ChaikinSmoothing` `ST_LineSubstring` `ST_LineInterpolatePoint` `ST_LineInterpolatePoints` `ST_LineExtend` `ST_GeometricMedian`, the `ST_Union` **aggregate**, and any crossing overlay |
+| **2D on purpose** (PostGIS answers 2D too — measured) | `ST_Centroid` `ST_PointOnSurface` `ST_Envelope` `ST_OrientedEnvelope` `ST_MinimumBoundingCircle` `ST_ClosestPoint` `ST_ShortestLine` `ST_LongestLine` `ST_Buffer` `ST_ClipByBox2D` `ST_AsMVTGeom` `ST_Force2D` |
+| **2D on purpose** (a bounding box, whose corners are not input vertices) | `ST_Expand` `ST_BoundingDiagonal` `ST_MakeBox2D` `ST_Extent` |
+
+Two details worth knowing:
+
+- **A bounding box never borrows a neighbour's Z.** `ST_BoundingDiagonal` of a
+  polygon whose (10 10) corner sits at z = 3 ends at that x and y but needs the
+  box's zmax, 4. Answering 3 would be confidently wrong, so every box-shaped
+  result stays 2D. ⚠️ PostGIS returns 3D for `ST_Expand` and
+  `ST_BoundingDiagonal`; kenro's answer is 2D there.
+- **Two heights at one plan position are ambiguous.** A vertical wall gives the
+  same (x, y) two Z values, and there is no way to pick. Those coordinates
+  count as "no honest Z", so the function refuses rather than choosing.
+
+`ST_Project` is the one exception that asserts a Z for a coordinate no input
+occupied: sliding a point along the ground does not change its elevation, which
+is what PostGIS does too. `ST_Transform` still refuses 3D input — it is
+coordinate-wise and could join the list above, and has not yet.
+
 ### `ST_3DExtent`
 
 ⚠️ PostGIS returns its `box3d` type. SQLite has no such type, and kenro cannot
@@ -409,12 +459,14 @@ Z survives; `ST_GeomFromWKB` does **not**, because it re-encodes.
 | `ST_ZMin(geom)` / `ST_ZMax(geom)` | REAL / NULL | ✅ | ❌ | ✅ | ⚠️ a 2D geometry answers **0**, not NULL — PostGIS derives these from a bbox whose Z slot is zero, and `WHERE ST_ZMax(g) > 100` should behave the same on both. NULL only for an empty geometry |
 
 Everything else stays planar on 3D input: the R-tree columns, every
-predicate, every measure. Two things reach past reporting without needing a
+predicate, every measure. Three things reach past reporting without needing a
 3D geometry model, each in its own section — surface collections are
-[read and measured](#surface-collections-polyhedralsurface-tin-triangle), and
-[`ST_Affine`](#3d-affine-transforms) rewrites Z in place. What is still *not*
-here is 3D geometry: no `ST_3DDistance`, no volumes, no 3D predicates, and no
-way to *create* a Z that was not already in the input.
+[read and measured](#surface-collections-polyhedralsurface-tin-triangle), the
+[coordinate transforms](#3d-affine-transforms) rewrite Z in place, and a
+[derived geometry](#derived-geometries-and-the-z) keeps the heights of the
+vertices it reused. What is still *not* here is 3D geometry: no
+`ST_3DDistance`, no volumes, no 3D predicates, and no way to *create* a Z that
+was not already in the input.
 
 ## GML 2/3 I/O
 
@@ -543,10 +595,11 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   collections are read and measured, never computed with, and the
   [coordinate transforms](#3d-affine-transforms) move them without decoding
   them; the design note behind that split is `tmp/3d-geometry-design.md`.
-- **Creating a Z** — no `ST_Force3D`, no `ST_MakePoint(x, y, z)`. Reading,
-  measuring and *transforming* 3D input all work on the encoding; raising a
-  2D geometry to 3D is the one thing that genuinely needs a 3D value to put
-  the result in.
+- **Creating a Z** — no `ST_Force3D`, no `ST_MakePoint(x, y, z)`, and no
+  interpolating one for a vertex the input did not have (see
+  [derived geometries](#derived-geometries-and-the-z)). Reading, measuring,
+  transforming and *carrying* a Z all work on the encoding; inventing a height
+  is the line, and PostGIS's interpolation is on the other side of it.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,

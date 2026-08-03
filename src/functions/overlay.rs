@@ -55,7 +55,20 @@ fn decode_operands(func: &'static str, a: &[u8], b: &[u8]) -> Result<(Geom, Geom
     Ok((ga, gb, ca, cb))
 }
 
-fn encode(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn encode(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: either PostGIS answers in
+/// 2D here too (measured), or there was no geometry input to carry a Z.
+fn encode_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -111,7 +124,7 @@ pub fn st_intersection(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     };
-    encode(result, ga.srid.max(gb.srid), FUNC)
+    encode(result, ga.srid.max(gb.srid), FUNC, &[a, b])
 }
 
 /// `ST_Difference(a, b)` — "a minus b".
@@ -139,7 +152,7 @@ pub fn st_difference(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     };
-    encode(result, ga.srid.max(gb.srid), FUNC)
+    encode(result, ga.srid.max(gb.srid), FUNC, &[a, b])
 }
 
 /// `ST_SymDifference(a, b)` — areal × areal via xor; puntal × puntal via
@@ -166,7 +179,7 @@ pub fn st_sym_difference(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     };
-    encode(result, ga.srid.max(gb.srid), FUNC)
+    encode(result, ga.srid.max(gb.srid), FUNC, &[a, b])
 }
 
 /// `ST_Union(a, b)` — scalar form. Areal × areal and puntal × puntal only;
@@ -200,7 +213,7 @@ pub fn st_union(a: &[u8], b: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     };
-    encode(result, ga.srid.max(gb.srid), FUNC)
+    encode(result, ga.srid.max(gb.srid), FUNC, &[a, b])
 }
 
 /// `ST_MakeValid(geom)` — pure-Rust polygon repair with GEOS's *structure*
@@ -221,10 +234,10 @@ pub fn st_make_valid(bytes: &[u8]) -> Result<Vec<u8>> {
     let class = classify(FUNC, &g.geometry)?;
     ensure_finite(FUNC, &g.geometry)?;
     if geom::is_empty(&g.geometry) || class != Class::Areal || g.geometry.is_valid() {
-        return encode(g.geometry, g.srid, FUNC);
+        return encode(g.geometry, g.srid, FUNC, &[bytes]);
     }
     let repaired = repair_multi_polygon(to_multi_polygon(&g.geometry));
-    encode(normalize_polygons(repaired), g.srid, FUNC)
+    encode(normalize_polygons(repaired), g.srid, FUNC, &[bytes])
 }
 
 /// The areal repair core (also used by the MVT pipeline in `full` builds):
@@ -272,6 +285,12 @@ pub struct UnionAggregate {
     polygons: Vec<Polygon<f64>>,
     points: Vec<Point<f64>>,
     seen_any: bool,
+    /// Any stepped row carried a Z. The accumulator holds `geo_types`
+    /// polygons, so that Z is already gone by the time `finish` runs — but a
+    /// union invents vertices at every crossing anyway, so there would be no
+    /// honest Z to write even if it were kept. Recorded here so `finish` can
+    /// refuse rather than hand back a silently flattened result.
+    saw_z: bool,
 }
 
 impl UnionAggregate {
@@ -282,6 +301,7 @@ impl UnionAggregate {
     pub fn step(&mut self, bytes: &[u8]) -> Result<()> {
         const FUNC: &str = "ST_Union";
         let geom = geom::decode_auto(bytes)?;
+        self.saw_z |= geom.has_zm;
         ensure_finite(FUNC, &geom.geometry)?;
         if let Some(existing) = self.srid {
             if existing > 0 && geom.srid > 0 && existing != geom.srid {
@@ -344,6 +364,18 @@ impl UnionAggregate {
         if !self.seen_any {
             return Ok(None);
         }
+        // A union places vertices where its inputs cross, and kenro has no way
+        // to interpolate a height for them. PostGIS does, and answers in 3D; so
+        // say so rather than return a silently flattened polygon.
+        if self.saw_z {
+            return Err(Error::Unsupported {
+                func: FUNC,
+                reason: "3D input: a union invents vertices at every crossing and \
+                         kenro cannot interpolate a Z for them; wrap the column in \
+                         ST_Force2D if a 2D union is what you want"
+                    .into(),
+            });
+        }
         let srid = self.srid.unwrap_or(0);
         let geometry = if !self.polygons.is_empty() {
             // unary_union requires consistent winding across inputs; kenro
@@ -357,7 +389,7 @@ impl UnionAggregate {
         } else {
             normalize_points(self.points)
         };
-        Some(encode(geometry, srid, FUNC)).transpose()
+        Some(encode_2d(geometry, srid, FUNC)).transpose()
     }
 }
 
@@ -504,7 +536,7 @@ pub fn st_buffer(bytes: &[u8], distance: f64, options_text: Option<&str>) -> Res
             JoinStyle::Bevel => LineJoin::Bevel,
         });
     let buffered = geom.geometry.buffer_with_style(style);
-    encode(normalize_polygons(buffered), geom.srid, FUNC)
+    encode_2d(normalize_polygons(buffered), geom.srid, FUNC)
 }
 
 /// `ST_UnaryUnion(geom)` — dissolve a geometry against itself, merging the
@@ -523,14 +555,7 @@ pub fn st_unary_union(bytes: &[u8]) -> Result<Vec<u8>> {
         Geometry::MultiPolygon(mp) => normalize_polygons(geo::unary_union(mp.iter())),
         other => other.clone(),
     };
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry: dissolved,
-            srid: g.srid,
-            has_zm: false,
-        },
-        FUNC,
-    )
+    geom::encode_derived(dissolved, g.srid, FUNC, &[bytes])
 }
 
 /// `ST_ClipByBox2D(geom, box)` — the part of `geom` inside the box, which is
@@ -558,6 +583,9 @@ pub fn st_clip_by_box_2d(bytes: &[u8], box_geom: &[u8]) -> Result<Vec<u8>> {
         });
     };
     let rect = envelope_polygon(&env);
+    // 2D on purpose: PostGIS answers 2D here too (measured), the name says so,
+    // and the clip edges are box edges rather than input vertices. Flattening
+    // both operands is what lets the shared ST_Intersection path stay 3D-strict.
     st_intersection(
         &geom::encode_canonical_gpb(
             &Geom {
@@ -614,26 +642,17 @@ pub fn st_subdivide(bytes: &[u8], max_vertices: i64) -> Result<Vec<u8>> {
         Geometry::MultiPolygon(mp) => mp.0.clone(),
         // Non-areal input is returned unchanged, as PostGIS does for points.
         other => {
-            return geom::encode_canonical_gpb(
-                &Geom {
-                    geometry: other.clone(),
-                    srid: g.srid,
-                    has_zm: false,
-                },
-                FUNC,
-            );
+            return geom::encode_derived(other.clone(), g.srid, FUNC, &[bytes]);
         }
     };
     for polygon in input {
         subdivide_into(&polygon, max_vertices as usize, 0, &mut parts);
     }
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry: Geometry::MultiPolygon(MultiPolygon::new(parts)),
-            srid: g.srid,
-            has_zm: false,
-        },
+    geom::encode_derived(
+        Geometry::MultiPolygon(MultiPolygon::new(parts)),
+        g.srid,
         FUNC,
+        &[bytes],
     )
 }
 

@@ -8,7 +8,20 @@ use geo_types::{Coord, Geometry, LineString, Point};
 use crate::error::{Error, Result};
 use crate::geom::{self, Geom};
 
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: PostGIS answers in 2D here
+/// too (measured), so there is no Z to preserve and nothing to refuse.
+fn out_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -43,7 +56,7 @@ pub fn st_segmentize(bytes: &[u8], max_length: f64) -> Result<Vec<u8>> {
         // Puntal input has no segments to split.
         other => other.clone(),
     };
-    out(dense, g.srid, FUNC)
+    out(dense, g.srid, FUNC, &[bytes])
 }
 
 /// `ST_LineSubstring(line, from, to)` — the piece between two fractions of
@@ -62,7 +75,7 @@ pub fn st_line_substring(bytes: &[u8], from: f64, to: f64) -> Result<Option<Vec<
     };
     let total = line_length(line);
     if total == 0.0 {
-        return out(g.geometry.clone(), g.srid, FUNC).map(Some);
+        return out(g.geometry.clone(), g.srid, FUNC, &[bytes]).map(Some);
     }
     let (start, end) = (total * from, total * to);
 
@@ -90,9 +103,21 @@ pub fn st_line_substring(bytes: &[u8], from: f64, to: f64) -> Result<Option<Vec<
     }
     if coords.len() == 1 {
         // A zero-length request collapses to a point, as in PostGIS.
-        return out(Geometry::Point(Point::from(coords[0])), g.srid, FUNC).map(Some);
+        return out(
+            Geometry::Point(Point::from(coords[0])),
+            g.srid,
+            FUNC,
+            &[bytes],
+        )
+        .map(Some);
     }
-    out(Geometry::LineString(LineString::new(coords)), g.srid, FUNC).map(Some)
+    out(
+        Geometry::LineString(LineString::new(coords)),
+        g.srid,
+        FUNC,
+        &[bytes],
+    )
+    .map(Some)
 }
 
 fn lerp(a: Coord<f64>, b: Coord<f64>, t: f64) -> Coord<f64> {
@@ -131,7 +156,7 @@ pub fn st_shortest_line(a: &[u8], b: &[u8]) -> Result<Option<Vec<u8>>> {
     let Some((from, to)) = closest_pair(&ga.geometry, &gb.geometry) else {
         return Ok(None);
     };
-    out(
+    out_2d(
         Geometry::LineString(LineString::new(vec![from, to])),
         srid_of(&ga, &gb),
         FUNC,
@@ -147,7 +172,7 @@ pub fn st_longest_line(a: &[u8], b: &[u8]) -> Result<Option<Vec<u8>>> {
     let Some((from, to)) = farthest_pair(&ga.geometry, &gb.geometry) else {
         return Ok(None);
     };
-    out(
+    out_2d(
         Geometry::LineString(LineString::new(vec![from, to])),
         srid_of(&ga, &gb),
         FUNC,
@@ -290,7 +315,7 @@ pub fn st_minimum_bounding_circle(bytes: &[u8], segs_per_quarter: i64) -> Result
         return Ok(None);
     };
     if radius == 0.0 {
-        return out(Geometry::Point(Point::from(centre)), g.srid, FUNC).map(Some);
+        return out_2d(Geometry::Point(Point::from(centre)), g.srid, FUNC).map(Some);
     }
     let steps = (segs_per_quarter * 4) as usize;
     let mut ring: Vec<Coord<f64>> = (0..steps)
@@ -303,7 +328,7 @@ pub fn st_minimum_bounding_circle(bytes: &[u8], segs_per_quarter: i64) -> Result
         })
         .collect();
     ring.push(ring[0]);
-    out(
+    out_2d(
         Geometry::Polygon(geo_types::Polygon::new(LineString::new(ring), vec![])),
         g.srid,
         FUNC,

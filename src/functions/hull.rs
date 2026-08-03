@@ -13,18 +13,18 @@ use geo_types::Geometry;
 
 #[allow(unused_imports)]
 use crate::error::{Error, Result};
-use crate::geom::{self, Geom};
+use crate::geom;
 
 #[allow(dead_code)]
-fn out(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry,
-            srid,
-            has_zm: false,
-        },
-        func,
-    )
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn out(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
 }
 
 /// `ST_ConcaveHull(geom, target_percent)` — a hull whose area is the given
@@ -56,7 +56,7 @@ pub fn st_concave_hull(bytes: &[u8], target_percent: f64) -> Result<Vec<u8>> {
     let convex = convex_hull_of(&g.geometry, FUNC)?;
     let convex_area = convex.unsigned_area();
     if target_percent >= 1.0 || convex_area == 0.0 {
-        return out(Geometry::Polygon(convex), g.srid, FUNC);
+        return out(Geometry::Polygon(convex), g.srid, FUNC, &[bytes]);
     }
 
     let target_area = convex_area * target_percent;
@@ -78,7 +78,7 @@ pub fn st_concave_hull(bytes: &[u8], target_percent: f64) -> Result<Vec<u8>> {
             break;
         }
     }
-    out(Geometry::Polygon(best), g.srid, FUNC)
+    out(Geometry::Polygon(best), g.srid, FUNC, &[bytes])
 }
 
 #[cfg(feature = "concave-hull")]
@@ -161,6 +161,7 @@ pub fn st_delaunay_triangles(bytes: &[u8]) -> Result<Vec<u8>> {
         Geometry::MultiPolygon(geo_types::MultiPolygon::new(polygons)),
         g.srid,
         FUNC,
+        &[bytes],
     )
 }
 
@@ -209,6 +210,7 @@ pub fn st_triangulate_polygon(bytes: &[u8]) -> Result<Vec<u8>> {
         )),
         g.srid,
         FUNC,
+        &[bytes],
     )
 }
 

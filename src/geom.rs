@@ -398,6 +398,64 @@ pub fn encode_storage_gpb(geom: &Geom, func: &'static str) -> Result<Vec<u8>> {
     ))
 }
 
+/// Encode a geometry a function *derived* from one or more input geometries,
+/// restoring Z from those inputs.
+///
+/// This is the one entry point for "I computed something from a geometry and
+/// now have to write it back", and it exists because the obvious spelling was
+/// wrong for years: six modules had a private helper that built a [`Geom`] with
+/// `has_zm: false`, which is the only field [`reject_zm`] consults. A 3D input
+/// was therefore **silently flattened** rather than refused — the exact loss
+/// `has_zm` was added to prevent.
+///
+/// The rule here comes from the data, not from a list of function names:
+///
+/// - No input carried a Z → plain 2D encode, nothing changes, nothing costs.
+/// - Every coordinate of the result was a vertex of some input → the result is
+///   written **with those Z values**. `ST_Reverse`, `ST_ExteriorRing`,
+///   `ST_Simplify`, `ST_ConvexHull` and friends land here, and PostGIS agrees:
+///   measured on 3.5, all of them return 3D with the original heights.
+/// - The result contains a coordinate no input had → the computation invented
+///   it (a segment midpoint, an intersection, a buffer arc), there is no honest
+///   Z for it, and this **errors** naming `ST_Force2D`. PostGIS interpolates
+///   instead; kenro cannot, so it says so. `ST_Segmentize`, `ST_Union` and
+///   `ST_Buffer` land here.
+///
+/// Functions whose answer is genuinely 2D even in PostGIS — `ST_Centroid`,
+/// `ST_Envelope`, `ST_Buffer`, `ST_AsMVTGeom`, … — must **not** call this.
+/// They keep encoding 2D, and say in a comment that it was measured.
+pub fn encode_derived(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    let index = crate::coords::z_index(sources)?;
+    let Some(index) = index else {
+        return encode_canonical_gpb(
+            &Geom {
+                geometry,
+                srid,
+                has_zm: false,
+            },
+            func,
+        );
+    };
+    // An empty result has no coordinates, so it has no Z to lose either.
+    if is_empty(&geometry) {
+        return encode_canonical_gpb(
+            &Geom {
+                geometry,
+                srid,
+                has_zm: false,
+            },
+            func,
+        );
+    }
+    let wkb = crate::coords::write_wkb_z(&geometry, &index, func)?;
+    Ok(gpb::write_gpb(&wkb, srid, None, false))
+}
+
 /// Empty test covering the `POINT EMPTY` NaN-coordinate convention, which
 /// `geo::HasDimensions` cannot see (a `geo_types` point is never "empty").
 pub fn is_empty(g: &Geometry<f64>) -> bool {

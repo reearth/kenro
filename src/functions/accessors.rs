@@ -114,16 +114,7 @@ pub fn st_geometry_n(bytes: &[u8], n: i64) -> Result<Option<Vec<u8>>> {
         single => (idx == 0 && !geom::is_empty(single)).then(|| single.clone()),
     };
     element
-        .map(|geometry| {
-            geom::encode_canonical_gpb(
-                &Geom {
-                    geometry,
-                    srid: geom.srid,
-                    has_zm: false,
-                },
-                "ST_GeometryN",
-            )
-        })
+        .map(|geometry| geom::encode_derived(geometry, geom.srid, "ST_GeometryN", &[bytes]))
         .transpose()
 }
 
@@ -159,16 +150,7 @@ fn line_endpoint(bytes: &[u8], func: &'static str, end: bool) -> Result<Option<V
         _ => None,
     };
     coord
-        .map(|c| {
-            geom::encode_canonical_gpb(
-                &Geom {
-                    geometry: Geometry::Point(Point::from(c)),
-                    srid: geom.srid,
-                    has_zm: false,
-                },
-                func,
-            )
-        })
+        .map(|c| geom::encode_derived(Geometry::Point(Point::from(c)), geom.srid, func, &[bytes]))
         .transpose()
 }
 
@@ -186,13 +168,11 @@ pub fn st_point_n(bytes: &[u8], n: i64) -> Result<Option<Vec<u8>>> {
         return Ok(None);
     }
     let coord = ls.0[(resolved - 1) as usize];
-    Some(geom::encode_canonical_gpb(
-        &Geom {
-            geometry: Geometry::Point(Point::from(coord)),
-            srid: geom.srid,
-            has_zm: false,
-        },
+    Some(geom::encode_derived(
+        Geometry::Point(Point::from(coord)),
+        geom.srid,
         "ST_PointN",
+        &[bytes],
     ))
     .transpose()
 }
@@ -229,14 +209,7 @@ pub fn st_reverse(bytes: &[u8]) -> Result<Vec<u8>> {
         }
     }
     let geom = geom::decode_auto(bytes)?;
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry: rev(&geom.geometry),
-            srid: geom.srid,
-            has_zm: false,
-        },
-        "ST_Reverse",
-    )
+    geom::encode_derived(rev(&geom.geometry), geom.srid, "ST_Reverse", &[bytes])
 }
 
 /// `ST_Length(geom)` — 2D cartesian length of linear geometries; 0 for
@@ -263,6 +236,8 @@ pub fn st_centroid(bytes: &[u8]) -> Result<Vec<u8>> {
         .geometry
         .centroid()
         .unwrap_or_else(|| Point::new(f64::NAN, f64::NAN));
+    // 2D on purpose: PostGIS also answers 2D here — measured on 3.5,
+    // ST_Centroid of a POLYGON Z is POINT(5 5), not a 3D point.
     geom::encode_canonical_gpb(
         &Geom {
             geometry: Geometry::Point(centroid),
@@ -304,6 +279,9 @@ pub fn st_envelope(bytes: &[u8]) -> Result<Vec<u8>> {
             }
         }
     };
+    // 2D on purpose: PostGIS answers 2D here (measured), and a box corner is
+    // generally not an input vertex — looking one up by (x, y) could find a
+    // neighbouring vertex's Z and be confidently wrong.
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -381,13 +359,11 @@ pub fn st_simplify(bytes: &[u8], tolerance: f64) -> Result<Vec<u8>> {
             other => other.clone(),
         }
     }
-    geom::encode_canonical_gpb(
-        &Geom {
-            geometry: simplify(&geom.geometry, tolerance),
-            srid: geom.srid,
-            has_zm: false,
-        },
+    geom::encode_derived(
+        simplify(&geom.geometry, tolerance),
+        geom.srid,
         "ST_Simplify",
+        &[bytes],
     )
 }
 

@@ -73,6 +73,262 @@ pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8
     }
 }
 
+/// Visit every coordinate of an encoded geometry without changing it.
+///
+/// Implemented on the rewriting walker with a read-only visitor, which costs
+/// one copy of the payload. That only happens on the 3D path (nothing calls
+/// this for a 2D geometry), and sharing the walker is worth more than the
+/// allocation: a second traversal would be a second place for the XYZ-vs-XYM
+/// distinction to be got wrong.
+pub fn for_each_coord(bytes: &[u8], f: &mut dyn FnMut(&Coord3)) -> Result<()> {
+    let mut scratch = if gpb::is_gpb(bytes) {
+        let header = GpbHeader::parse(bytes)?;
+        bytes[header.wkb_offset..].to_vec()
+    } else {
+        bytes.to_vec()
+    };
+    rewrite(&mut scratch, &mut |c| f(c))?;
+    Ok(())
+}
+
+/// Every Z in an encoded geometry, keyed by the (x, y) it belongs to.
+///
+/// This is how a function that derives a geometry from a geometry keeps its
+/// heights without kenro having a 3D geometry model: the input's Z values are
+/// remembered here, the computation runs in 2D as always, and the encoder looks
+/// each output coordinate back up. An output coordinate that is not in the
+/// index is one the computation *invented* — a segment midpoint, an
+/// intersection, a buffer's arc — and there is no honest Z to give it, so the
+/// encode fails rather than guessing.
+///
+/// The classification therefore comes out of the data instead of a
+/// hand-maintained list, which is what makes it right where a list would have
+/// been wrong: `ST_ConvexHull`'s output vertices *are* input vertices, so its Z
+/// survives, while `ST_Segmentize`'s new midpoints cannot.
+#[derive(Debug, Default)]
+pub struct ZIndex {
+    /// `None` marks an (x, y) that carried two different Z values — a vertical
+    /// feature seen in plan view. Looking one up is an error rather than a
+    /// coin flip.
+    map: std::collections::HashMap<(u64, u64), Option<f64>>,
+}
+
+impl ZIndex {
+    /// An index asserting one Z at one coordinate.
+    ///
+    /// For the rare function that *moves* a geometry to a place none of its
+    /// vertices occupied, yet whose height is not in question — `ST_Project`
+    /// slides a point along the ground and keeps its elevation, which is what
+    /// PostGIS does (measured). Using this is a claim that the Z is known, so
+    /// it belongs only where that claim is written down next to the call.
+    pub fn at(x: f64, y: f64, z: f64) -> Self {
+        let mut index = Self::default();
+        index.insert(x, y, z);
+        index
+    }
+
+    /// The Z at `(x, y)`, or `None` when the coordinate is absent *or*
+    /// ambiguous. Callers treat both as "cannot restore a Z here".
+    pub fn get(&self, x: f64, y: f64) -> Option<f64> {
+        self.map.get(&key(x, y)).copied().flatten()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    fn insert(&mut self, x: f64, y: f64, z: f64) {
+        use std::collections::hash_map::Entry;
+        match self.map.entry(key(x, y)) {
+            Entry::Vacant(v) => {
+                v.insert(Some(z));
+            }
+            Entry::Occupied(mut o) => {
+                if o.get().is_some_and(|seen| seen.to_bits() != z.to_bits()) {
+                    o.insert(None); // two heights at one plan position
+                }
+            }
+        }
+    }
+}
+
+/// Bit patterns, so 0.0 and -0.0 agree and NaN never matches itself.
+fn key(x: f64, y: f64) -> (u64, u64) {
+    ((x + 0.0).to_bits(), (y + 0.0).to_bits())
+}
+
+/// Build a [`ZIndex`] from every geometry a function was given, or `None` when
+/// none of them carries a Z (the ordinary 2D path, which pays nothing).
+pub fn z_index(sources: &[&[u8]]) -> Result<Option<ZIndex>> {
+    let mut index = ZIndex::default();
+    for bytes in sources {
+        // Surface collections never reach here: everything that derives a
+        // geometry decodes its input first, and that is where they are refused.
+        for_each_coord(bytes, &mut |c| {
+            if let Some(z) = c.z {
+                index.insert(c.x, c.y, z);
+            }
+        })?;
+    }
+    Ok((!index.is_empty()).then_some(index))
+}
+
+/// Encode a (2D) `geo_types` geometry as ISO WKB **with Z**, taking each
+/// coordinate's height from `index`.
+///
+/// Hand-written because there is nothing to delegate to: geozero writes what
+/// the value holds, and a `geo_types` geometry holds two ordinates. This is the
+/// writer half of the encoding-level path — the piece `ST_Force3D` and
+/// `ST_MakePoint(x, y, z)` would also need, differing only in where the Z comes
+/// from.
+///
+/// Returns `Err` naming the coordinate when `index` has no unambiguous Z for
+/// it. That is the whole safety property: a geometry the computation invented
+/// cannot be written with a made-up height.
+pub fn write_wkb_z(
+    g: &geo_types::Geometry<f64>,
+    index: &ZIndex,
+    func: &'static str,
+) -> Result<Vec<u8>> {
+    let mut out = Vec::new();
+    put_geometry(&mut out, g, index, func)?;
+    Ok(out)
+}
+
+fn header(out: &mut Vec<u8>, base: u32) {
+    out.push(0x01); // little-endian, as every kenro encoder emits
+    out.extend_from_slice(&(1000 + base).to_le_bytes());
+}
+
+fn put_coord(
+    out: &mut Vec<u8>,
+    c: geo_types::Coord<f64>,
+    index: &ZIndex,
+    func: &'static str,
+) -> Result<()> {
+    let Some(z) = index.get(c.x, c.y) else {
+        return Err(Error::Unsupported {
+            func,
+            reason: format!(
+                "this operation would have to invent a Z for ({} {}), which was not \
+                 a vertex of the input; flatten with ST_Force2D first if a 2D result \
+                 is what you want",
+                c.x, c.y
+            ),
+        });
+    };
+    out.extend_from_slice(&c.x.to_le_bytes());
+    out.extend_from_slice(&c.y.to_le_bytes());
+    out.extend_from_slice(&z.to_le_bytes());
+    Ok(())
+}
+
+fn put_ring(
+    out: &mut Vec<u8>,
+    ring: &geo_types::LineString<f64>,
+    index: &ZIndex,
+    func: &'static str,
+) -> Result<()> {
+    out.extend_from_slice(&(ring.0.len() as u32).to_le_bytes());
+    for c in &ring.0 {
+        put_coord(out, *c, index, func)?;
+    }
+    Ok(())
+}
+
+fn put_polygon(
+    out: &mut Vec<u8>,
+    p: &geo_types::Polygon<f64>,
+    index: &ZIndex,
+    func: &'static str,
+) -> Result<()> {
+    out.extend_from_slice(&(1 + p.interiors().len() as u32).to_le_bytes());
+    put_ring(out, p.exterior(), index, func)?;
+    for r in p.interiors() {
+        put_ring(out, r, index, func)?;
+    }
+    Ok(())
+}
+
+fn put_geometry(
+    out: &mut Vec<u8>,
+    g: &geo_types::Geometry<f64>,
+    index: &ZIndex,
+    func: &'static str,
+) -> Result<()> {
+    use geo_types::Geometry as G;
+    match g {
+        G::Point(p) => {
+            header(out, 1);
+            put_coord(out, p.0, index, func)?;
+        }
+        // `Line` has no WKB type of its own; PostGIS spells it LINESTRING, and
+        // so does `geom::wkt_type_name`.
+        G::Line(l) => {
+            header(out, 2);
+            out.extend_from_slice(&2u32.to_le_bytes());
+            put_coord(out, l.start, index, func)?;
+            put_coord(out, l.end, index, func)?;
+        }
+        G::LineString(ls) => {
+            header(out, 2);
+            out.extend_from_slice(&(ls.0.len() as u32).to_le_bytes());
+            for c in &ls.0 {
+                put_coord(out, *c, index, func)?;
+            }
+        }
+        G::Polygon(p) => {
+            header(out, 3);
+            put_polygon(out, p, index, func)?;
+        }
+        // Rect and Triangle are POLYGON in WKB, matching `wkt_type_name`.
+        G::Rect(r) => {
+            header(out, 3);
+            put_polygon(out, &r.to_polygon(), index, func)?;
+        }
+        G::Triangle(t) => {
+            header(out, 3);
+            put_polygon(out, &t.to_polygon(), index, func)?;
+        }
+        G::MultiPoint(mp) => {
+            header(out, 4);
+            out.extend_from_slice(&(mp.0.len() as u32).to_le_bytes());
+            for p in &mp.0 {
+                header(out, 1);
+                put_coord(out, p.0, index, func)?;
+            }
+        }
+        G::MultiLineString(ml) => {
+            header(out, 5);
+            out.extend_from_slice(&(ml.0.len() as u32).to_le_bytes());
+            for ls in &ml.0 {
+                put_geometry(
+                    out,
+                    &geo_types::Geometry::LineString(ls.clone()),
+                    index,
+                    func,
+                )?;
+            }
+        }
+        G::MultiPolygon(mp) => {
+            header(out, 6);
+            out.extend_from_slice(&(mp.0.len() as u32).to_le_bytes());
+            for p in &mp.0 {
+                header(out, 3);
+                put_polygon(out, p, index, func)?;
+            }
+        }
+        G::GeometryCollection(gc) => {
+            header(out, 7);
+            out.extend_from_slice(&(gc.0.len() as u32).to_le_bytes());
+            for member in &gc.0 {
+                put_geometry(out, member, index, func)?;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// What the walk learned on the way through, for the fields a GPB header
 /// needs that the payload alone does not spell out.
 struct Scan {

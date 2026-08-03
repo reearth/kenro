@@ -158,6 +158,17 @@ pub fn st_project(bytes: &[u8], distance: f64, azimuth: f64) -> Result<Vec<u8>> 
         p.x() + distance * azimuth.sin(),
         p.y() + distance * azimuth.cos(),
     );
+    // The projected point sits where no input vertex did, so the (x, y) index
+    // the other derived functions use cannot help. Its height is not in
+    // question though — sliding a point along the ground does not change its
+    // elevation, and PostGIS agrees (measured on 3.5:
+    // `ST_Project(POINT Z (1 2 3), 100, 0.5)` keeps the 3). So assert that one
+    // Z rather than refuse.
+    if let Some(z) = crate::functions::threed::st_z(bytes)? {
+        let index = crate::coords::ZIndex::at(moved.x(), moved.y(), z);
+        let wkb = crate::coords::write_wkb_z(&Geometry::Point(moved), &index, FUNC)?;
+        return Ok(crate::gpb::write_gpb(&wkb, g.srid, None, false));
+    }
     geom::encode_canonical_gpb(
         &Geom {
             geometry: Geometry::Point(moved),

@@ -22,7 +22,20 @@ fn decode_pair(func: &'static str, a: &[u8], b: &[u8]) -> Result<(Geom, Geom)> {
     Ok((ga, gb))
 }
 
-fn point_geom(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Encode a derived geometry, restoring Z from the inputs it came from.
+/// See [`geom::encode_derived`] for why every call site has to name them.
+fn point_geom(
+    geometry: Geometry<f64>,
+    srid: i32,
+    func: &'static str,
+    sources: &[&[u8]],
+) -> Result<Vec<u8>> {
+    geom::encode_derived(geometry, srid, func, sources)
+}
+
+/// Encode a derived geometry as 2D **on purpose**: either PostGIS answers in
+/// 2D here too (measured), or there was no geometry input to carry a Z.
+fn point_geom_2d(geometry: Geometry<f64>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry,
@@ -54,7 +67,7 @@ pub fn st_closest_point(a: &[u8], b: &[u8]) -> Result<Option<Vec<u8>>> {
     };
     match ga.geometry.closest_point(&p) {
         geo::Closest::Intersection(c) | geo::Closest::SinglePoint(c) => {
-            Some(point_geom(Geometry::Point(c), ga.srid, FUNC)).transpose()
+            Some(point_geom_2d(Geometry::Point(c), ga.srid, FUNC)).transpose()
         }
         geo::Closest::Indeterminate => Ok(None),
     }
@@ -87,7 +100,7 @@ pub fn st_line_interpolate_point(a: &[u8], fraction: f64) -> Result<Vec<u8>> {
             func: FUNC,
             reason: "cannot interpolate on an empty or degenerate linestring".into(),
         })?;
-    point_geom(Geometry::Point(point), geom.srid, FUNC)
+    point_geom(Geometry::Point(point), geom.srid, FUNC, &[a])
 }
 
 /// `ST_LineLocatePoint(line, point)` — fraction of the line's length at
