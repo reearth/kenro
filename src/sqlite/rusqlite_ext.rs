@@ -493,6 +493,7 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_threed(conn)?;
     register_surface(conn)?;
     register_lines(conn)?;
+    register_grid(conn)?;
     #[cfg(feature = "gml")]
     register_gml(conn)?;
     #[cfg(feature = "text-encodings")]
@@ -1490,6 +1491,32 @@ fn register_hull(conn: &Connection) -> rusqlite::Result<()> {
                 return Ok(None);
             };
             blob(f(g, Some(tol), Some(e)))
+        })?;
+    }
+    Ok(())
+}
+
+/// Grid generators (see `functions::grid`).
+fn register_grid(conn: &Connection) -> rusqlite::Result<()> {
+    use crate::functions::grid;
+
+    // Note the argument order: PostGIS's (size, bounds), which is the reverse
+    // of SpatiaLite's (geom, size). A pasted SpatiaLite call hits the type
+    // check on argument 0 rather than gridding the wrong thing.
+    for (name, f) in [
+        (
+            "ST_SquareGrid",
+            grid::st_square_grid as fn(f64, &[u8]) -> crate::error::Result<Vec<u8>>,
+        ),
+        ("ST_HexagonGrid", grid::st_hexagon_grid),
+    ] {
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(size), Some(bounds)) =
+                (real_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            blob(f(size, bounds))
         })?;
     }
     Ok(())

@@ -39,6 +39,7 @@ pub mod geodesic;
 pub mod geojson;
 #[cfg(feature = "gml")]
 pub mod gml;
+pub mod grid;
 #[cfg(feature = "h3")]
 pub mod h3;
 pub mod hull;

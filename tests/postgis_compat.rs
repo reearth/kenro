@@ -1939,3 +1939,106 @@ fn voronoi_matches_postgis_where_it_can_and_says_where_it_cannot() {
         Some("ST_MultiLineString")
     );
 }
+
+/// The grid generators, through SQL. Cell counts and geometry were compared
+/// against PostGIS 3.5 over eleven size/bounds combinations; the squares come
+/// back byte-identical and the hexagons differ only in `ST_AsText`'s digit
+/// count, which is the rendering difference documented at the top of
+/// docs/functions.md.
+#[test]
+fn the_grid_generators_tile_like_postgis() {
+    let conn = conn();
+    let env = |a: f64, b: f64, x: f64, y: f64| {
+        format!("ST_GeomFromText('POLYGON(({a} {b},{x} {b},{x} {y},{a} {y},{a} {b}))')")
+    };
+
+    // Anchored at the origin, and the column starting exactly on maxx counts.
+    assert_eq!(
+        int(
+            &conn,
+            &format!(
+                "SELECT ST_NumGeometries(ST_SquareGrid(1, {}))",
+                env(0.0, 0.0, 3.0, 2.0)
+            )
+        ),
+        Some(12)
+    );
+    assert_eq!(
+        text(
+            &conn,
+            &format!(
+                "SELECT ST_AsText(ST_SquareGrid(1, {}))",
+                env(0.5, 0.5, 1.6, 1.4)
+            )
+        )
+        .as_deref(),
+        Some(
+            "MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)),((0 1,0 2,1 2,1 1,0 1)),\
+             ((1 0,1 1,2 1,2 0,1 0)),((1 1,1 2,2 2,2 1,1 1)))"
+        )
+    );
+    // The asymmetric edge rule: the hexagon whose top edge is exactly miny is
+    // dropped, so this is 8 and not 9.
+    assert_eq!(
+        int(
+            &conn,
+            &format!(
+                "SELECT ST_NumGeometries(ST_HexagonGrid(1, {}))",
+                env(0.0, 0.0, 3.0, 3.0)
+            )
+        ),
+        Some(8)
+    );
+    // A spread of sizes and offsets, all matched against PostGIS.
+    for (size, a, b, x, y, squares, hexes) in [
+        (2.0, -3.0, -3.0, 7.0, 5.0, 30, 15),
+        (0.5, 0.0, 0.0, 2.0, 2.0, 25, 12),
+        (1.0, -2.5, 1.25, 4.75, 6.0, 48, 21),
+        (1.5, -7.0, -2.0, 2.0, 9.0, 63, 25),
+    ] {
+        assert_eq!(
+            int(
+                &conn,
+                &format!(
+                    "SELECT ST_NumGeometries(ST_SquareGrid({size}, {}))",
+                    env(a, b, x, y)
+                )
+            ),
+            Some(squares),
+            "squares at size {size}"
+        );
+        assert_eq!(
+            int(
+                &conn,
+                &format!(
+                    "SELECT ST_NumGeometries(ST_HexagonGrid({size}, {}))",
+                    env(a, b, x, y)
+                )
+            ),
+            Some(hexes),
+            "hexes at size {size}"
+        );
+    }
+    // size <= 0 is zero rows in PostGIS, so empty here rather than an error.
+    assert_eq!(
+        text(
+            &conn,
+            &format!(
+                "SELECT ST_AsText(ST_SquareGrid(0, {}))",
+                env(0.0, 0.0, 2.0, 2.0)
+            )
+        )
+        .as_deref(),
+        Some("MULTIPOLYGON EMPTY")
+    );
+    // kenro materialises what PostGIS streams, so a huge grid is refused.
+    let err = conn
+        .query_row(
+            &format!("SELECT ST_SquareGrid(1, {})", env(0.0, 0.0, 1000.0, 1000.0)),
+            [],
+            |r| r.get::<_, Vec<u8>>(0),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("cells"), "{err}");
+}

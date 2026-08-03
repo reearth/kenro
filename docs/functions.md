@@ -224,6 +224,8 @@ naming the feature.
 | `ST_UnaryUnion(geom)` | geometry | ✅ | ❌ | ✅ | `overlay` feature. Dissolves a multipolygon's overlapping members into one areal result; non-areal input passes through |
 | `ST_ClipByBox2D(geom, box)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ takes **any geometry** and uses its envelope (PostGIS takes a `box2d`) — pass `ST_MakeEnvelope(...)`. Unlike PostGIS, which documents that it may return an invalid geometry, this goes through the overlay engine, so the result is valid |
 | `ST_Subdivide(geom, max_vertices)` | geometry | ✅ | ❌ | ❌ | `overlay` feature. ⚠️ PostGIS returns **one row per part**; kenro has no set-returning functions, so this returns a MULTIPOLYGON — walk it with `ST_NumGeometries` / `ST_GeometryN`. Splits along the longer axis; `max_vertices` must be ≥ 5 |
+| `ST_SquareGrid(size, bounds)` | geometry | ✅ | ❌ | ⚠️ scalar, args reversed | The square tiling covering `bounds`, **anchored at the origin** — cell `(i,j)` is always `[i·size, (i+1)·size] × [j·size, (j+1)·size]`, so grids from different bounds line up. Byte-identical to PostGIS's cells and cell order (i-major, then j) across eleven measured size/bounds combinations. ⚠️ PostGIS yields one row per cell with `i`/`j` columns; kenro returns a **MULTIPOLYGON** and drops the indices — recover them as `ST_MinX(cell)/size`. ⚠️ **SpatiaLite's `ST_SquareGrid(geom, size)` takes its arguments the other way round**; kenro follows PostGIS, so pasted SpatiaLite SQL fails on the argument type instead of gridding the wrong thing. `size ≤ 0` is empty, not an error (PostGIS returns zero rows). Over 100,000 cells is an error, because kenro materialises what PostGIS streams |
+| `ST_HexagonGrid(size, bounds)` | geometry | ✅ | ❌ | ⚠️ named `ST_HexagonalGrid`, different layout | As above, hexagonal. `size` is the **circumradius**: cell `(0,0)` is centred on the origin with vertices at `(±size, 0)`, flat-topped, `2·size` wide and `√3·size` tall; centres step `1.5·size` in x and `√3·size` in y with odd columns staggered up by half a row. All of that is measured — pointy-top, and `size` as the inradius or the width, are equally plausible and all wrong. ⚠️ The edge rule is **asymmetric**: a cell whose low edge sits exactly on the bounds' maximum is kept, one whose high edge sits exactly on the minimum is dropped. Same MULTIPOLYGON and cell-budget divergences as `ST_SquareGrid` |
 
 ## Predicates, transforms and accessors reachable without a dependency
 
@@ -616,16 +618,12 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   scalars and aggregates, not table-valued functions. Two things this does
   *not* mean, both worth stating because the earlier wording implied
   otherwise:
-  - It does not mean the results are unreachable. Where the shape allows it
-    kenro returns a MULTI\* (`ST_Subdivide`, `ST_DelaunayTriangles`,
-    `ST_Split`), and a MULTI\* can be walked with `ST_NumGeometries` +
-    `ST_GeometryN` over a recursive CTE. ⚠️ That walk is **quadratic** —
-    `ST_GeometryN` re-decodes the whole blob per call, measured at 0.4 s for
-    1,600 parts and 104 s for 25,600, against 11 ms for a single call that
-    touches every part once. Fine for tens of parts; use it knowingly.
-  - It does not cover `ST_VoronoiPolygons`, which was on this list by mistake:
-    PostGIS's version returns one geometry rather than a set, and kenro
-    implements it (see [Hulls and triangulation](#hulls-and-triangulation)).
+  - It does not mean the results are unreachable — see
+    [Getting N rows out](#getting-n-rows-out) below.
+  - It no longer covers the grid generators or `ST_VoronoiPolygons`, which
+    were on this list by mistake. PostGIS's Voronoi functions return one
+    geometry rather than a set, and the grids are the same MULTI\*
+    accommodation `ST_Subdivide` already makes. All four are implemented.
 - **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
 - **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
@@ -667,6 +665,52 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **Datum-grid transforms** — `ST_Transform` is gridless projection math
   ([accuracy](accuracy.md)); survey-grade work needs full PROJ.
 - Any claim of full SpatiaLite/PostGIS compatibility.
+
+## Getting N rows out
+
+kenro has no table-valued functions, so a MULTI\* is how a many-part result
+arrives. Two ways to turn one into rows. Both work on every host — the second
+needs only JSON1, which is in every SQLite build measured (3.49 and up) —
+and the difference between them is large enough to matter.
+
+**The exact one, and it is quadratic.** `ST_GeometryN` over a recursive CTE:
+
+```sql
+WITH RECURSIVE g(b) AS (SELECT ST_Subdivide(geom, 64) FROM parks WHERE id = 1),
+     i(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM i, g WHERE n < ST_NumGeometries(b))
+SELECT n, ST_GeometryN(g.b, i.n) FROM i, g;
+```
+
+Bit-exact, and no new functions. But `ST_GeometryN` re-decodes the whole blob
+on every call, so an n-part geometry costs n decodes: **measured at 0.4 s for
+1,600 parts and 104 s for 25,600**, against 11 ms for a single call that
+touches every part once. Fine for tens of parts.
+
+**The fast one, and it is lossy.** One `ST_AsGeoJSON` decodes once; `json_each`
+splits the coordinate array; each part is rebuilt:
+
+```sql
+SELECT j.key + 1 AS path,
+       ST_GeomFromGeoJSON(json_object('type', 'Polygon', 'coordinates', j.value))
+FROM   parks p, json_each(json_extract(ST_AsGeoJSON(p.geom), '$.coordinates')) j;
+```
+
+Measured on the same geometries: **17 ms at 1,600 parts, 105 ms at 25,600** —
+about a thousand times faster at the top end, and linear rather than
+quadratic. Use `'LineString'` for a MULTILINESTRING and `'Point'` for a
+MULTIPOINT.
+
+⚠️ **It does not round-trip exactly.** GeoJSON is text, and
+`ST_AsGeoJSON`'s precision caps at 15 decimals: the default 9 turns
+`139.76770019531247` into `139.767700195` and `1e-12` into `0`, and even at
+15 a coordinate of `1.2000000000000002` comes back `1.2`. A full `f64` needs
+17 significant digits. So this is the right recipe for rendering, tiling and
+counting, and the wrong one for anything that must preserve the input bit for
+bit. (`ST_AsText`, by contrast, *is* round-trip exact — but WKT does not
+split with `json_each`.)
+
+Neither route carries the `path[]` of PostGIS's `geometry_dump`, and neither
+reaches inside a nested collection.
 
 ## Semantics: PostGIS is the reference
 

@@ -951,6 +951,17 @@ export const SMOKE_SQL = {
   // The constrained triangulation leaves the hole uncovered: 96, not 100.
   // Voronoi: the clip box is the sites' envelope padded by max(w,h) a side,
   // so a 4x4 input gives 12x12 = 144.
+  // Grids: anchored at the origin, PostGIS's (size, bounds) argument order.
+  "ST_SquareGrid/2": {
+    sql: "SELECT ST_AsText(ST_SquareGrid(1, ST_GeomFromText('POLYGON((0.5 0.5,1.6 0.5,1.6 1.4,0.5 1.4,0.5 0.5))')))",
+    check: (v) =>
+      v ===
+      "MULTIPOLYGON(((0 0,0 1,1 1,1 0,0 0)),((0 1,0 2,1 2,1 1,0 1)),((1 0,1 1,2 1,2 0,1 0)),((1 1,1 2,2 2,2 1,1 1)))",
+  },
+  "ST_HexagonGrid/2": {
+    sql: "SELECT ST_NumGeometries(ST_HexagonGrid(1, ST_GeomFromText('POLYGON((0 0,3 0,3 3,0 3,0 0))')))",
+    check: (v) => Number(v) === 8,
+  },
   "ST_VoronoiPolygons/1": {
     sql: "SELECT ST_Area(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))",
     check: (v) => Math.abs(Number(v) - 144) < 1e-9,

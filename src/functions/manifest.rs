@@ -496,6 +496,11 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Blob,
         Some("overlay")
     ),
+    // Grid generators (functions::grid). PostGIS makes these set-returning;
+    // kenro returns a MULTIPOLYGON, the accommodation ST_Subdivide below
+    // already makes under its own PostGIS name.
+    entry!("ST_SquareGrid", "stSquareGrid", [Real, Blob], Blob, None),
+    entry!("ST_HexagonGrid", "stHexagonGrid", [Real, Blob], Blob, None),
     entry!(
         "ST_Subdivide",
         "stSubdivide",
@@ -1225,6 +1230,8 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("ST_TriangulatePolygon", &[1]),
     ("ST_VoronoiPolygons", &[1, 2, 3]),
     ("ST_VoronoiLines", &[1, 2, 3]),
+    ("ST_SquareGrid", &[2]),
+    ("ST_HexagonGrid", &[2]),
     ("ST_IsSimple", &[1]),
     ("ST_LineMerge", &[1, 2]),
     ("ST_Split", &[2]),

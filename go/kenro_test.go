@@ -174,6 +174,8 @@ var smokeCases = []smokeCase{
 	{"ST_DelaunayTriangles", `ST_NumGeometries(ST_DelaunayTriangles(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))`, int64(2)},
 	{"ST_AsKML", `ST_AsKML(ST_GeomFromText('POINT(1 2)', 4326))`, "<Point><coordinates>1,2</coordinates></Point>"},
 	{"ST_AsSVG", `ST_AsSVG(ST_GeomFromText('POLYGON((0 0,4 0,4 4,0 4,0 0))'))`, "M 0 0 L 4 0 4 -4 0 -4 Z"},
+	{"ST_SquareGrid", `ST_NumGeometries(ST_SquareGrid(1, ST_GeomFromText('POLYGON((0 0,3 0,3 2,0 2,0 0))')))`, int64(12)},
+	{"ST_HexagonGrid", `ST_NumGeometries(ST_HexagonGrid(1, ST_GeomFromText('POLYGON((0 0,3 0,3 3,0 3,0 0))')))`, int64(8)},
 	{"ST_VoronoiPolygons", `ST_Area(ST_VoronoiPolygons(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))`, 144.0},
 	{"ST_VoronoiLines", `ST_GeometryType(ST_VoronoiLines(ST_GeomFromText('MULTIPOINT(0 0,4 0,4 4,0 4)')))`, "ST_MultiLineString"},
 	{"ST_TriangulatePolygon", `ST_Area(ST_TriangulatePolygon(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))')))`, 96.0},

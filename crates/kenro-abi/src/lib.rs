@@ -1542,6 +1542,16 @@ pub extern "C" fn k_stVoronoiLinesExtend(
 // ---- Line structure (functions::lines) ----
 
 #[unsafe(no_mangle)]
+pub extern "C" fn k_stSquareGrid(size: f64, b_p: *const u8, b_l: u32) -> i32 {
+    blob(kenro::functions::grid::st_square_grid(size, s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stHexagonGrid(size: f64, b_p: *const u8, b_l: u32) -> i32 {
+    blob(kenro::functions::grid::st_hexagon_grid(size, s(b_p, b_l)))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn k_stIsSimple(geom_p: *const u8, geom_l: u32) -> i32 {
     boolean(kenro::functions::lines::st_is_simple(s(geom_p, geom_l)))
 }

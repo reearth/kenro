@@ -799,6 +799,16 @@ pub fn st_voronoi_lines_extend(geom: &[u8], tolerance: f64, extend_to: &[u8]) ->
 
 // ---- Line structure (functions::lines) ----
 
+#[wasm_bindgen(js_name = stSquareGrid)]
+pub fn st_square_grid(size: f64, bounds: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::grid::st_square_grid(size, bounds).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stHexagonGrid)]
+pub fn st_hexagon_grid(size: f64, bounds: &[u8]) -> R<Vec<u8>> {
+    kenro::functions::grid::st_hexagon_grid(size, bounds).map_err(err)
+}
+
 #[wasm_bindgen(js_name = stIsSimple)]
 pub fn st_is_simple(geom: &[u8]) -> R<bool> {
     kenro::functions::lines::st_is_simple(geom).map_err(err)
@@ -1787,6 +1797,8 @@ mod tests {
             "stVoronoiLines",
             "stVoronoiLinesTol",
             "stVoronoiLinesExtend",
+            "stSquareGrid",
+            "stHexagonGrid",
             "stIsSimple",
             "stLineMerge",
             "stLineMergeDirected",
