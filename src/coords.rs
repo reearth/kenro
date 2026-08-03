@@ -29,12 +29,16 @@
 //!   geometry model at all. Measured: PostGIS transforms them too.
 //!
 //! What this is **not** is a second geometry model. It never holds a 3D
-//! geometry, only one coordinate at a time, and it cannot answer a single
-//! question about shape. That is the line `tmp/3d-geometry-design.md` draws, and
-//! it is why *interpolating* a Z stays out: knowing where along a segment a new
-//! vertex sits, and which two heights to blend, is knowledge of shape. Setting
-//! a height the caller named is not, which is why `ST_Force3D` fits here and
-//! `ST_Segmentize` does not.
+//! geometry, only one coordinate at a time.
+//!
+//! It does hold one piece of shape knowledge, and exactly one: **consecutive
+//! coordinates in a run are a segment.** The walker already sees runs, so that
+//! costs nothing, and it is enough to blend a height for a coordinate lying
+//! between two known ones (`tmp/z-interpolation.md`). Which is where the line
+//! now sits — not at "interpolating is shape knowledge" as an earlier draft of
+//! this comment had it, but at **there being one honest answer**: a segment
+//! lends its two heights, a segment's *extension* lends nothing, and two
+//! segments that disagree lend nothing either.
 
 use crate::error::{Error, Result};
 use crate::gpb::{self, GpbHeader};
@@ -60,7 +64,7 @@ pub struct Coord3 {
 /// verbatim and re-wrapped, which is what lets a 3D or surface payload
 /// survive a round trip that the 2D encoders would refuse.
 pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8>> {
-    rewrite_blob(bytes, None, f)
+    rewrite_blob(bytes, None, &mut |c, _first| f(c))
 }
 
 /// As [`map_coords`], but labelling the result with a different SRID.
@@ -74,14 +78,10 @@ pub fn map_coords_relabelled(
     srid: i32,
     f: &mut dyn FnMut(&mut Coord3),
 ) -> Result<Vec<u8>> {
-    rewrite_blob(bytes, Some(srid), f)
+    rewrite_blob(bytes, Some(srid), &mut |c, _first| f(c))
 }
 
-fn rewrite_blob(
-    bytes: &[u8],
-    srid_override: Option<i32>,
-    f: &mut dyn FnMut(&mut Coord3),
-) -> Result<Vec<u8>> {
+fn rewrite_blob(bytes: &[u8], srid_override: Option<i32>, f: &mut Visitor<'_>) -> Result<Vec<u8>> {
     if gpb::is_gpb(bytes) {
         let header = GpbHeader::parse(bytes)?;
         let mut wkb = bytes[header.wkb_offset..].to_vec();
@@ -115,13 +115,25 @@ fn rewrite_blob(
 /// allocation: a second traversal would be a second place for the XYZ-vs-XYM
 /// distinction to be got wrong.
 pub fn for_each_coord(bytes: &[u8], f: &mut dyn FnMut(&Coord3)) -> Result<()> {
+    for_each_coord_in_runs(bytes, &mut |c, _first| f(c))
+}
+
+/// As [`for_each_coord`], but saying which coordinates **begin a run**.
+///
+/// A run is one contiguous sequence in the encoding: a LineString's vertices, a
+/// ring's, a Point's single coordinate. Consecutive coordinates *within* a run
+/// form a segment; consecutive coordinates across a boundary do not, and
+/// treating them as one would fabricate a segment from the end of one ring to
+/// the start of the next. That distinction is the only shape knowledge the
+/// interpolating index needs, and the walker already has it.
+pub fn for_each_coord_in_runs(bytes: &[u8], f: &mut dyn FnMut(&Coord3, bool)) -> Result<()> {
     let mut scratch = if gpb::is_gpb(bytes) {
         let header = GpbHeader::parse(bytes)?;
         bytes[header.wkb_offset..].to_vec()
     } else {
         bytes.to_vec()
     };
-    rewrite(&mut scratch, &mut |c| f(c))?;
+    rewrite(&mut scratch, &mut |c, first| f(c, first))?;
     Ok(())
 }
 
@@ -150,7 +162,44 @@ pub struct ZIndex {
     /// `ST_Force3D` says "every coordinate gets this height", which is the
     /// whole of *creating* a Z rather than carrying one.
     fallback: Option<f64>,
+    /// The input's segments, for coordinates that are not vertices but lie
+    /// *between* two that are. See [`ZIndex::interpolate`].
+    segments: Vec<Segment>,
+    /// Which segment answered last. Output coordinates arrive in input order —
+    /// every function this serves traverses its input once — so resuming here
+    /// turns an `O(segments)` scan into an amortised `O(1)` step. Without it,
+    /// densifying a 10k-vertex line into 100k points would be 10⁹ comparisons,
+    /// the same quadratic shape `tmp/tvf-layer.md` §2.2 measured elsewhere.
+    cursor: std::cell::Cell<usize>,
 }
+
+/// One segment of an input, with a height at each end.
+#[derive(Debug, Clone, Copy)]
+struct Segment {
+    ax: f64,
+    ay: f64,
+    az: f64,
+    bx: f64,
+    by: f64,
+    bz: f64,
+    /// Which of `z_index`'s sources this came from. Two sources disagreeing
+    /// about a point's height is the overlay case, and it is refused.
+    source: u32,
+}
+
+/// How far off a segment a coordinate may sit and still be considered on it,
+/// relative to the segment's length.
+///
+/// It cannot be zero: the algorithms compute these coordinates in floating
+/// point, so a densified vertex is within a few ULP of the mathematical
+/// segment rather than exactly on it. It is kept at the ULP scale rather than a
+/// human-friendly tolerance, because the risk this number governs is a
+/// coordinate that belongs somewhere else being handed a height it has no claim
+/// to.
+const ON_SEGMENT_EPS: f64 = 1e-9;
+
+/// How closely two segments must agree before their answer counts as one.
+const AGREEMENT_EPS: f64 = 1e-9;
 
 impl ZIndex {
     /// An index asserting one Z at one coordinate.
@@ -176,8 +225,8 @@ impl ZIndex {
     /// otherwise, having been written before the writer existed).
     pub fn constant(z: f64) -> Self {
         Self {
-            map: std::collections::HashMap::new(),
             fallback: Some(z),
+            ..Self::default()
         }
     }
 
@@ -188,9 +237,64 @@ impl ZIndex {
     /// statement that the answer is unknown, not an absence of information.
     pub fn get(&self, x: f64, y: f64) -> Option<f64> {
         match self.map.get(&key(x, y)) {
-            Some(z) => *z,
-            None => self.fallback,
+            Some(z) => return *z,
+            None => {
+                if let Some(z) = self.fallback {
+                    return Some(z);
+                }
+            }
         }
+        self.interpolate(x, y)
+    }
+
+    /// The height at a coordinate that lies **between** two input vertices.
+    ///
+    /// This is the last piece of the 3D work, and the rule it implements is one
+    /// sentence: *interpolate when exactly one honest answer exists.*
+    ///
+    /// - On exactly one segment (or on several that agree) → blend the two
+    ///   heights by the 2D distance ratio. Measured: that is what PostGIS does,
+    ///   and by **2D** length — `ST_LineInterpolatePoint` at 0.5 on
+    ///   `LINESTRING Z (0 0 0,10 0 10,20 0 30)` returns the middle vertex, which
+    ///   only 2D fractions put there.
+    /// - On segments from two different sources that disagree → `None`. That is
+    ///   the overlay crossing: a point where two surfaces cross in plan view has
+    ///   no shared height. ⚠️ GEOS returns the **average** of the two
+    ///   (measured: operands at z = 0 and z = 1000 give a crossing at 500,
+    ///   symmetrically). kenro declines to, because that number describes
+    ///   neither surface; the refusal names `ST_Force2D`. The reasoning is in
+    ///   `tmp/z-interpolation.md` §3.2.
+    /// - On no segment → `None`, unchanged. A buffer's arc and
+    ///   `ST_LineExtend`'s extrapolation both land here: `t` outside `[0, 1]`
+    ///   never matches, so a segment's *extension* cannot lend a height.
+    fn interpolate(&self, x: f64, y: f64) -> Option<f64> {
+        if self.segments.is_empty() {
+            return None;
+        }
+        let mut answer: Option<(f64, u32)> = None;
+        let start = self.cursor.get();
+        for step in 0..self.segments.len() {
+            let i = (start + step) % self.segments.len();
+            let s = &self.segments[i];
+            let Some(z) = s.height_at(x, y) else { continue };
+            match answer {
+                None => {
+                    answer = Some((z, s.source));
+                    self.cursor.set(i);
+                }
+                Some((seen, seen_source)) => {
+                    let scale = seen.abs().max(z.abs()).max(1.0);
+                    if (seen - z).abs() > AGREEMENT_EPS * scale {
+                        // Two heights with equal claim. Which source they came
+                        // from does not change the answer — it only changes how
+                        // the docs explain it — so both cases refuse.
+                        let _ = seen_source;
+                        return None;
+                    }
+                }
+            }
+        }
+        answer.map(|(z, _)| z)
     }
 
     /// Nothing *recorded* — a constant index is not empty in the sense that
@@ -214,6 +318,31 @@ impl ZIndex {
     }
 }
 
+impl Segment {
+    /// The interpolated height at `(x, y)`, or `None` when the coordinate is not
+    /// on this segment.
+    fn height_at(&self, x: f64, y: f64) -> Option<f64> {
+        let (dx, dy) = (self.bx - self.ax, self.by - self.ay);
+        let len_sq = dx * dx + dy * dy;
+        if len_sq == 0.0 {
+            return None; // a degenerate segment lends nothing
+        }
+        // Where along the segment the coordinate projects. Outside [0, 1] means
+        // beyond an end, and the extension of a segment is not the segment.
+        let t = ((x - self.ax) * dx + (y - self.ay) * dy) / len_sq;
+        if !(-1e-12..=1.0 + 1e-12).contains(&t) {
+            return None;
+        }
+        // Perpendicular offset, compared against the segment's own length so
+        // the tolerance scales with the geometry rather than with the origin.
+        let cross = (x - self.ax) * dy - (y - self.ay) * dx;
+        if cross.abs() > ON_SEGMENT_EPS * len_sq.sqrt() * len_sq.sqrt() {
+            return None;
+        }
+        Some(self.az + t * (self.bz - self.az))
+    }
+}
+
 /// Bit patterns, so 0.0 and -0.0 agree and NaN never matches itself.
 fn key(x: f64, y: f64) -> (u64, u64) {
     ((x + 0.0).to_bits(), (y + 0.0).to_bits())
@@ -223,13 +352,29 @@ fn key(x: f64, y: f64) -> (u64, u64) {
 /// none of them carries a Z (the ordinary 2D path, which pays nothing).
 pub fn z_index(sources: &[&[u8]]) -> Result<Option<ZIndex>> {
     let mut index = ZIndex::default();
-    for bytes in sources {
+    for (source, bytes) in sources.iter().enumerate() {
         // Surface collections never reach here: everything that derives a
         // geometry decodes its input first, and that is where they are refused.
-        for_each_coord(bytes, &mut |c| {
-            if let Some(z) = c.z {
-                index.insert(c.x, c.y, z);
+        let mut previous: Option<(f64, f64, f64)> = None;
+        for_each_coord_in_runs(bytes, &mut |c, first| {
+            let Some(z) = c.z else {
+                previous = None;
+                return;
+            };
+            index.insert(c.x, c.y, z);
+            // A segment only exists between two coordinates of the *same* run.
+            if let Some((ax, ay, az)) = previous.filter(|_| !first) {
+                index.segments.push(Segment {
+                    ax,
+                    ay,
+                    az,
+                    bx: c.x,
+                    by: c.y,
+                    bz: z,
+                    source: source as u32,
+                });
             }
+            previous = Some((c.x, c.y, z));
         })?;
     }
     Ok((!index.is_empty()).then_some(index))
@@ -408,7 +553,10 @@ impl Scan {
     }
 }
 
-fn rewrite(buf: &mut [u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Scan> {
+/// The internal visitor: a coordinate, and whether it begins a run.
+type Visitor<'a> = dyn FnMut(&mut Coord3, bool) + 'a;
+
+fn rewrite(buf: &mut [u8], f: &mut Visitor<'_>) -> Result<Scan> {
     let mut scan = Scan {
         srid: 0,
         coords: 0,
@@ -423,7 +571,7 @@ fn walk(
     buf: &mut [u8],
     pos: &mut usize,
     depth: u8,
-    f: &mut dyn FnMut(&mut Coord3),
+    f: &mut Visitor<'_>,
     scan: &mut Scan,
 ) -> Result<()> {
     if depth > 32 {
@@ -490,11 +638,12 @@ fn run(
     dims: usize,
     has_z: bool,
     le: bool,
-    f: &mut dyn FnMut(&mut Coord3),
+    f: &mut Visitor<'_>,
     scan: &mut Scan,
     top_level: bool,
 ) -> Result<()> {
     let stride = 8 * dims;
+    let run_start = *pos;
     // Checked before the loop, so a hostile count is an error rather than a
     // long walk off the end (the guard `geom::validate_wkb` exists for).
     let total = n.checked_mul(stride).ok_or_else(|| bad("count overflow"))?;
@@ -513,7 +662,7 @@ fn run(
         if top_level && c.x.is_nan() && c.y.is_nan() {
             scan.nan_point = true;
         }
-        f(&mut c);
+        f(&mut c, *pos == run_start);
         wr_f64(buf, at, le, c.x);
         wr_f64(buf, at + 8, le, c.y);
         // Gated on the *encoding's* Z, not the visitor's: a visitor that

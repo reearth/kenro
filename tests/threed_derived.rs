@@ -144,27 +144,147 @@ fn a_second_geometrys_vertices_count_too() {
     assert_eq!(z, 99.0);
 }
 
+/// A vertex *between* two input vertices gets its height blended from them —
+/// the interpolation step, and the last item on the 3D list. Every expectation
+/// measured on PostGIS 3.5; the reasoning is `tmp/z-interpolation.md`.
+///
+/// The input is deliberately steep — 2D length 10, Z climbing 100 — so a
+/// fraction taken by 3D length would land visibly elsewhere.
 #[test]
-fn inventing_a_vertex_is_an_error_not_a_guess() {
+fn a_vertex_between_two_others_is_interpolated() {
     let conn = conn();
-    let l = line_z(&[[0., 0., 1.], [10., 10., 2.], [20., 0., 3.]]);
-    // Each of these places a vertex where no input had one. PostGIS
-    // interpolates a Z; kenro cannot, so it refuses and names the way out
-    // rather than handing back a silently flattened geometry.
-    let cases = [
-        format!("ST_Segmentize({l}, 2)"),
-        format!("ST_LineSubstring({l}, 0.2, 0.8)"),
-        format!("ST_LineInterpolatePoint({l}, 0.3)"),
-        format!("ST_ChaikinSmoothing({l})"),
-        format!("ST_LineExtend({l}, 1)"),
-    ];
-    for expr in cases {
-        let err = ndims(&conn, &expr).unwrap_err().to_string();
-        assert!(err.contains("invent a Z"), "{expr}: {err}");
-        assert!(err.contains("ST_Force2D"), "{expr}: {err}");
-        // And ST_Force2D really is the way through.
-        let flattened = expr.replacen(&l, &format!("ST_Force2D({l})"), 1);
-        assert_eq!(ndims(&conn, &flattened).unwrap(), 2, "{flattened}");
+    let steep = line_z(&[[0., 0., 0.], [10., 0., 100.]]);
+    /// Every Z of a linestring result, in order.
+    fn heights(conn: &Connection, expr: &str) -> Vec<f64> {
+        let mut stmt = conn
+            .prepare(&format!(
+                "WITH RECURSIVE g(b) AS (SELECT {expr}),
+                      i(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM i, g
+                               WHERE n < ST_NumPoints(b))
+                 SELECT ST_Z(ST_PointN(g.b, i.n)) FROM i, g"
+            ))
+            .unwrap();
+        let rows = stmt.query_map([], |r| r.get::<_, f64>(0)).unwrap();
+        rows.map(|r| r.unwrap()).collect()
+    }
+    // ST_Segmentize(…, 2.5) -> 0 0 0, 2.5 0 25, 5 0 50, 7.5 0 75, 10 0 100
+    assert_eq!(
+        heights(&conn, &format!("ST_Segmentize({steep}, 2.5)")),
+        vec![0.0, 25.0, 50.0, 75.0, 100.0]
+    );
+    // ST_LineSubstring(…, 0.25, 0.75) -> 2.5 0 25, 7.5 0 75
+    assert_eq!(
+        heights(&conn, &format!("ST_LineSubstring({steep}, 0.25, 0.75)")),
+        vec![25.0, 75.0]
+    );
+    // Chaikin's new points are 0.25/0.75 blends of adjacent vertices, and the
+    // original interior vertex is dropped: 0, 75, 75, 0.
+    let peak = line_z(&[[0., 0., 0.], [10., 0., 100.], [20., 0., 0.]]);
+    assert_eq!(
+        heights(&conn, &format!("ST_ChaikinSmoothing({peak})")),
+        vec![0.0, 75.0, 75.0, 0.0]
+    );
+    // ST_Split's new vertex sits on the input segment; the blade's own Z is
+    // ignored (measured), so a blade at z = -999 changes nothing.
+    assert_eq!(
+        heights(
+            &conn,
+            &format!("ST_GeometryN(ST_Split({steep}, ST_MakePoint(5, 0)), 1)")
+        ),
+        vec![0.0, 50.0]
+    );
+
+    let z = |expr: &str| -> f64 {
+        conn.query_row(&format!("SELECT ST_Z({expr})"), [], |r| r.get(0))
+            .unwrap()
+    };
+    assert_eq!(z(&format!("ST_LineInterpolatePoint({steep}, 0.5)")), 50.0);
+
+    // A polygon densifies **per ring**. This is what the run-boundary flag in
+    // the walker buys: without it, the last vertex of one ring and the first of
+    // the next would be treated as a segment and lend heights along a line that
+    // does not exist. Measured on PostGIS 3.5 for
+    // POLYGON Z ((0 0 0,10 0 10,10 10 20,0 0 0)) at 7.
+    let mut v = vec![0x01u8];
+    v.extend_from_slice(&1003u32.to_le_bytes());
+    v.extend_from_slice(&1u32.to_le_bytes());
+    v.extend_from_slice(&4u32.to_le_bytes());
+    for c in [
+        [0.0f64, 0.0, 0.0],
+        [10.0, 0.0, 10.0],
+        [10.0, 10.0, 20.0],
+        [0.0, 0.0, 0.0],
+    ] {
+        for o in c {
+            v.extend_from_slice(&o.to_le_bytes());
+        }
+    }
+    let triangle = wkb_literal(&v);
+    let got = heights(
+        &conn,
+        &format!("ST_ExteriorRing(ST_Segmentize({triangle}, 7))"),
+    );
+    let want = [0.0, 5.0, 10.0, 15.0, 20.0, 40.0 / 3.0, 20.0 / 3.0, 0.0];
+    assert_eq!(got.len(), want.len(), "{got:?}");
+    for (g, w) in got.iter().zip(want) {
+        assert!((g - w).abs() < 1e-9, "{got:?}");
+    }
+}
+
+/// **Fractions are 2D.** `LINESTRING Z (0 0 0,10 0 10,20 0 30)` has 2D lengths
+/// 10 and 10 but 3D lengths 14.14 and 22.36, so 0.5 of the 2D length is exactly
+/// the middle vertex while 0.5 of the 3D length would fall inside the second
+/// segment. PostGIS returns the middle vertex; kenro must agree.
+#[test]
+fn the_fraction_is_taken_by_2d_length() {
+    let conn = conn();
+    let l = line_z(&[[0., 0., 0.], [10., 0., 10.], [20., 0., 30.]]);
+    let z = |f: &str| -> f64 {
+        conn.query_row(
+            &format!("SELECT ST_Z(ST_LineInterpolatePoint({l}, {f}))"),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    assert_eq!(z("0.5"), 10.0); // the middle vertex, not 3D's 18.25 mark
+    assert_eq!(z("0.75"), 20.0); // half way along segment two, Z 10 -> 30
+}
+
+/// What interpolation still refuses, and why each one is different.
+#[test]
+fn interpolation_stops_where_there_is_no_single_honest_answer() {
+    let conn = conn();
+    let steep = line_z(&[[0., 0., 0.], [10., 0., 100.]]);
+
+    // Beyond the last vertex. A segment's *extension* is not the segment, so
+    // `t` outside [0, 1] never matches. ⚠️ PostGIS extrapolates the gradient
+    // and returns z = 150 (measured); kenro refuses rather than guessing how
+    // far a height keeps climbing.
+    let err = ndims(&conn, &format!("ST_LineExtend({steep}, 5)"))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("invent a Z"), "{err}");
+    assert!(err.contains("ST_Force2D"), "{err}");
+
+    // A second smoothing pass works on the chords between the *first* pass's
+    // points, which lie on no original segment — so it refuses where one pass
+    // succeeds. The input has to bend for this: on a straight line every pass's
+    // points stay on the original segment and interpolation keeps working, which
+    // is correct rather than lucky.
+    let vee = line_z(&[[0., 0., 0.], [10., 10., 100.], [20., 0., 0.]]);
+    assert_eq!(
+        ndims(&conn, &format!("ST_ChaikinSmoothing({vee}, 1)")).unwrap(),
+        3
+    );
+    assert!(ndims(&conn, &format!("ST_ChaikinSmoothing({vee}, 2)")).is_err());
+
+    // ST_Force2D remains the documented way through for all of them.
+    for expr in [
+        format!("ST_LineExtend(ST_Force2D({steep}), 5)"),
+        format!("ST_ChaikinSmoothing(ST_Force2D({vee}), 2)"),
+    ] {
+        assert_eq!(ndims(&conn, &expr).unwrap(), 2, "{expr}");
     }
 }
 

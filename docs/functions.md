@@ -322,12 +322,15 @@ from the data** rather than from a list of function names:
 1. No input carried a Z → nothing changes, and nothing costs.
 2. Every coordinate of the result was a vertex of some input → the result is
    written with those heights.
-3. Some coordinate was **invented** — a segment midpoint, an intersection, a
-   buffer arc — and there is no honest Z for it → **error**, naming
-   `ST_Force2D`.
+3. A coordinate lies **between** two input vertices → its height is blended
+   from them, by the **2D** distance ratio. That covers densifying, cutting and
+   smoothing — see [interpolated heights](#interpolated-heights).
+4. Some coordinate was **invented** with no single honest source — a buffer
+   arc, an extrapolation past the end, a crossing where two surfaces disagree →
+   **error**, naming `ST_Force2D`.
 
-That third case is the point. PostGIS interpolates a Z there; kenro cannot, and
-the alternative it used to take was to return a 2D geometry without saying so.
+The last case is the point. The alternative kenro used to take was to return a
+2D geometry without saying so.
 `UPDATE buildings SET geom = ST_AsGPB(ST_Simplify(ST_GeomFromGPB(geom), 0.1))`
 would flatten a whole table in silence. It now either keeps the heights or
 refuses.
@@ -359,6 +362,47 @@ Two details worth knowing:
 `ST_Project` is the one exception that asserts a Z for a coordinate no input
 occupied: sliding a point along the ground does not change its elevation, which
 is what PostGIS does too.
+
+### Interpolated heights
+
+Consecutive coordinates in one coordinate run — a linestring's vertices, a
+ring's — are a segment, and the encoding says so without any geometry model
+being involved. So a coordinate that lies on a segment gets the two ends'
+heights blended by how far along it sits. That is what unblocks the
+linear-referencing family:
+
+| Function | Example, measured on PostGIS 3.5 |
+|---|---|
+| `ST_Segmentize` | `ST_Segmentize(LINESTRING Z (0 0 0,10 0 100), 2.5)` → `0 0 0, 2.5 0 25, 5 0 50, 7.5 0 75, 10 0 100`. Polygons densify **per ring** |
+| `ST_LineSubstring` | `(…, 0.25, 0.75)` → `2.5 0 25, 7.5 0 75` |
+| `ST_LineInterpolatePoint` / `…Points` | `(…, 0.5)` → `POINT(5 0 50)` |
+| `ST_ChaikinSmoothing` | one pass → `0 0 0, 7.5 0 75, 12.5 0 75, 20 0 0` — 0.25/0.75 blends |
+| `ST_Split` | the cut vertex takes the input's interpolated height; the **blade's own Z is ignored**, as in PostGIS |
+
+**The fraction is 2D.** `LINESTRING Z (0 0 0,10 0 10,20 0 30)` has 2D lengths
+10 and 10 but 3D lengths 14.14 and 22.36, so `ST_LineInterpolatePoint(…, 0.5)`
+is the middle vertex — where only a 2D fraction puts it. (PostGIS's 3D-aware
+`ST_3DLineInterpolatePoint` is a separate function and is not implemented.)
+
+What still refuses, each for its own reason:
+
+- ⚠️ **An overlay crossing.** Two surfaces crossing in plan view have no shared
+  height. GEOS returns the **average** of the two — measured: operands at z = 0
+  and z = 1000 give a crossing at 500, and swapping them returns the identical
+  result, so it is a mean rather than a preference. kenro declines, because that
+  number describes neither surface; the error names `ST_Force2D`. This is a
+  deliberate divergence, argued in `tmp/z-interpolation.md` §3.2.
+- ⚠️ **`ST_LineExtend`.** Its new vertex is *past* the last one, so no segment
+  contains it. PostGIS extrapolates the final gradient (`… ,10 0 100,15 0 150`);
+  kenro refuses rather than assuming a height keeps climbing.
+- **`ST_ChaikinSmoothing` with more than one iteration.** The second pass works
+  on chords between the first pass's points, which lie on no original segment.
+  One pass succeeds, two refuse. (On a straight input every pass stays on the
+  original segment, so it keeps working — correct rather than lucky.)
+- **`ST_GeometricMedian`.** PostGIS computes it in 3D; there is nothing to
+  interpolate from.
+- **Two heights with equal claim**, from a vertical wall or a self-touching
+  ring. Ambiguity is a positive statement that the answer is unknown.
 
 ## Creating a Z
 
@@ -661,12 +705,12 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   collections are read and measured, never computed with, and the
   [coordinate transforms](#3d-affine-transforms) move them without decoding
   them; the design note behind that split is `tmp/3d-geometry-design.md`.
-- **Interpolating a Z** — no height for a vertex the input did not have (see
-  [derived geometries](#derived-geometries-and-the-z)). Reading, measuring,
-  transforming, carrying and *setting* a Z all work on the encoding;
-  **guessing** one is the line, and PostGIS's interpolation is on the other side
-  of it. `ST_Force3D` sets a height because the caller named it; `ST_Segmentize`
-  would have to invent one, and refuses.
+- **Guessing a Z** — extrapolating one past the end of a line, or averaging two
+  that disagree (see [derived geometries](#derived-geometries-and-the-z)).
+  Reading, measuring, transforming, carrying, *interpolating between two known
+  heights* and *setting* one all work on the encoding. The line is where there
+  is no single honest answer: `ST_LineExtend` past the end, an overlay crossing
+  between two surfaces, a vertical wall's two heights at one plan position.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,
