@@ -64,7 +64,7 @@ replayed against the raw wasm exports.
 The SQLite versions differ more than the table suggests, and wa-sqlite is the
 floor: **3.44.0**, against 3.50 for the official build and 3.49 for sql.js.
 That matters for the row-splitting recipes in
-[the function reference](functions.md#getting-n-rows-out), which need JSON1
+[the function reference](scope.md#getting-n-rows-out), which need JSON1
 (3.38+) and `unhex` (3.41+) — measured present on all three, but wa-sqlite is
 the one to re-check if either recipe grows a newer dependency.
 

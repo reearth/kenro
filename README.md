@@ -24,7 +24,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
-- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~12× smaller**, measured); the wasm build starts at 595 KB (232 KB wire), and the everything-included tier is 2.2 MB (669 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/functions.md#deliberately-out-of-scope) (no topology, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
+- **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~12× smaller**, measured); the wasm build starts at 595 KB (232 KB wire), and the everything-included tier is 2.2 MB (669 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/scope.md#deliberately-out-of-scope) (no topology, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
 The headline: **with kenro registered, a plain SQLite build maintains a GeoPackage spatial index correctly.** No SpatiaLite, no GDAL, no C toolchain.
 
@@ -178,8 +178,11 @@ surface-collection pass-through, H3, and MVT vector tiles — plus four
 aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`, `ST_3DExtent(geom)`).
 
 **The full table — every function with its PostGIS / DuckDB Spatial /
-SpatiaLite comparison and documented behavior differences — lives in
-[docs/functions.md](docs/functions.md).**
+SpatiaLite comparison, documented behavior differences, and a link to each
+function's PostGIS page — lives in [docs/functions.md](docs/functions.md).**
+Two topics have their own pages: **[3D geometry](docs/3d.md)** (what happens to
+a Z, and surface collections) and **[scope and semantics](docs/scope.md)** (what
+kenro leaves out, and why).
 
 All implemented functions are **deterministic and pure** (no I/O, no clock,
 no randomness) and NULL-strict (NULL in → NULL out; aggregates skip NULL
@@ -219,7 +222,7 @@ Structural differences that matter more than any single function:
   app's SQLite file: predicates, overlay/repair/buffer, R-tree maintenance,
   CRS transforms, MVT generation, aggregates. Reach for PostGIS or DuckDB
   spatial when you need what kenro
-  [deliberately leaves out](docs/functions.md#deliberately-out-of-scope) —
+  [deliberately leaves out](docs/scope.md#deliberately-out-of-scope) —
   raster, topology/networks, file-format conversion,
   GeometryCollection-producing operations, datum-grid transforms. They
   compose rather than compete.
