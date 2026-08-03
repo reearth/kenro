@@ -132,6 +132,12 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Length2D", "stLength", [Blob], Real, None),
     // EWKT/EWKB and the flattening that lets 3D input reach an encoder.
     entry!("ST_Force2D", "stForce2d", [Blob], Blob, None),
+    // ST_Force3D and its PostGIS alias ST_Force3DZ: the only functions that
+    // *create* a Z. The optional argument fills gaps; it never overwrites one.
+    entry!("ST_Force3D", "stForce3d", [Blob], Blob, None),
+    entry!("ST_Force3D", "stForce3dZ", [Blob, Real], Blob, None),
+    entry!("ST_Force3DZ", "stForce3d", [Blob], Blob, None),
+    entry!("ST_Force3DZ", "stForce3dZ", [Blob, Real], Blob, None),
     entry!("ST_AsEWKT", "stAsEwkt", [Blob], Text, None),
     entry!("ST_GeomFromEWKT", "stGeomFromEwkt", [Text], Blob, None),
     entry!("ST_AsEWKB", "stAsEwkb", [Blob], Blob, None),
@@ -917,6 +923,13 @@ pub const FUNCTIONS: &[FnEntry] = &[
     ),
     // Constructors.
     entry!("ST_MakePoint", "stMakePoint", [Real, Real], Blob, None),
+    entry!(
+        "ST_MakePoint",
+        "stMakePointZ",
+        [Real, Real, Real],
+        Blob,
+        None
+    ),
     entry!("ST_Point", "stPoint", [Real, Real], Blob, None),
     entry!("ST_Point", "stPointSrid", [Real, Real, Int], Blob, None),
     entry!(

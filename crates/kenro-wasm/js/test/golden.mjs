@@ -892,6 +892,27 @@ export const SMOKE_SQL = {
   },
   // The 3D form. A 2D geometry stays 2D: z is taken as 0 for the x'/y' rows
   // and the z' row is discarded (PostGIS 3.5, measured).
+  // The only functions that create a Z: ST_Force3D and its PostGIS alias.
+  "ST_Force3D/1": {
+    sql: "SELECT ST_NDims(ST_Force3D(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_Force3D/2": {
+    sql: "SELECT ST_Z(ST_Force3D(ST_GeomFromText('POINT(1 2)'), 7))",
+    check: (v) => Number(v) === 7,
+  },
+  "ST_Force3DZ/1": {
+    sql: "SELECT ST_NDims(ST_Force3DZ(ST_GeomFromText('POINT(1 2)')))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_Force3DZ/2": {
+    sql: "SELECT ST_Z(ST_Force3DZ(ST_GeomFromText('POINT(1 2)'), 7))",
+    check: (v) => Number(v) === 7,
+  },
+  "ST_MakePoint/3": {
+    sql: "SELECT ST_Z(ST_MakePoint(1, 2, 3))",
+    check: (v) => Number(v) === 3,
+  },
   "ST_Affine/13": {
     sql: "SELECT ST_AsText(ST_Affine(ST_GeomFromText('POINT(1 2)'), 1,2,3, 4,5,6, 7,8,9, 10,20,30))",
     check: (v) => v === "POINT(15 34)",

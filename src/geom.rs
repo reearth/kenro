@@ -85,6 +85,38 @@ pub fn surface_kind(bytes: &[u8]) -> Option<SurfaceKind> {
     }
 }
 
+/// Does the *encoding* carry a Z ordinate?
+///
+/// Read from the type code, so it distinguishes XYZ from XYM where an ordinate
+/// count cannot. `functions::threed::st_has_z` answers a slightly different
+/// question — it treats a surface collection as 3D whatever its type code says,
+/// because its reader supplies a zero — and `ST_Force3D` needs this one.
+pub fn has_z_encoded(bytes: &[u8]) -> Result<bool> {
+    let wkb = if gpb::is_gpb(bytes) {
+        let header = GpbHeader::parse(bytes)?;
+        &bytes[header.wkb_offset..]
+    } else {
+        bytes
+    };
+    if wkb.len() < 5 {
+        return Err(Error::InvalidWkb("shorter than a 5-byte WKB header".into()));
+    }
+    let raw: [u8; 4] = wkb[1..5].try_into().expect("length checked");
+    let ty = match wkb[0] {
+        0 => u32::from_be_bytes(raw),
+        1 => u32::from_le_bytes(raw),
+        b => {
+            return Err(Error::InvalidWkb(format!(
+                "invalid byte-order marker {b:#04x}"
+            )));
+        }
+    };
+    if ty & 0x8000_0000 != 0 {
+        return Ok(true); // EWKB Z flag
+    }
+    Ok(matches!((ty & 0x0000_FFFF) / 1000, 1 | 3))
+}
+
 /// The SRID a blob carries, without decoding it.
 ///
 /// Needed by the encoding-level path: a surface collection has an SRID like

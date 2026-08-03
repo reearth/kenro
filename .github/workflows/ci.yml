@@ -101,6 +101,15 @@ jobs:
         run: cargo clippy -p kenro-wasm --no-default-features --target wasm32-unknown-unknown -- -D warnings
       - name: Manifest consistency (rusqlite registration == manifest)
         run: cargo test --all-features --test manifest_consistency
+      # The two hand-written wasm bindings drifted once: kenro-abi kept calling a
+      # stale `accessors::st_coord_dim` that answered a constant 2, so ST_NDims
+      # was wrong on every Go and Cloudflare host while rusqlite was right.
+      - name: Binding parity (kenro-abi and kenro-wasm call the same functions)
+        run: cargo test --all-features --test binding_parity
+      # `has_zm: false` is how a function silently drops a Z; the guard keeps the
+      # set of places allowed to write it enumerated and decided.
+      - name: No silent 2D flatten
+        run: cargo test --all-features --test no_silent_flatten
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:

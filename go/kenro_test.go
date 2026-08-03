@@ -96,6 +96,10 @@ var smokeCases = []smokeCase{
 
 	// Constructors
 	{"ST_MakePoint", `ST_AsText(ST_MakePoint(1, 2))`, "POINT(1 2)"},
+	// The only functions that create a Z. ST_NDims reports it; ST_AsText would
+	// refuse, kenro having no 3D text writer.
+	{"ST_Force3D", `ST_NDims(ST_Force3D(` + pt + `))`, int64(3)},
+	{"ST_Force3DZ", `ST_Z(ST_Force3DZ(` + pt + `, 7))`, 7.0},
 	{"ST_Point", `ST_SRID(ST_Point(1, 2, 4326))`, int64(4326)},
 	{"ST_MakeEnvelope", `ST_AsText(ST_MakeEnvelope(0, 0, 1, 1, 4326))`, "POLYGON((0 0,0 1,1 1,1 0,0 0))"},
 

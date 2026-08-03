@@ -70,13 +70,16 @@ fn bounds_of(bounds: &[u8], func: &'static str) -> Result<Option<(Geom, [f64; 4]
     Ok(Some((g, [r.min().x, r.min().y, r.max().x, r.max().y])))
 }
 
-fn out(cells: Vec<Polygon<f64>>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
+/// Named `out_2d`, not `out`: everywhere else in the tree `out` means "restore
+/// the Z from the inputs" and `out_2d` means "2D on purpose". A grid is
+/// generated rather than derived — there are no input vertices to take a height
+/// from — and PostGIS's grids are 2D too (measured on 3.5: `ST_SquareGrid` and
+/// `ST_HexagonGrid` over a `POLYGON Z` both answer `ST_NDims = 2`).
+fn out_2d(cells: Vec<Polygon<f64>>, srid: i32, func: &'static str) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(
         &Geom {
             geometry: Geometry::MultiPolygon(MultiPolygon::new(cells)),
             srid,
-            // A grid is generated, not derived: there are no input vertices
-            // to take a Z from, and PostGIS's grids are 2D as well.
             has_zm: false,
         },
         func,
@@ -111,12 +114,12 @@ fn too_many(func: &'static str, wanted: i64) -> Error {
 pub fn st_square_grid(size: f64, bounds: &[u8]) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_SquareGrid";
     let Some((g, [minx, miny, maxx, maxy])) = bounds_of(bounds, FUNC)? else {
-        return out(vec![], geom::decode_auto(bounds)?.srid, FUNC);
+        return out_2d(vec![], geom::decode_auto(bounds)?.srid, FUNC);
     };
     // NaN is caught by is_finite, so the comparison never sees it.
     if !size.is_finite() || size <= 0.0 {
         // PostGIS answers zero rows for size <= 0, not an error.
-        return out(vec![], g.srid, FUNC);
+        return out_2d(vec![], g.srid, FUNC);
     }
     let (i0, i1) = cell_range(minx, maxx, size);
     let (j0, j1) = cell_range(miny, maxy, size);
@@ -142,7 +145,7 @@ pub fn st_square_grid(size: f64, bounds: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     }
-    out(cells, g.srid, FUNC)
+    out_2d(cells, g.srid, FUNC)
 }
 
 /// `ST_HexagonGrid(size, bounds)` — a hexagonal tiling covering `bounds`.
@@ -164,10 +167,10 @@ pub fn st_square_grid(size: f64, bounds: &[u8]) -> Result<Vec<u8>> {
 pub fn st_hexagon_grid(size: f64, bounds: &[u8]) -> Result<Vec<u8>> {
     const FUNC: &str = "ST_HexagonGrid";
     let Some((g, [minx, miny, maxx, maxy])) = bounds_of(bounds, FUNC)? else {
-        return out(vec![], geom::decode_auto(bounds)?.srid, FUNC);
+        return out_2d(vec![], geom::decode_auto(bounds)?.srid, FUNC);
     };
     if !size.is_finite() || size <= 0.0 {
-        return out(vec![], g.srid, FUNC);
+        return out_2d(vec![], g.srid, FUNC);
     }
     let half_h = size * 3.0_f64.sqrt() / 2.0; // flat-to-flat, halved
     let row = half_h * 2.0; // √3·size
@@ -209,7 +212,7 @@ pub fn st_hexagon_grid(size: f64, bounds: &[u8]) -> Result<Vec<u8>> {
             ));
         }
     }
-    out(cells, g.srid, FUNC)
+    out_2d(cells, g.srid, FUNC)
 }
 
 #[cfg(test)]

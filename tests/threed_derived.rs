@@ -398,6 +398,121 @@ fn reprojection_refuses_an_unlabelled_geometry_as_postgis_does() {
     assert_eq!(z, 100.0);
 }
 
+/// Creating a Z, which the design note called the wall. It turned out the
+/// writer built for *carrying* heights across a derived geometry already emits
+/// ISO XYZ type codes, so a constant Z source is the whole of it — no decoded
+/// 3D geometry model involved. Every expectation measured on PostGIS 3.5.
+#[test]
+fn force_3d_creates_a_z_where_there_was_none() {
+    let conn = conn();
+    let z = |expr: &str| -> f64 {
+        conn.query_row(&format!("SELECT ST_Z({expr})"), [], |r| r.get(0))
+            .unwrap()
+    };
+    // ST_Force3D(POINT(1 2)) → POINT(1 2 0); with a zvalue → POINT(1 2 7).
+    assert_eq!(z("ST_Force3D(ST_GeomFromText('POINT(1 2)'))"), 0.0);
+    assert_eq!(z("ST_Force3D(ST_GeomFromText('POINT(1 2)'), 7)"), 7.0);
+    // ST_Force3DZ is PostGIS's alias for the same thing.
+    assert_eq!(z("ST_Force3DZ(ST_GeomFromText('POINT(1 2)'))"), 0.0);
+    assert_eq!(z("ST_Force3DZ(ST_GeomFromText('POINT(1 2)'), 7)"), 7.0);
+    // The x and y are untouched, and the SRID survives.
+    let (x, srid): (f64, i64) = conn
+        .query_row(
+            "SELECT ST_MinX(g), ST_SRID(g) FROM
+               (SELECT ST_Force3D(ST_GeomFromText('POINT(1 2)', 4326)) AS g)",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((x, srid), (1.0, 4326));
+
+    // Every geometry type, not just points.
+    for wkt in [
+        "LINESTRING(0 0,1 1)",
+        "POLYGON((0 0,1 0,1 1,0 0))",
+        "MULTIPOINT((1 2),(3 4))",
+        "MULTILINESTRING((0 0,1 1))",
+        "MULTIPOLYGON(((0 0,1 0,1 1,0 0)))",
+        "GEOMETRYCOLLECTION(POINT(1 2),LINESTRING(0 0,1 1))",
+    ] {
+        let expr = format!("ST_Force3D(ST_GeomFromText('{wkt}'))");
+        assert_eq!(ndims(&conn, &expr).unwrap(), 3, "{wkt}");
+    }
+
+    // An existing Z is never overwritten — the argument fills gaps, it does not
+    // set heights. Measured: ST_Force3D(POINT Z (1 2 3), 7) is POINT(1 2 3).
+    let pz = point_z(1.0, 2.0, 3.0);
+    assert_eq!(z(&format!("ST_Force3D({pz})")), 3.0);
+    assert_eq!(z(&format!("ST_Force3D({pz}, 7)")), 3.0);
+
+    // An empty geometry has no ordinates to raise, so it comes back unchanged.
+    assert_eq!(
+        ndims(&conn, "ST_Force3D(ST_GeomFromText('LINESTRING EMPTY'))").unwrap(),
+        2
+    );
+
+    // ST_MakePoint's three-argument form: the smallest use of the same writer.
+    assert_eq!(ndims(&conn, "ST_MakePoint(1, 2, 3)").unwrap(), 3);
+    assert_eq!(z("ST_MakePoint(1, 2, 3)"), 3.0);
+}
+
+/// XYM in, XYZ out — the M is dropped rather than kept alongside, because kenro
+/// has no way to write one. Measured: `ST_Force3D(POINT M (1 2 99))` is
+/// `POINT(1 2 0)` in PostGIS too.
+#[test]
+fn force_3d_on_an_m_geometry_drops_the_m() {
+    let conn = conn();
+    let mut v = vec![0x01u8];
+    v.extend_from_slice(&2001u32.to_le_bytes()); // POINT M
+    for o in [1.0f64, 2.0, 99.0] {
+        v.extend_from_slice(&o.to_le_bytes());
+    }
+    let pm = wkb_literal(&v);
+    let expr = format!("ST_Force3D({pm})");
+    assert_eq!(ndims(&conn, &expr).unwrap(), 3);
+    let (z, has_m): (f64, i64) = conn
+        .query_row(&format!("SELECT ST_Z({expr}), ST_HasM({expr})"), [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap();
+    assert_eq!(z, 0.0);
+    assert_eq!(has_m, 0);
+}
+
+/// A surface collection that has no Z in its type code cannot be raised: doing
+/// so would mean rebuilding the nested patch encoding, which the XYZ writer
+/// does not do. Refused with a message that says which geometry and why.
+#[test]
+fn force_3d_refuses_a_2d_surface_rather_than_guessing() {
+    let conn = conn();
+    // POLYHEDRALSURFACE (no Z): type 15, patches of type 3.
+    let mut v = vec![0x01u8];
+    v.extend_from_slice(&15u32.to_le_bytes());
+    v.extend_from_slice(&1u32.to_le_bytes());
+    v.push(0x01);
+    v.extend_from_slice(&3u32.to_le_bytes());
+    v.extend_from_slice(&1u32.to_le_bytes());
+    v.extend_from_slice(&4u32.to_le_bytes());
+    for c in [[0.0f64, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 0.0]] {
+        for o in c {
+            v.extend_from_slice(&o.to_le_bytes());
+        }
+    }
+    let flat_surface = wkb_literal(&v);
+    let err = ndims(&conn, &format!("ST_Force3D({flat_surface})"))
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("POLYHEDRALSURFACE"), "{err}");
+    // A surface that already has a Z passes straight through.
+    let s = surface_z();
+    assert_eq!(
+        conn.query_row(&format!("SELECT ST_NumPatches(ST_Force3D({s}))"), [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+}
+
 #[test]
 fn nothing_changed_for_2d_input() {
     let conn = conn();

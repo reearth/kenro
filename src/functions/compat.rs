@@ -28,6 +28,52 @@ pub fn st_force_2d(bytes: &[u8]) -> Result<Vec<u8>> {
     geom::encode_canonical_gpb(&geom, "ST_Force2D")
 }
 
+/// `ST_Force3D(geom [, zvalue])` / `ST_Force3DZ` — give every coordinate a Z,
+/// defaulting to 0.
+///
+/// This is the one thing the encoding-level rewriter provably cannot do: adding
+/// an ordinate changes the type code and the byte length. It needs a *writer*,
+/// and [`crate::coords::write_wkb_z`] — built to carry heights across a derived
+/// geometry — turns out to be exactly that, with the height coming from a
+/// constant instead of from the input. So no decoded 3D geometry model is
+/// involved after all.
+///
+/// Measured on PostGIS 3.5:
+///
+/// - `ST_Force3D(POINT(1 2))` is `POINT(1 2 0)`; with `zvalue = 7`, `POINT(1 2 7)`.
+/// - **An existing Z is never overwritten.** `ST_Force3D(POINT Z (1 2 3), 7)` is
+///   `POINT(1 2 3)` — the argument fills gaps, it does not set heights.
+/// - **XYM loses its M.** `ST_Force3D(POINT M (1 2 99))` is `POINT(1 2 0)`:
+///   the result is XYZ, and there is no XYZM here (kenro cannot write an M).
+/// - An empty geometry has no ordinates, so it comes back unchanged.
+pub fn st_force_3d(bytes: &[u8], z: f64) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_Force3D";
+    // Already 3D: PostGIS returns it untouched, `zvalue` and all.
+    if geom::has_z_encoded(bytes)? {
+        return crate::coords::map_coords(bytes, &mut |_| {});
+    }
+    if let Some(kind) = geom::surface_kind(bytes) {
+        // A surface collection with no Z in its type code. Raising one needs a
+        // writer that can emit nested surface WKB, which is not this one.
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: format!(
+                "cannot add a Z to a 2D {}: kenro writes surface collections \
+                 through byte-level paths only, and this one would have to \
+                 rebuild the patch encoding",
+                kind.name()
+            ),
+        });
+    }
+    let g = geom::decode_auto(bytes)?;
+    // Nothing to raise, and `write_wkb_z` has no coordinate to write.
+    if geom::is_empty(&g.geometry) {
+        return geom::encode_canonical_gpb(&g, FUNC);
+    }
+    let wkb = crate::coords::write_wkb_z(&g.geometry, &crate::coords::ZIndex::constant(z), FUNC)?;
+    Ok(crate::gpb::write_gpb(&wkb, g.srid, None, false))
+}
+
 /// `ST_AsEWKT(geom)` — WKT with PostGIS's `SRID=n;` prefix, omitted when the
 /// SRID is unknown (0), matching PostGIS exactly.
 pub fn st_as_ewkt(bytes: &[u8]) -> Result<String> {

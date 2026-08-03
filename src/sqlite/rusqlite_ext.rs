@@ -838,6 +838,33 @@ fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
 
     // New code, all of it small.
     register_geom_to_blob(conn, "ST_Force2D", compat::st_force_2d)?;
+    // ST_Force3D / ST_Force3DZ, one and two arguments. The default zvalue is 0,
+    // as in PostGIS.
+    for name in ["ST_Force3D", "ST_Force3DZ"] {
+        conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+            let Some(g) = blob_or_null(ctx, 0, name)? else {
+                return Ok(None);
+            };
+            blob(compat::st_force_3d(g, 0.0))
+        })?;
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(g), Some(z)) = (blob_or_null(ctx, 0, name)?, real_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            blob(compat::st_force_3d(g, z))
+        })?;
+    }
+    conn.create_scalar_function("ST_MakePoint", 3, FLAGS, |ctx| {
+        let (Some(x), Some(y), Some(z)) = (
+            real_or_null(ctx, 0, "ST_MakePoint")?,
+            real_or_null(ctx, 1, "ST_MakePoint")?,
+            real_or_null(ctx, 2, "ST_MakePoint")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(io::st_make_point_z(x, y, z))
+    })?;
     conn.create_scalar_function("ST_AsEWKT", 1, FLAGS, |ctx| {
         let Some(b) = blob_or_null(ctx, 0, "ST_AsEWKT")? else {
             return Ok(None);

@@ -11,13 +11,14 @@
 //! This module is that second path. It walks the WKB and rewrites each
 //! coordinate where it lies, which buys three properties worth stating:
 //!
-//! - **dimensionality never changes.** A 2D geometry stays 2D (a 3D matrix's
-//!   Z row is evaluated against `z = 0` and discarded, as PostGIS does); a 3D
-//!   geometry keeps its Z. Nothing here can *add* an ordinate — that would
-//!   change the type code and the byte length. Raising dimensionality is what
-//!   `ST_Force3D` and `ST_MakePoint(x, y, z)` would need, and it is
-//!   deliberately not possible here: a visitor that assigns a Z where the
-//!   encoding has no slot for one is ignored.
+//! - **the rewriter never changes dimensionality.** A 2D geometry stays 2D (a
+//!   3D matrix's Z row is evaluated against `z = 0` and discarded, as PostGIS
+//!   does); a 3D geometry keeps its Z. [`map_coords`] edits bytes in place, so
+//!   it cannot add an ordinate — the type code and the byte length would have
+//!   to change — and a visitor that assigns a Z where there is no slot is
+//!   ignored. Raising dimensionality is [`write_wkb_z`]'s job instead: it
+//!   builds fresh bytes and emits ISO XYZ type codes, which is what
+//!   `ST_Force3D` and `ST_MakePoint(x, y, z)` are built on.
 //! - **M is never touched.** ISO dimension code 2 is XYM — three ordinates,
 //!   none of them Z — so keying off the ordinate *count* would transform a
 //!   measure as if it were a height. Measured on PostGIS 3.5:
@@ -27,12 +28,13 @@
 //!   nested WKB like any multi-geometry, so *moving a building* needs no
 //!   geometry model at all. Measured: PostGIS transforms them too.
 //!
-//! What this is **not** is a second geometry model. It never holds a
+//! What this is **not** is a second geometry model. It never holds a 3D
 //! geometry, only one coordinate at a time, and it cannot answer a single
-//! question about shape. That is the line `tmp/3d-geometry-design.md` draws:
-//! a caller that needs to know anything beyond "here is a coordinate, here is
-//! its replacement" does not belong here, and wants the decoded 3D value that
-//! design note defers.
+//! question about shape. That is the line `tmp/3d-geometry-design.md` draws, and
+//! it is why *interpolating* a Z stays out: knowing where along a segment a new
+//! vertex sits, and which two heights to blend, is knowledge of shape. Setting
+//! a height the caller named is not, which is why `ST_Force3D` fits here and
+//! `ST_Segmentize` does not.
 
 use crate::error::{Error, Result};
 use crate::gpb::{self, GpbHeader};
@@ -143,6 +145,11 @@ pub struct ZIndex {
     /// feature seen in plan view. Looking one up is an error rather than a
     /// coin flip.
     map: std::collections::HashMap<(u64, u64), Option<f64>>,
+    /// The Z to give a coordinate the map has never seen. `None` — the default
+    /// — is what makes an invented coordinate an error; `Some` is how
+    /// `ST_Force3D` says "every coordinate gets this height", which is the
+    /// whole of *creating* a Z rather than carrying one.
+    fallback: Option<f64>,
 }
 
 impl ZIndex {
@@ -159,12 +166,35 @@ impl ZIndex {
         index
     }
 
-    /// The Z at `(x, y)`, or `None` when the coordinate is absent *or*
-    /// ambiguous. Callers treat both as "cannot restore a Z here".
-    pub fn get(&self, x: f64, y: f64) -> Option<f64> {
-        self.map.get(&key(x, y)).copied().flatten()
+    /// An index that answers `z` for every coordinate, known or not.
+    ///
+    /// This is the difference between *carrying* a Z and *creating* one:
+    /// [`write_wkb_z`] already emits ISO XYZ type codes, so a constant source is
+    /// all `ST_Force3D` needs. No decoded 3D geometry model is involved, which
+    /// is why raising dimensionality turned out to be within reach of the
+    /// encoding-level path after all (`tmp/3d-geometry-design.md` §5 expected
+    /// otherwise, having been written before the writer existed).
+    pub fn constant(z: f64) -> Self {
+        Self {
+            map: std::collections::HashMap::new(),
+            fallback: Some(z),
+        }
     }
 
+    /// The Z at `(x, y)`, or `None` when there is no honest answer.
+    ///
+    /// A coordinate the map has *seen ambiguously* returns `None` even when a
+    /// fallback exists: two recorded heights at one plan position is a positive
+    /// statement that the answer is unknown, not an absence of information.
+    pub fn get(&self, x: f64, y: f64) -> Option<f64> {
+        match self.map.get(&key(x, y)) {
+            Some(z) => *z,
+            None => self.fallback,
+        }
+    }
+
+    /// Nothing *recorded* — a constant index is not empty in the sense that
+    /// matters to a caller, but `z_index` only ever builds recording indexes.
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }

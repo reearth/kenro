@@ -269,9 +269,9 @@ Three properties, each measured against PostGIS 3.5:
 - **The 3D form cannot raise dimensionality.** On 2D input, `z` is taken as 0
   for the `x'`/`y'` rows and the `z'` row is discarded:
   `ST_Affine(POINT(1 2), 1,2,3, 4,5,6, 7,8,9, 10,20,30)` is `POINT(15 34)`,
-  not a 3D point. Producing 3D from 2D is `ST_Force3D`'s and
-  `ST_MakePoint(x, y, z)`'s job, and neither is implemented — they need a
-  geometry model kenro does not have, where this does not.
+  not a 3D point. Producing 3D from 2D is
+  [`ST_Force3D`](#creating-a-z)'s job, and asking for it explicitly is the
+  difference: a transform must not change dimensionality behind your back.
 - **M is never mistaken for Z.** ISO dimension code 2 is XYM: three
   ordinates, none of them a height.
   `ST_Affine(POINT M (1 2 99), …, zoff := 30)` is `POINTM(11 22 99)`.
@@ -359,6 +359,35 @@ Two details worth knowing:
 `ST_Project` is the one exception that asserts a Z for a coordinate no input
 occupied: sliding a point along the ground does not change its elevation, which
 is what PostGIS does too.
+
+## Creating a Z
+
+`ST_Force3D` is the one function that *adds* a height rather than carrying or
+computing one, and it is a fair amount less exotic than it sounds: the XYZ
+writer built to carry heights across a derived geometry already emits ISO XYZ
+type codes, so all `ST_Force3D` supplies is a constant instead of a lookup. No
+decoded 3D geometry model is involved.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_Force3D(geom [, zvalue])` | geometry | ✅ | ❌ | ⚠️ named `CastToXYZ` | Every coordinate gains a Z, default 0. Works on every type, including collections |
+| `ST_Force3DZ(geom [, zvalue])` | geometry | ✅ | ❌ | ❌ | PostGIS's alias for the same function |
+| `ST_MakePoint(x, y, z)` | geometry | ✅ | ✅ | ⚠️ named `MakePointZ` | The four-argument XYZM form is not implemented — kenro cannot write an M |
+
+Measured on PostGIS 3.5, and matched:
+
+- `ST_Force3D(POINT(1 2))` is `POINT(1 2 0)`; with `zvalue = 7`, `POINT(1 2 7)`.
+- **An existing Z is never overwritten.** `ST_Force3D(POINT Z (1 2 3), 7)` is
+  `POINT(1 2 3)` — the argument fills gaps rather than setting heights. Use
+  `ST_Affine`'s 3D form or `ST_Translate` to *change* a height.
+- **XYM loses its M**: `ST_Force3D(POINT M (1 2 99))` is `POINT(1 2 0)`. The
+  result is XYZ, and kenro has no XYZM writer.
+- An empty geometry has no ordinates, so it comes back unchanged.
+
+⚠️ A **surface collection with no Z in its type code** is refused rather than
+raised: adding an ordinate there means rebuilding the nested patch encoding,
+which this writer does not do. Surfaces that already carry a Z — which is all of
+them in practice — pass straight through.
 
 ### `ST_Transform`
 
@@ -632,11 +661,12 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   collections are read and measured, never computed with, and the
   [coordinate transforms](#3d-affine-transforms) move them without decoding
   them; the design note behind that split is `tmp/3d-geometry-design.md`.
-- **Creating a Z** — no `ST_Force3D`, no `ST_MakePoint(x, y, z)`, and no
-  interpolating one for a vertex the input did not have (see
+- **Interpolating a Z** — no height for a vertex the input did not have (see
   [derived geometries](#derived-geometries-and-the-z)). Reading, measuring,
-  transforming and *carrying* a Z all work on the encoding; inventing a height
-  is the line, and PostGIS's interpolation is on the other side of it.
+  transforming, carrying and *setting* a Z all work on the encoding;
+  **guessing** one is the line, and PostGIS's interpolation is on the other side
+  of it. `ST_Force3D` sets a height because the caller named it; `ST_Segmentize`
+  would have to invent one, and refuses.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,

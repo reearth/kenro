@@ -13,7 +13,7 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~210 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~212 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
 - **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured, affine-transformed and flattened rather than silently lost — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])

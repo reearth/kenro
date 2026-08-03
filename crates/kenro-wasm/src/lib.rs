@@ -621,6 +621,24 @@ pub fn st_affine_3d(
     extra::st_affine_3d(geom, a, b, c, d, e, f, g, h, i, xoff, yoff, zoff).map_err(err)
 }
 
+/// `ST_Force3D(geom)` / `ST_Force3DZ(geom)` — zvalue defaults to 0.
+#[wasm_bindgen(js_name = stForce3d)]
+pub fn st_force_3d(geom: &[u8]) -> R<Vec<u8>> {
+    compat::st_force_3d(geom, 0.0).map_err(err)
+}
+
+/// `ST_Force3D(geom, zvalue)` / `ST_Force3DZ(geom, zvalue)`.
+#[wasm_bindgen(js_name = stForce3dZ)]
+pub fn st_force_3d_z(geom: &[u8], z: f64) -> R<Vec<u8>> {
+    compat::st_force_3d(geom, z).map_err(err)
+}
+
+/// `ST_MakePoint(x, y, z)`.
+#[wasm_bindgen(js_name = stMakePointZ)]
+pub fn st_make_point_z(x: f64, y: f64, z: f64) -> R<Vec<u8>> {
+    io::st_make_point_z(x, y, z).map_err(err)
+}
+
 #[wasm_bindgen(js_name = stTransScale)]
 pub fn st_trans_scale(geom: &[u8], dx: f64, dy: f64, x_factor: f64, y_factor: f64) -> R<Vec<u8>> {
     extra::st_trans_scale(geom, dx, dy, x_factor, y_factor).map_err(err)
@@ -1841,6 +1859,9 @@ mod tests {
             "stPatchN",
             "kenroGpkgExtensionRequired",
             "stAffine3d",
+            "stForce3d",
+            "stForce3dZ",
+            "stMakePointZ",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

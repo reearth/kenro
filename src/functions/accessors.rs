@@ -395,13 +395,6 @@ pub fn st_dimension(bytes: &[u8]) -> Result<i64> {
     })
 }
 
-/// `ST_CoordDim(geom)` / `ST_NDims(geom)` — always 2: kenro is 2D, and 3D
-/// input has its Z/M dropped on decode (see `ST_Force2D`).
-pub fn st_coord_dim(bytes: &[u8]) -> Result<i64> {
-    geom::decode_auto(bytes)?;
-    Ok(2)
-}
-
 /// `ST_IsValidReason(geom)` — `"Valid Geometry"`, or a description of the
 /// first problem found.
 ///

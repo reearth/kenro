@@ -128,6 +128,18 @@ pub fn st_make_point(x: f64, y: f64) -> Result<Vec<u8>> {
     st_point(x, y, None)
 }
 
+/// `ST_MakePoint(x, y, z)` — a 3D point, no SRID.
+///
+/// The smallest possible use of the XYZ writer: one coordinate, and the height
+/// is an argument rather than something looked up. (PostGIS also has the
+/// four-argument XYZM form; kenro cannot write an M, so it is not here.)
+pub fn st_make_point_z(x: f64, y: f64, z: f64) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_MakePoint";
+    let point = geo_types::Geometry::Point(geo_types::Point::new(x, y));
+    let wkb = crate::coords::write_wkb_z(&point, &crate::coords::ZIndex::constant(z), FUNC)?;
+    Ok(gpb::write_gpb(&wkb, 0, None, false))
+}
+
 /// `ST_Point(x, y [, srid])` — like ST_MakePoint; the srid arity is
 /// PostGIS ≥ 3.2.
 pub fn st_point(x: f64, y: f64, srid: Option<i32>) -> Result<Vec<u8>> {

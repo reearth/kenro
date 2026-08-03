@@ -1187,7 +1187,11 @@ pub extern "C" fn k_stDimension(geom_p: *const u8, geom_l: u32) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn k_stCoordDim(geom_p: *const u8, geom_l: u32) -> i32 {
-    int(accessors::st_coord_dim(s(geom_p, geom_l)))
+    // `threed`, not `accessors`: the latter answered a constant 2 and was
+    // replaced when 3D pass-through landed. rusqlite and kenro-wasm both moved;
+    // this export did not, so every Go and Cloudflare caller was told a 3D
+    // geometry had two dimensions. `tests/binding_parity.rs` now catches that.
+    int(threed::st_coord_dim(s(geom_p, geom_l)))
 }
 
 #[unsafe(no_mangle)]
@@ -1364,6 +1368,24 @@ pub extern "C" fn k_stAffine3d(
         yoff,
         zoff,
     ))
+}
+
+/// `ST_Force3D(geom)` / `ST_Force3DZ(geom)` — zvalue defaults to 0.
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stForce3d(geom_p: *const u8, geom_l: u32) -> i32 {
+    blob(compat::st_force_3d(s(geom_p, geom_l), 0.0))
+}
+
+/// `ST_Force3D(geom, zvalue)` / `ST_Force3DZ(geom, zvalue)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stForce3dZ(geom_p: *const u8, geom_l: u32, z: f64) -> i32 {
+    blob(compat::st_force_3d(s(geom_p, geom_l), z))
+}
+
+/// `ST_MakePoint(x, y, z)`.
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stMakePointZ(x: f64, y: f64, z: f64) -> i32 {
+    blob(io::st_make_point_z(x, y, z))
 }
 
 #[unsafe(no_mangle)]
