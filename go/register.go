@@ -425,6 +425,21 @@ func (a *aggregate) step(ctx context.Context, e aggEntry, args []driver.Value) e
 		}
 		return nil
 
+	case aggExtent3D:
+		// ST_3DExtent steps like ST_Extent; only the result type differs.
+		params, err := marshalArgs(ctx, a.in, a.name, e.Args, args)
+		if err != nil {
+			return err
+		}
+		status, err := a.in.call(ctx, a.in.extent3dStep, append([]uint64{api.EncodeI32(a.handle)}, params...)...)
+		if err != nil {
+			return err
+		}
+		if status == statusErr {
+			return a.in.errFromOut(ctx)
+		}
+		return nil
+
 	case aggMVT:
 		if a.in.mvtStep == nil {
 			return errf("kenro: %s is unavailable in this wasm module (built without the `mvt` cargo feature)", a.name)
@@ -498,7 +513,13 @@ func (a *aggregate) WindowValue(*sqlite.FunctionContext) (driver.Value, error) {
 		a.err = err
 		return nil, err
 	}
-	v, err := readResult(ctx, a.in, status, "opt_blob")
+	// ST_3DExtent is the one aggregate whose result is TEXT (`BOX3D(…)`),
+	// SQLite having no box3d type; every other one returns a geometry blob.
+	ret := "opt_blob"
+	if a.kind == aggExtent3D {
+		ret = "opt_text"
+	}
+	v, err := readResult(ctx, a.in, status, ret)
 	if err != nil {
 		a.err = err
 		return nil, err

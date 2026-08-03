@@ -106,6 +106,87 @@ fn results_are_correct_through_sql() {
     assert_eq!(hit, 1);
 }
 
+/// The 3D coordinate path, end to end through SQL: both `ST_Affine` arities
+/// and the `ST_3DExtent` aggregate, on the shape a CityGML workflow has.
+///
+/// Every expected value here was measured on PostGIS 3.5.
+#[test]
+fn the_3d_coordinate_path_works_through_sql() {
+    let conn = conn();
+
+    // ST_Affine's 3D form on 2D input stays 2D, with z taken as 0:
+    //   ST_Affine(POINT(1 2), 1,2,3, 4,5,6, 7,8,9, 10,20,30) → POINT(15 34)
+    let wkt: String = conn
+        .query_row(
+            "SELECT ST_AsText(ST_Affine(ST_GeomFromText('POINT(1 2)'),
+                 1,2,3, 4,5,6, 7,8,9, 10,20,30))",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(wkt, "POINT(15 34)");
+
+    // A 3D column arrives the way it does in practice: a WKB blob written by
+    // something else (GDAL, QGIS, a CityGML importer). ISO WKB POINT Z is
+    // type 1001, and a SQL blob literal is how it gets into a query here.
+    fn point_z_literal(x: f64, y: f64, z: f64) -> String {
+        let mut v = vec![0x01u8];
+        v.extend_from_slice(&1001u32.to_le_bytes());
+        for value in [x, y, z] {
+            v.extend_from_slice(&value.to_le_bytes());
+        }
+        v.iter().map(|b| format!("{b:02x}")).collect()
+    }
+    let point_z_hex = point_z_literal(1.0, 2.0, 3.0);
+
+    // The 2D form now carries the Z through, as PostGIS does:
+    //   ST_Affine(POINT Z (1 2 3), 2,0,0,2, 10,20) → POINT(12 24 3)
+    let (x, z): (f64, f64) = conn
+        .query_row(
+            &format!(
+                "SELECT ST_MinX(g), ST_Z(g) FROM
+                   (SELECT ST_Affine(x'{point_z_hex}', 2,0,0,2, 10,20) AS g)"
+            ),
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((x, z), (12.0, 3.0));
+
+    // …and the 3D form transforms it: → POINT(24 52 80).
+    let (x, z): (f64, f64) = conn
+        .query_row(
+            &format!(
+                "SELECT ST_MinX(g), ST_Z(g) FROM
+                   (SELECT ST_Affine(x'{point_z_hex}', 1,2,3, 4,5,6, 7,8,9, 10,20,30) AS g)"
+            ),
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((x, z), (24.0, 80.0));
+
+    // ST_3DExtent over a group: PostGIS renders BOX3D(1 2 3,7 8 9).
+    let other = point_z_literal(7.0, 8.0, 9.0);
+    let box3d: String = conn
+        .query_row(
+            &format!(
+                "SELECT ST_3DExtent(g) FROM
+                   (SELECT x'{point_z_hex}' AS g UNION ALL SELECT x'{other}')"
+            ),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(box3d, "BOX3D(1 2 3,7 8 9)");
+
+    // NULL rows are skipped and a zero-row group is NULL, like ST_Extent.
+    assert!(matches!(
+        query_value(&conn, "SELECT ST_3DExtent(NULL)").unwrap(),
+        Value::Null
+    ));
+}
+
 #[test]
 fn null_in_null_out_for_every_function() {
     let conn = conn();

@@ -526,6 +526,17 @@ pub const FUNCTIONS: &[FnEntry] = &[
         Blob,
         None
     ),
+    // The 3D form: the upper 3×4 of a 4×4 matrix. Both arities go through
+    // `coords`, so Z rides along instead of being refused.
+    entry!(
+        "ST_Affine",
+        "stAffine3d",
+        [
+            Blob, Real, Real, Real, Real, Real, Real, Real, Real, Real, Real, Real, Real
+        ],
+        Blob,
+        None
+    ),
     entry!(
         "ST_TransScale",
         "stTransScale",
@@ -1092,6 +1103,14 @@ pub const AGGREGATES: &[AggEntry] = &[
     AggEntry {
         sql_name: "ST_Extent",
         ctor_export: "ExtentAgg",
+        args: &[Kind::Blob],
+        feature: None,
+    },
+    // ⚠️ Returns TEXT (`BOX3D(…)`), not a geometry — SQLite has no box3d and
+    // kenro cannot write a 3D geometry to stand in for one.
+    AggEntry {
+        sql_name: "ST_3DExtent",
+        ctor_export: "Extent3DAgg",
         args: &[Kind::Blob],
         feature: None,
     },

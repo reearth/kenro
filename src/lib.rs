@@ -34,6 +34,7 @@
 //! All functions are pure (no I/O, no clock, no randomness): identical input
 //! always produces identical output.
 
+pub mod coords;
 #[cfg(feature = "transform")]
 pub mod crs;
 pub mod error;

@@ -813,6 +813,7 @@ pub extern "C" fn k_stSimplify(p: *const u8, l: u32, tolerance: f64) -> i32 {
 const AGG_UNION: i32 = 0;
 const AGG_MVT: i32 = 1;
 const AGG_EXTENT: i32 = 2;
+const AGG_EXTENT_3D: i32 = 3;
 
 enum Agg {
     #[cfg(feature = "overlay")]
@@ -820,6 +821,7 @@ enum Agg {
     #[cfg(feature = "mvt")]
     Mvt(kenro::functions::mvt::MvtAggregate),
     Extent(extra::ExtentAggregate),
+    Extent3D(extra::Extent3DAggregate),
 }
 
 static AGGS: Slot<Vec<Option<Agg>>> = Slot::new(Vec::new());
@@ -838,6 +840,7 @@ pub extern "C" fn k_agg_new(kind: i32) -> i32 {
         #[cfg(feature = "mvt")]
         AGG_MVT => Agg::Mvt(kenro::functions::mvt::MvtAggregate::new()),
         AGG_EXTENT => Agg::Extent(extra::ExtentAggregate::new()),
+        AGG_EXTENT_3D => Agg::Extent3D(extra::Extent3DAggregate::new()),
         _ => return -1,
     };
     let slot = aggs().iter().position(Option::is_none);
@@ -858,7 +861,10 @@ fn agg_gone() -> i32 {
     ERR
 }
 
-#[cfg(feature = "overlay")]
+// No feature gate: `ST_Extent` is in the manifest unconditionally, so a
+// standard-tier build that lacked this export registered an aggregate whose
+// step function was missing (the Go binding resolves it to nil and fails on
+// first use). The `overlay` cfg that used to be here was a copy-paste.
 #[unsafe(no_mangle)]
 pub extern "C" fn k_agg_extent_step(h: i32, p: *const u8, l: u32) -> i32 {
     let Some(Some(Agg::Extent(a))) = aggs().get_mut(h as usize) else {
@@ -870,6 +876,22 @@ pub extern "C" fn k_agg_extent_step(h: i32, p: *const u8, l: u32) -> i32 {
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn k_agg_extent3d_step(h: i32, p: *const u8, l: u32) -> i32 {
+    let Some(Some(Agg::Extent3D(a))) = aggs().get_mut(h as usize) else {
+        return agg_gone();
+    };
+    match a.step(s(p, l)) {
+        Ok(()) => OK,
+        Err(e) => fail(e),
+    }
+}
+
+// Gated to match `Agg::Union`: without `overlay` there is no accumulator to
+// step, and the manifest does not advertise `ST_Union` either. (Without this
+// the crate did not compile at all below the `full` tier — CI only ever
+// builds `full`, so it went unnoticed.)
+#[cfg(feature = "overlay")]
 #[unsafe(no_mangle)]
 pub extern "C" fn k_agg_union_step(h: i32, p: *const u8, l: u32) -> i32 {
     match aggs().get_mut(h as usize).and_then(Option::as_mut) {
@@ -933,6 +955,8 @@ pub extern "C" fn k_agg_finish(h: i32) -> i32 {
         #[cfg(feature = "mvt")]
         Some(Agg::Mvt(a)) => opt_blob(a.finish()),
         Some(Agg::Extent(a)) => opt_blob(a.finish()),
+        // TEXT, not a blob: `BOX3D(…)`, since SQLite has no box3d type.
+        Some(Agg::Extent3D(a)) => opt_text(a.finish()),
         None => agg_gone(),
     }
 }
@@ -1296,6 +1320,42 @@ pub extern "C" fn k_stAffine(
     yoff: f64,
 ) -> i32 {
     blob(extra::st_affine(s(geom_p, geom_l), a, b, d, e, xoff, yoff))
+}
+
+/// `ST_Affine`'s 3D form: the upper 3×4 of a 4×4 matrix.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn k_stAffine3d(
+    geom_p: *const u8,
+    geom_l: u32,
+    a: f64,
+    b: f64,
+    c: f64,
+    d: f64,
+    e: f64,
+    f: f64,
+    g: f64,
+    h: f64,
+    i: f64,
+    xoff: f64,
+    yoff: f64,
+    zoff: f64,
+) -> i32 {
+    blob(extra::st_affine_3d(
+        s(geom_p, geom_l),
+        a,
+        b,
+        c,
+        d,
+        e,
+        f,
+        g,
+        h,
+        i,
+        xoff,
+        yoff,
+        zoff,
+    ))
 }
 
 #[unsafe(no_mangle)]
@@ -2009,6 +2069,7 @@ pub extern "C" fn k_manifest() -> i32 {
         j.push_str(match e.ctor_export {
             "UnionAgg" => "0",
             "ExtentAgg" => "2",
+            "Extent3DAgg" => "3",
             _ => "1",
         });
         j.push_str(",\"args\":");

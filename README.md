@@ -13,9 +13,9 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~205 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~206 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
-- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured and flattened rather than silently lost — all first-class citizens
+- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured, affine-transformed and flattened rather than silently lost — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
 - **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` / `ST_Split` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree maintenance triggers require, plus the helper the (since-withdrawn) geometry-type triggers call, because files carrying them are still out there

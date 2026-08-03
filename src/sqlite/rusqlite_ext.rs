@@ -1277,6 +1277,22 @@ fn register_extra(conn: &Connection) -> rusqlite::Result<()> {
             g, args[0], args[1], args[2], args[3], args[4], args[5],
         ))
     })?;
+    conn.create_scalar_function("ST_Affine", 13, FLAGS, |ctx| {
+        let Some(g) = blob_or_null(ctx, 0, "ST_Affine")? else {
+            return Ok(None);
+        };
+        let mut args = [0.0f64; 12];
+        for (i, slot) in args.iter_mut().enumerate() {
+            let Some(v) = real_or_null(ctx, i + 1, "ST_Affine")? else {
+                return Ok(None);
+            };
+            *slot = v;
+        }
+        blob(extra::st_affine_3d(
+            g, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8],
+            args[9], args[10], args[11],
+        ))
+    })?;
     conn.create_scalar_function("ST_TransScale", 5, FLAGS, |ctx| {
         let Some(g) = blob_or_null(ctx, 0, "ST_TransScale")? else {
             return Ok(None);
@@ -1383,6 +1399,36 @@ fn register_extra(conn: &Connection) -> rusqlite::Result<()> {
         }
     }
     conn.create_aggregate_function("ST_Extent", 1, FLAGS, ExtentAgg)?;
+
+    // ST_3DExtent(geom): same semantics, but the result is TEXT — SQLite has
+    // no box3d type, and kenro cannot write a 3D geometry to stand in.
+    struct Extent3DAgg;
+    impl rusqlite::functions::Aggregate<extra::Extent3DAggregate, Option<Value>> for Extent3DAgg {
+        fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<extra::Extent3DAggregate> {
+            Ok(extra::Extent3DAggregate::new())
+        }
+        fn step(
+            &self,
+            ctx: &mut Context<'_>,
+            acc: &mut extra::Extent3DAggregate,
+        ) -> rusqlite::Result<()> {
+            match blob_or_null(ctx, 0, "ST_3DExtent")? {
+                None => Ok(()),
+                Some(b) => acc.step(b).map_err(sql_err),
+            }
+        }
+        fn finalize(
+            &self,
+            _: &mut Context<'_>,
+            acc: Option<extra::Extent3DAggregate>,
+        ) -> rusqlite::Result<Option<Value>> {
+            match acc {
+                None => Ok(None),
+                Some(agg) => agg.finish().map(|o| o.map(Value::Text)).map_err(sql_err),
+            }
+        }
+    }
+    conn.create_aggregate_function("ST_3DExtent", 1, FLAGS, Extent3DAgg)?;
     Ok(())
 }
 

@@ -247,6 +247,9 @@ var smokeCases = []smokeCase{
 	{"ST_YMin", `ST_YMin(ST_GeomFromText('LINESTRING(1 2,3 4)'))`, int64(2)},
 	// ST_Extent is an aggregate, so it needs a table rather than one row.
 	{"ST_Extent", `(SELECT ST_AsText(ST_Extent(g)) FROM (SELECT ST_GeomFromText('POINT(1 2)') AS g UNION ALL SELECT ST_GeomFromText('POINT(5 0)')))`, "POLYGON((1 0,1 2,5 2,5 0,1 0))"},
+	// ST_3DExtent is the one aggregate returning TEXT, so it exercises the
+	// binding's opt_text path. 2D rows contribute Z = 0, as in PostGIS.
+	{"ST_3DExtent", `(SELECT ST_3DExtent(g) FROM (SELECT ST_GeomFromText('POINT(1 2)') AS g UNION ALL SELECT ST_GeomFromText('POINT(5 0)')))`, "BOX3D(1 0 0,5 2 0)"},
 
 	// --- the tail (functions::misc) ---
 	{"ST_Box2dFromGeoHash", `ST_GeometryType(ST_Box2dFromGeoHash('xn76f'))`, "ST_Polygon"},
@@ -401,6 +404,32 @@ func TestErrorsCarryKenroPrefix(t *testing.T) {
 		if !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: error %q does not contain %q", tc.query, err, tc.want)
 		}
+	}
+}
+
+// ST_Affine's 3D form is the widest call in the manifest — 14 wasm parameters
+// against a scratch stack sized for 12 — and the smoke table only covers one
+// arity per name, so it gets its own test. Both expectations were measured on
+// PostGIS 3.5.
+func TestAffine3DThroughTheWasmBinding(t *testing.T) {
+	db := open(t)
+	var wkt string
+	err := db.QueryRow(`SELECT ST_AsText(ST_Affine(ST_GeomFromText('POINT(1 2)'),
+	                        1,2,3, 4,5,6, 7,8,9, 10,20,30))`).Scan(&wkt)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	// A 2D geometry stays 2D: z is taken as 0 and the z' row is discarded.
+	if wkt != "POINT(15 34)" {
+		t.Errorf("ST_Affine 3D form = %q, want POINT(15 34)", wkt)
+	}
+	// The 2D form still works alongside it, on the same connection.
+	if err := db.QueryRow(`SELECT ST_AsText(ST_Affine(ST_GeomFromText('LINESTRING(1 2,3 4)'),
+	                           2,0,0,2, 10,20))`).Scan(&wkt); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if wkt != "LINESTRING(12 24,16 28)" {
+		t.Errorf("ST_Affine 2D form = %q, want LINESTRING(12 24,16 28)", wkt)
 	}
 }
 

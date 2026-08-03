@@ -600,6 +600,27 @@ pub fn st_affine(geom: &[u8], a: f64, b: f64, d: f64, e: f64, xoff: f64, yoff: f
     extra::st_affine(geom, a, b, d, e, xoff, yoff).map_err(err)
 }
 
+/// `ST_Affine`'s 3D form: the upper 3×4 of a 4×4 matrix.
+#[wasm_bindgen(js_name = stAffine3d)]
+#[allow(clippy::too_many_arguments)]
+pub fn st_affine_3d(
+    geom: &[u8],
+    a: f64,
+    b: f64,
+    c: f64,
+    d: f64,
+    e: f64,
+    f: f64,
+    g: f64,
+    h: f64,
+    i: f64,
+    xoff: f64,
+    yoff: f64,
+    zoff: f64,
+) -> R<Vec<u8>> {
+    extra::st_affine_3d(geom, a, b, c, d, e, f, g, h, i, xoff, yoff, zoff).map_err(err)
+}
+
 #[wasm_bindgen(js_name = stTransScale)]
 pub fn st_trans_scale(geom: &[u8], dx: f64, dy: f64, x_factor: f64, y_factor: f64) -> R<Vec<u8>> {
     extra::st_trans_scale(geom, dx, dy, x_factor, y_factor).map_err(err)
@@ -679,6 +700,42 @@ impl ExtentAgg {
         self.inner
             .take()
             .ok_or_else(|| JsError::new("kenro: ST_Extent accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
+}
+
+/// `ST_3DExtent` accumulator. ⚠️ `finish` returns **text** —
+/// `BOX3D(minx miny minz,maxx maxy maxz)` — because SQLite has no box3d type
+/// and kenro cannot write a 3D geometry to stand in for one.
+#[wasm_bindgen]
+pub struct Extent3DAgg {
+    inner: Option<extra::Extent3DAggregate>,
+}
+
+#[wasm_bindgen]
+impl Extent3DAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Extent3DAgg {
+        Extent3DAgg {
+            inner: Some(extra::Extent3DAggregate::new()),
+        }
+    }
+
+    pub fn step(&mut self, geom: &[u8]) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: ST_3DExtent accumulator already finished"))?
+            .step(geom)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows aggregated).
+    pub fn finish(&mut self) -> Result<Option<String>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: ST_3DExtent accumulator already finished"))?
             .finish()
             .map_err(err)
     }
@@ -1729,6 +1786,7 @@ mod tests {
             "stNumPatches",
             "stPatchN",
             "kenroGpkgExtensionRequired",
+            "stAffine3d",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(
@@ -1737,7 +1795,7 @@ mod tests {
                 entry.export
             );
         }
-        let known_aggregates = ["UnionAgg", "MvtAgg", "ExtentAgg"];
+        let known_aggregates = ["UnionAgg", "MvtAgg", "ExtentAgg", "Extent3DAgg"];
         for entry in kenro::functions::manifest::active_aggregates() {
             assert!(
                 known_aggregates.contains(&entry.ctor_export),

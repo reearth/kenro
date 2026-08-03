@@ -98,6 +98,12 @@ pub fn st_relate_match(matrix: &str, pattern: &str) -> Result<bool> {
 
 /// `ST_Affine(geom, a, b, d, e, xoff, yoff)` — the 2D affine form:
 /// `x' = a·x + b·y + xoff`, `y' = d·x + e·y + yoff`.
+///
+/// Z and M ride through untouched. That is PostGIS's behaviour (measured on
+/// 3.5: `ST_Affine(POINT Z (1 2 3), 2,0,0,2, 10,20)` is `POINT(12 24 3)`) and
+/// it is why this goes through [`crate::coords`] rather than the 2D geometry
+/// model, which would have refused the input. Surface collections transform
+/// too, for the same reason.
 pub fn st_affine(
     bytes: &[u8],
     a: f64,
@@ -107,9 +113,53 @@ pub fn st_affine(
     xoff: f64,
     yoff: f64,
 ) -> Result<Vec<u8>> {
-    map_geometry(bytes, "ST_Affine", |c| Coord {
-        x: a * c.x + b * c.y + xoff,
-        y: d * c.x + e * c.y + yoff,
+    crate::coords::map_coords(bytes, &mut |p| {
+        let (x, y) = (p.x, p.y);
+        p.x = a * x + b * y + xoff;
+        p.y = d * x + e * y + yoff;
+    })
+}
+
+/// `ST_Affine(geom, a,b,c, d,e,f, g,h,i, xoff,yoff,zoff)` — the 3D form, the
+/// row-major upper 3×4 of a 4×4 matrix:
+///
+/// ```text
+/// x' = a·x + b·y + c·z + xoff
+/// y' = d·x + e·y + f·z + yoff
+/// z' = g·x + h·y + i·z + zoff
+/// ```
+///
+/// **A 2D geometry stays 2D**: `z` is taken as 0 for the `x'`/`y'` rows and
+/// `z'` is discarded, so the third row can only be observed on input that
+/// already carries a Z. Measured on PostGIS 3.5 —
+/// `ST_Affine(POINT(1 2), 1,2,3, 4,5,6, 7,8,9, 10,20,30)` is `POINT(15 34)`,
+/// and the same matrix on `POINT Z (1 2 3)` is `POINT(24 52 80)`.
+///
+/// This is the form CityGML's implicit geometry needs: a relative geometry
+/// placed into the world by a 4×4 transformation matrix.
+#[allow(clippy::too_many_arguments)]
+pub fn st_affine_3d(
+    bytes: &[u8],
+    a: f64,
+    b: f64,
+    c: f64,
+    d: f64,
+    e: f64,
+    f: f64,
+    g: f64,
+    h: f64,
+    i: f64,
+    xoff: f64,
+    yoff: f64,
+    zoff: f64,
+) -> Result<Vec<u8>> {
+    crate::coords::map_coords(bytes, &mut |p| {
+        let (x, y, z) = (p.x, p.y, p.z.unwrap_or(0.0));
+        p.x = a * x + b * y + c * z + xoff;
+        p.y = d * x + e * y + f * z + yoff;
+        if let Some(pz) = p.z.as_mut() {
+            *pz = g * x + h * y + i * z + zoff;
+        }
     })
 }
 
@@ -433,6 +483,79 @@ impl ExtentAggregate {
     }
 }
 
+/// `ST_3DExtent(geom)` aggregate state — the 3D bounding box of every row.
+///
+/// ⚠️ PostGIS returns its `box3d` type. SQLite has no such type, and kenro
+/// cannot write a 3D geometry to stand in for one, so this returns **the text
+/// PostGIS renders a box3d as**: `BOX3D(minx miny minz,maxx maxy maxz)`. That
+/// keeps the shape recognisable even though the type cannot be.
+///
+/// Two consequences worth knowing before reaching for it:
+///
+/// - The digits are kenro's (Rust's shortest round-trip), not PostGIS's.
+///   PostGIS renders a box3d through the server's `extra_float_digits`, so its
+///   own output is not a fixed string either — which is why kenro's golden
+///   tests compare the six numbers rather than the rendering.
+/// - Nothing consumes it yet. PostGIS's `ST_XMin`/`ST_ZMin` family accepts a
+///   box3d; kenro's takes a geometry blob only. For the six numbers, use
+///   `min(ST_MinX(g))` … `max(ST_ZMax(g))` with SQLite's own aggregates —
+///   which is what a query needing them should do anyway.
+///
+/// A 2D row contributes Z = 0 rather than nothing, following `ST_ZMin` /
+/// `ST_ZMax` (measured: PostGIS answers `BOX3D(0 0 0,5 5 0)` for
+/// `LINESTRING(0 0,5 5)`, and `BOX3D(0 0 0,1 1 5)` for a 2D and a 3D row
+/// together). Empty geometries contribute nothing; an all-empty or zero-row
+/// group is NULL.
+#[derive(Debug, Default)]
+pub struct Extent3DAggregate {
+    /// minx, miny, minz, maxx, maxy, maxz.
+    bounds: Option<[f64; 6]>,
+}
+
+impl Extent3DAggregate {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn step(&mut self, bytes: &[u8]) -> Result<()> {
+        use crate::functions::{rtree, threed};
+        // Read through the accessors rather than a fresh walk: they already
+        // handle surface collections and the 2D-Z-is-zero rule, and the cost
+        // matches the `min(ST_MinX(g))` a caller would write by hand.
+        let (Some(minx), Some(miny), Some(maxx), Some(maxy)) = (
+            rtree::st_min_x(bytes)?,
+            rtree::st_min_y(bytes)?,
+            rtree::st_max_x(bytes)?,
+            rtree::st_max_y(bytes)?,
+        ) else {
+            return Ok(()); // empty geometry: nothing to contribute
+        };
+        let minz = threed::st_zmin(bytes)?.unwrap_or(0.0);
+        let maxz = threed::st_zmax(bytes)?.unwrap_or(0.0);
+        self.bounds = Some(match self.bounds {
+            None => [minx, miny, minz, maxx, maxy, maxz],
+            Some(b) => [
+                b[0].min(minx),
+                b[1].min(miny),
+                b[2].min(minz),
+                b[3].max(maxx),
+                b[4].max(maxy),
+                b[5].max(maxz),
+            ],
+        });
+        Ok(())
+    }
+
+    pub fn finish(self) -> Result<Option<String>> {
+        Ok(self.bounds.map(|b| {
+            format!(
+                "BOX3D({} {} {},{} {} {})",
+                b[0], b[1], b[2], b[3], b[4], b[5]
+            )
+        }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,5 +704,127 @@ mod tests {
             "POLYGON((1 0,1 2,5 2,5 0,1 0))"
         );
         assert!(ExtentAggregate::new().finish().unwrap().is_none());
+    }
+
+    /// ISO WKB `POINT Z (x y z)` — the route 3D input actually takes into
+    /// kenro (written by GDAL/QGIS, not by a constructor).
+    fn point_z(x: f64, y: f64, z: f64) -> Vec<u8> {
+        let mut v = vec![0x01];
+        v.extend_from_slice(&1001u32.to_le_bytes());
+        for value in [x, y, z] {
+            v.extend_from_slice(&value.to_le_bytes());
+        }
+        v
+    }
+
+    #[test]
+    fn affine_2d_form_carries_z_through_like_postgis() {
+        // Measured on PostGIS 3.5:
+        //   ST_Affine(POINT Z (1 2 3), 2,0,0,2, 10,20) → POINT(12 24 3)
+        // kenro used to refuse this outright; the Z now rides along.
+        let out = st_affine(&point_z(1.0, 2.0, 3.0), 2.0, 0.0, 0.0, 2.0, 10.0, 20.0).unwrap();
+        use crate::functions::{rtree, threed};
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(12.0));
+        assert_eq!(rtree::st_min_y(&out).unwrap(), Some(24.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(3.0));
+        assert_eq!(threed::st_coord_dim(&out).unwrap(), 3);
+    }
+
+    #[test]
+    fn affine_3d_form_matches_the_measured_matrix() {
+        use crate::functions::{rtree, threed};
+        // Measured on PostGIS 3.5, matrix (1,2,3 / 4,5,6 / 7,8,9) + (10,20,30):
+        //   POINT Z (1 2 3) → POINT(24 52 80)
+        let out = st_affine_3d(
+            &point_z(1.0, 2.0, 3.0),
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            20.0,
+            30.0,
+        )
+        .unwrap();
+        assert_eq!(rtree::st_min_x(&out).unwrap(), Some(24.0));
+        assert_eq!(rtree::st_min_y(&out).unwrap(), Some(52.0));
+        assert_eq!(threed::st_z(&out).unwrap(), Some(80.0));
+
+        // …and the same matrix on 2D input → POINT(15 34): z is taken as 0
+        // for the x/y rows, the z row is discarded, the result stays 2D.
+        let flat = st_affine_3d(
+            &g("POINT(1 2)"),
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            6.0,
+            7.0,
+            8.0,
+            9.0,
+            10.0,
+            20.0,
+            30.0,
+        )
+        .unwrap();
+        assert_eq!(wkt(&flat), "POINT(15 34)");
+        assert!(!threed::st_has_z(&flat).unwrap());
+    }
+
+    #[test]
+    fn affine_3d_moves_a_building() {
+        // The CityGML case: place a relative geometry into the world. No 2D
+        // function can touch a POLYHEDRALSURFACE, but this one can.
+        let cube = crate::functions::surface::fixtures::cube(6);
+        let placed = st_affine_3d(
+            &cube, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1000.0, 2000.0, 50.0,
+        )
+        .unwrap();
+        use crate::functions::{rtree, surface, threed};
+        assert_eq!(surface::st_num_patches(&placed).unwrap(), Some(6));
+        assert_eq!(surface::is_closed(&placed).unwrap(), Some(true));
+        assert_eq!(rtree::st_min_x(&placed).unwrap(), Some(1000.0));
+        assert_eq!(rtree::st_max_y(&placed).unwrap(), Some(2001.0));
+        assert_eq!(threed::st_zmin(&placed).unwrap(), Some(50.0));
+        assert_eq!(threed::st_zmax(&placed).unwrap(), Some(51.0));
+    }
+
+    #[test]
+    fn extent_3d_reports_the_box_postgis_reports() {
+        let mut agg = Extent3DAggregate::new();
+        agg.step(&point_z(1.0, 2.0, 3.0)).unwrap();
+        agg.step(&point_z(7.0, 8.0, 9.0)).unwrap();
+        // Measured on PostGIS 3.5: BOX3D(1 2 3,7 8 9).
+        assert_eq!(agg.finish().unwrap().unwrap(), "BOX3D(1 2 3,7 8 9)");
+
+        // A 2D row contributes Z = 0, not nothing — PostGIS answers
+        // BOX3D(0 0 0,5 5 0) for LINESTRING(0 0,5 5).
+        let mut agg = Extent3DAggregate::new();
+        agg.step(&g("LINESTRING(0 0,5 5)")).unwrap();
+        assert_eq!(agg.finish().unwrap().unwrap(), "BOX3D(0 0 0,5 5 0)");
+
+        // Mixed 2D and 3D rows: PostGIS gives BOX3D(0 0 0,1 1 5).
+        let mut agg = Extent3DAggregate::new();
+        agg.step(&g("POINT(0 0)")).unwrap();
+        agg.step(&point_z(1.0, 1.0, 5.0)).unwrap();
+        assert_eq!(agg.finish().unwrap().unwrap(), "BOX3D(0 0 0,1 1 5)");
+
+        // Surfaces are covered, since the accessors already were.
+        let mut agg = Extent3DAggregate::new();
+        agg.step(&crate::functions::surface::fixtures::cube(6))
+            .unwrap();
+        assert_eq!(agg.finish().unwrap().unwrap(), "BOX3D(0 0 0,1 1 1)");
+
+        // Zero rows, and an all-empty group, are NULL (PostGIS: NULL).
+        assert!(Extent3DAggregate::new().finish().unwrap().is_none());
+        let mut agg = Extent3DAggregate::new();
+        agg.step(&g("LINESTRING EMPTY")).unwrap();
+        assert!(agg.finish().unwrap().is_none());
     }
 }

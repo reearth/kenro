@@ -237,7 +237,8 @@ is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
 | `ST_ContainsProperly(a, b)` | INTEGER | ✅ | ❌ | ✅ | b in a's interior, touching neither boundary nor exterior — a polygon does not properly contain its own corner |
 | `ST_DFullyWithin(a, b, d)` | INTEGER | ✅ | ❌ | ✅ | *Every* part within `d`, i.e. the maximum distance is at most `d` |
 | `ST_RelateMatch(matrix, pattern)` | INTEGER | ✅ | ❌ | ✅ | The DE-9IM pattern language: `T` non-empty, `F` empty, `*` anything, `0`/`1`/`2` exact |
-| `ST_Affine(geom, a, b, d, e, xoff, yoff)` | geometry | ✅ | ❌ | ✅ | `x' = a·x + b·y + xoff`, `y' = d·x + e·y + yoff`. The 3D 12-argument form is not implemented |
+| `ST_Affine(geom, a, b, d, e, xoff, yoff)` | geometry | ✅ | ❌ | ✅ | `x' = a·x + b·y + xoff`, `y' = d·x + e·y + yoff`. **Z and M ride through untouched**, as in PostGIS, and surface collections transform — see [3D affine transforms](#3d-affine-transforms) |
+| `ST_Affine(geom, a,b,c, d,e,f, g,h,i, xoff,yoff,zoff)` | geometry | ✅ | ❌ | ❌ | The 3D form. A 2D geometry stays 2D — see [3D affine transforms](#3d-affine-transforms) |
 | `ST_TransScale(geom, dx, dy, xfactor, yfactor)` | geometry | ✅ | ❌ | ✅ | Translate **then** scale — PostGIS's order, which is easy to invert |
 | `ST_ReducePrecision(geom, gridsize)` | geometry | ✅ | ❌ | ❌ | ⚠️ rounds only; PostGIS also repairs the result. Follow with `ST_MakeValid` if you need that |
 | `ST_Angle(p1, p2, p3 [, p4])` | REAL / NULL | ✅ | ❌ | ❌ | ⚠️ **clockwise**, in [0, 2π) — `ST_Angle((0 0),(1 0),(0 0),(0 1))` is 270°, not 90°. POINT arguments only; the linestring form is not implemented |
@@ -247,6 +248,69 @@ is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
 | `ST_OrderingEquals(a, b)` | INTEGER | ✅ | ❌ | ✅ | Same geometry *and* same vertex order, unlike the topological `ST_Equals` |
 | `ST_GeoHash(geom [, maxchars])` | TEXT / NULL | ✅ | ❌ | ✅ | 20 characters by default. An extended geometry keeps only the prefix its bbox corners agree on (PostGIS's behavior); non-lon/lat input is an error |
 | `ST_Extent(geom)` **aggregate** | geometry / NULL | ✅ | ✅ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for. NULL rows are skipped; an all-NULL group is NULL |
+| `ST_3DExtent(geom)` **aggregate** | TEXT / NULL | ✅ | ❌ | ❌ | ⚠️ returns **text** — `BOX3D(minx miny minz,maxx maxy maxz)` — see [3D affine transforms](#3d-affine-transforms) for why, and what to use instead |
+
+## 3D affine transforms
+
+kenro computes in 2D, but a coordinate transform does not need a geometry
+model: it needs each coordinate, once. So `ST_Affine` does not go through the
+2D value every other function decodes into — it rewrites the coordinates
+**in the encoding**, which means Z survives, `POLYHEDRALSURFACE` transforms,
+and *placing a CityGML building into the world* works without kenro becoming
+a 3D engine.
+
+Three properties, each measured against PostGIS 3.5:
+
+- **Z rides through the 2D form.** `ST_Affine(POINT Z (1 2 3), 2,0,0,2, 10,20)`
+  is `POINT(12 24 3)` — PostGIS leaves the Z alone, and so does kenro.
+  (Earlier kenro versions raised an error here instead.)
+- **The 3D form cannot raise dimensionality.** On 2D input, `z` is taken as 0
+  for the `x'`/`y'` rows and the `z'` row is discarded:
+  `ST_Affine(POINT(1 2), 1,2,3, 4,5,6, 7,8,9, 10,20,30)` is `POINT(15 34)`,
+  not a 3D point. Producing 3D from 2D is `ST_Force3D`'s and
+  `ST_MakePoint(x, y, z)`'s job, and neither is implemented — they need a
+  geometry model kenro does not have, where this does not.
+- **M is never mistaken for Z.** ISO dimension code 2 is XYM: three
+  ordinates, none of them a height.
+  `ST_Affine(POINT M (1 2 99), …, zoff := 30)` is `POINTM(11 22 99)`.
+
+The 3D matrix is the upper 3×4 of a 4×4, row-major:
+
+```text
+x' = a·x + b·y + c·z + xoff
+y' = d·x + e·y + f·z + yoff
+z' = g·x + h·y + i·z + zoff
+```
+
+⚠️ **The sibling transforms have not moved yet.** `ST_Translate`, `ST_Scale`,
+`ST_Rotate`, `ST_TransScale` and `ST_ReducePrecision` still decode into the 2D
+value, so they still refuse 3D input and surface collections. Only `ST_Affine`
+takes the encoding-level path so far; the others are mechanical to follow and
+have not been done.
+
+### `ST_3DExtent`
+
+⚠️ PostGIS returns its `box3d` type. SQLite has no such type, and kenro cannot
+write a 3D geometry to stand in for one, so `ST_3DExtent` returns **the text
+PostGIS renders a box3d as**: `BOX3D(minx miny minz,maxx maxy maxz)`. The
+digits are Rust's shortest round-trip, not PostGIS's — PostGIS renders a box3d
+through the server's `extra_float_digits`, so its own output is not a fixed
+string either.
+
+Nothing consumes that text yet: PostGIS's `ST_XMin`/`ST_ZMin` family accepts a
+box3d, kenro's takes a geometry blob only. **For the six numbers, use SQLite's
+own aggregates over kenro's scalars**, which is what a query wanting them
+should do anyway:
+
+```sql
+SELECT min(ST_MinX(geom)), min(ST_MinY(geom)), min(ST_ZMin(geom)),
+       max(ST_MaxX(geom)), max(ST_MaxY(geom)), max(ST_ZMax(geom))
+FROM buildings;
+```
+
+A 2D row contributes Z = 0 rather than nothing, following `ST_ZMin`/`ST_ZMax`
+(PostGIS answers `BOX3D(0 0 0,5 5 0)` for `LINESTRING(0 0,5 5)`). Empty
+geometries contribute nothing; a zero-row or all-empty group is NULL.
 
 ## Hulls and triangulation
 
@@ -325,9 +389,12 @@ Z survives; `ST_GeomFromWKB` does **not**, because it re-encodes.
 | `ST_ZMin(geom)` / `ST_ZMax(geom)` | REAL / NULL | ✅ | ❌ | ✅ | ⚠️ a 2D geometry answers **0**, not NULL — PostGIS derives these from a bbox whose Z slot is zero, and `WHERE ST_ZMax(g) > 100` should behave the same on both. NULL only for an empty geometry |
 
 Everything else stays planar on 3D input: the R-tree columns, every
-predicate, every measure. What is *not* here is 3D geometry — no
-`ST_3DDistance`, no volumes, no `POLYHEDRALSURFACE` — which would need a
-geometry model kenro does not have.
+predicate, every measure. Two things reach past reporting without needing a
+3D geometry model, each in its own section — surface collections are
+[read and measured](#surface-collections-polyhedralsurface-tin-triangle), and
+[`ST_Affine`](#3d-affine-transforms) rewrites Z in place. What is still *not*
+here is 3D geometry: no `ST_3DDistance`, no volumes, no 3D predicates, and no
+way to *create* a Z that was not already in the input.
 
 ## GML 2/3 I/O
 
@@ -367,10 +434,13 @@ The route in is a GeoPackage written by GDAL, QGIS or a CityGML importer —
 the same route as [3D pass-through](#3d-pass-through). `ST_GeomFromWKB` will
 not do it, because it re-encodes.
 
-**Everything else refuses surface input, loudly and in one place.** A
-predicate or an overlay function raises with a message naming `ST_Force2D`;
-silently flattening a building into overlapping faces would be the same class
-of mistake as writing 2D where 3D went in.
+**Everything that needs a decoded geometry refuses surface input, loudly and
+in one place.** A predicate or an overlay function raises with a message naming
+`ST_Force2D`; silently flattening a building into overlapping faces would be
+the same class of mistake as writing 2D where 3D went in. The exception is the
+other function that reads the encoding rather than decoding it —
+[`ST_Affine`](#3d-affine-transforms) — which transforms a surface collection
+directly.
 
 | Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
 |---|---|---|---|---|---|
@@ -383,6 +453,7 @@ of mistake as writing 2D where 3D went in.
 | `ST_MinX` … `ST_MaxY`, `ST_ZMin`, `ST_ZMax`, `ST_HasZ`, `ST_NDims` | | ✅ | ❌ | ❌ | Walked from the patches; a surface column stays indexable |
 | `ST_Force2D(geom)` | geometry | ✅ | ✅ | ❌ | → MULTIPOLYGON of the patches. ⚠️ a closed solid becomes **overlapping coplanar faces** — geometrically correct, visually surprising, and what PostGIS does |
 | `ST_IsClosed(geom)` | INTEGER | ✅ | ❌ | ❌ | Is this a closed shell? Combinatorial, not geometric: every edge shared by exactly two patches, tested on the 3D coordinates |
+| `ST_Affine(…)` | geometry | ✅ | ❌ | ❌ | Both arities transform a surface collection, patches and Z included, because they rewrite the encoding rather than decoding it — [3D affine transforms](#3d-affine-transforms) |
 | `kenro_gpkg_extension_required(geom)` | TEXT / NULL | ❌ | ❌ | ❌ | **kenro-only.** See below |
 
 `ST_GeomFromGML` also reads CityGML's surface wrappers — `gml:Solid`,
@@ -449,8 +520,13 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
 - **3D geometry operations** — no `ST_3DIntersects`/`ST_3DDistance`, no
   volumes, no SOLID type (which is SFCGAL's, not stock PostGIS's). Surface
-  collections are read and measured, never computed with; the design note
-  behind that split is `tmp/3d-geometry-design.md`.
+  collections are read and measured, never computed with, and `ST_Affine`
+  moves coordinates without decoding them; the design note behind that split
+  is `tmp/3d-geometry-design.md`.
+- **Creating a Z** — no `ST_Force3D`, no `ST_MakePoint(x, y, z)`. Reading,
+  measuring and *transforming* 3D input all work on the encoding; raising a
+  2D geometry to 3D is the one thing that genuinely needs a 3D value to put
+  the result in.
 - **Single-sided buffering** — no `ST_OffsetCurve`: `geo`'s buffer has no
   side option, which is also why `ST_Buffer` rejects `side=`.
 - **Record-returning functions** — no `ST_IsValidDetail`,

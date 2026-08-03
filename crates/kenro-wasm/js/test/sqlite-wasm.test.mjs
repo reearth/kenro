@@ -128,6 +128,42 @@ test("ST_Union aggregate dissolves per group", () => {
   }
 });
 
+// ST_3DExtent is the first aggregate whose result is TEXT rather than a
+// geometry blob, so it exercises a path the other three never did.
+test("ST_3DExtent aggregate returns BOX3D text", () => {
+  const db = openDb();
+  try {
+    db.exec(`
+      CREATE TABLE pts (grp TEXT, geom BLOB);
+      INSERT INTO pts VALUES
+        ('a', ST_GeomFromText('POINT(1 2)')),
+        ('a', ST_GeomFromText('POINT(5 0)')),
+        ('a', NULL);
+    `);
+    // 2D rows contribute Z = 0, as PostGIS does.
+    assert.equal(
+      db.selectValue("SELECT ST_3DExtent(geom) FROM pts WHERE grp = 'a'"),
+      "BOX3D(1 0 0,5 2 0)",
+    );
+    // A 3D row raises the Z extent. ISO WKB POINT Z (0 0 7) is type 1001.
+    db.exec(
+      "INSERT INTO pts VALUES ('a', " +
+        "x'01e9030000000000000000000000000000000000000000000000001c40')",
+    );
+    assert.equal(
+      db.selectValue("SELECT ST_3DExtent(geom) FROM pts WHERE grp = 'a'"),
+      "BOX3D(0 0 0,5 2 7)",
+    );
+    // Zero rows → NULL.
+    assert.equal(
+      db.selectValue("SELECT ST_3DExtent(geom) FROM pts WHERE grp = 'nope'"),
+      null,
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test("ST_AsMVT aggregate produces a tile", () => {
   const db = openDb();
   try {

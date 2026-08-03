@@ -890,6 +890,12 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_AsText(ST_Affine(ST_GeomFromText('LINESTRING(1 2,3 4)'), 2,0,0,2,10,20))",
     check: (v) => v === "LINESTRING(12 24,16 28)",
   },
+  // The 3D form. A 2D geometry stays 2D: z is taken as 0 for the x'/y' rows
+  // and the z' row is discarded (PostGIS 3.5, measured).
+  "ST_Affine/13": {
+    sql: "SELECT ST_AsText(ST_Affine(ST_GeomFromText('POINT(1 2)'), 1,2,3, 4,5,6, 7,8,9, 10,20,30))",
+    check: (v) => v === "POINT(15 34)",
+  },
   "ST_TransScale/5": {
     sql: "SELECT ST_AsText(ST_TransScale(ST_GeomFromText('POINT(1 2)'), 1, 2, 3, 4))",
     check: (v) => v === "POINT(6 16)",
