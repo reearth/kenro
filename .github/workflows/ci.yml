@@ -110,6 +110,10 @@ jobs:
       # set of places allowed to write it enumerated and decided.
       - name: No silent 2D flatten
         run: cargo test --all-features --test no_silent_flatten
+      # A "what kenro does not do" list is prose nothing compiles, so it rots.
+      # This one rotted four times before the guard existed.
+      - name: Docs do not claim a registered function is missing
+        run: cargo test --all-features --test docs_not_stale
       - name: Install wasm-pack
         uses: taiki-e/install-action@v2
         with:

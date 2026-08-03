@@ -48,7 +48,7 @@ classes kenro doesn't cover.
 
 | | [@sqlite.org/sqlite-wasm] (primary) | [wa-sqlite] | [sql.js] |
 |---|---|---|---|
-| All 207 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| All 218 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
 | Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`, `ST_3DExtent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
 | GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ❌ **neither wa-sqlite build carries the rtree module** (sync and async, both SQLite 3.44.0) — measured, after this cell said ✅ for a long time with no test behind it | ❌ the stock sql.js build ships **without SQLite's R-tree module** |

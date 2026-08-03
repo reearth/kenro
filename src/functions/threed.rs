@@ -20,8 +20,12 @@
 //!   encoded coordinates directly, so a CityGML-style workflow can filter on
 //!   height while every predicate stays planar.
 //!
-//! What this is *not* is 3D geometry: no `ST_3DDistance`, no volumes, no
-//! `POLYHEDRALSURFACE`. Those need a geometry model kenro does not have.
+//! What this module is *not* is the whole 3D story — it is the reporting half.
+//! `functions::surface` reads POLYHEDRALSURFACE, `coords` moves a Z through the
+//! transforms, `geom::encode_derived` carries one across a derived geometry, and
+//! `functions::threed_metric` has `ST_3DDistance` and the rest of the family
+//! core PostGIS ships without SFCGAL. None of them needs a decoded 3D value,
+//! which is still the thing kenro does not have.
 
 use geozero::{GeomProcessor, GeozeroGeometry};
 
