@@ -51,7 +51,7 @@ classes kenro doesn't cover.
 | All 207 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
 | Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`, `ST_3DExtent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
-| GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ✅ | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
+| GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ❌ **neither wa-sqlite build carries the rtree module** (sync and async, both SQLite 3.44.0) — measured, after this cell said ✅ for a long time with no test behind it | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
 | Arity overloads (`ST_GeomFromText/1,/2`, …) | ✅ | ✅ | ✅ via a registry shim (sql.js keys UDFs by name only; the adapter works around it — sql.js version pinned) |
 | Error messages (`kenro: …`) | ✅ | ✅ (exceptions propagate to the statement caller) | ✅ via string-throw workaround (sql.js empties thrown `Error` objects) |
 | Stub errors (helpful "not implemented") | ✅ variadic | ✅ variadic | ✅ registered per concrete arity |
@@ -60,6 +60,13 @@ All three hosts run the same CI suite in Node: every registered function
 through SQL at least once, stub and NULL-strictness behavior, plus the full
 golden-vector set (700+ vectors from PostGIS / the H3 reference library)
 replayed against the raw wasm exports.
+
+The SQLite versions differ more than the table suggests, and wa-sqlite is the
+floor: **3.44.0**, against 3.50 for the official build and 3.49 for sql.js.
+That matters for the row-splitting recipes in
+[the function reference](functions.md#getting-n-rows-out), which need JSON1
+(3.38+) and `unhex` (3.41+) — measured present on all three, but wa-sqlite is
+the one to re-check if either recipe grows a newer dependency.
 
 ## Usage
 

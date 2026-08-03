@@ -100,3 +100,54 @@ test("h3 cells survive as 64-bit values", async () => {
     await sqlite3.close(db);
   }
 });
+
+test("documented limitation: the wa-sqlite build has no R-tree module", async () => {
+  // Same shape as the sql.js limitation, and it was mis-documented as ✅
+  // until measured: neither wa-sqlite build (sync or async, both SQLite
+  // 3.44.0) carries the rtree module, so GeoPackage spatial-index
+  // maintenance is impossible on this host. Not a kenro restriction — the
+  // module is absent. Pinned so a future build that adds it flips this test
+  // and the docs together.
+  const db = await sqlite3.open_v2(":memory:");
+  try {
+    await assert.rejects(
+      async () => {
+        for await (const stmt of sqlite3.statements(
+          db,
+          "CREATE VIRTUAL TABLE r USING rtree(id, minx, maxx, miny, maxy)",
+        )) {
+          await sqlite3.step(stmt);
+        }
+      },
+      /no such module: rtree/,
+    );
+  } finally {
+    await sqlite3.close(db);
+  }
+});
+
+test("json_each and unhex are available, so the row-splitting recipes work", async () => {
+  // docs/functions.md's "Getting N rows out" recipes rely on JSON1 and
+  // unhex. wa-sqlite pins the oldest SQLite of any host kenro supports
+  // (3.44.0 against 3.49–3.53 elsewhere), so it is the one worth asserting:
+  // unhex needs 3.41+.
+  const db = await sqlite3.open_v2(":memory:");
+  try {
+    assert.equal(
+      await selectValue(db, "SELECT count(*) FROM json_each('[10,20,30]')"),
+      3,
+    );
+    assert.equal(await selectValue(db, "SELECT hex(unhex('414243'))"), "414243");
+    // The MULTI* → rows shape, end to end.
+    assert.equal(
+      await selectValue(
+        db,
+        `SELECT count(*) FROM json_each(json_extract(
+           '{"type":"MultiPolygon","coordinates":[[[[0,0]]],[[[1,1]]]]}', '$.coordinates'))`,
+      ),
+      2,
+    );
+  } finally {
+    await sqlite3.close(db);
+  }
+});
