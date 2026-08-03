@@ -38,6 +38,14 @@ pub struct Vector {
     pub expected: serde_json::Value,
     #[serde(default)]
     pub kenro_expected: Option<serde_json::Value>,
+    /// "kenro answers NULL here, whatever the reference said."
+    ///
+    /// A separate flag rather than `"kenro_expected": null`, because serde
+    /// collapses a JSON `null` into `None` for an `Option` field — so that
+    /// spelling is indistinguishable from the key being absent, and silently
+    /// falls back to the reference value.
+    #[serde(default)]
+    pub kenro_null: Option<bool>,
     #[serde(default)]
     pub note: Option<String>,
 }

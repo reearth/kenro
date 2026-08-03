@@ -55,7 +55,7 @@ use kenro::functions::hull;
 use kenro::functions::overlay;
 use kenro::functions::{
     accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, misc,
-    predicates, processing, rtree, surface, threed,
+    predicates, processing, rtree, surface, threed, threed_metric,
 };
 
 // ---------------------------------------------------------------- status
@@ -1367,6 +1367,62 @@ pub extern "C" fn k_stAffine3d(
         xoff,
         yoff,
         zoff,
+    ))
+}
+
+// ---- the core-PostGIS 3D metric family (functions::threed_metric) ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dDistance(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    opt_real(threed_metric::st_3d_distance(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dMaxDistance(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    opt_real(threed_metric::st_3d_max_distance(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dIntersects(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    boolean(threed_metric::st_3d_intersects(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dDwithin(ap: *const u8, al: u32, bp: *const u8, bl: u32, d: f64) -> i32 {
+    boolean(threed_metric::st_3d_dwithin(s(ap, al), s(bp, bl), d))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dDfullyWithin(
+    ap: *const u8,
+    al: u32,
+    bp: *const u8,
+    bl: u32,
+    d: f64,
+) -> i32 {
+    boolean(threed_metric::st_3d_dfully_within(s(ap, al), s(bp, bl), d))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dClosestPoint(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    opt_blob(threed_metric::st_3d_closest_point(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dShortestLine(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    opt_blob(threed_metric::st_3d_shortest_line(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dLongestLine(ap: *const u8, al: u32, bp: *const u8, bl: u32) -> i32 {
+    opt_blob(threed_metric::st_3d_longest_line(s(ap, al), s(bp, bl)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dLineInterpolatePoint(gp: *const u8, gl: u32, fraction: f64) -> i32 {
+    blob(threed_metric::st_3d_line_interpolate_point(
+        s(gp, gl),
+        fraction,
     ))
 }
 

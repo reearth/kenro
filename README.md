@@ -13,13 +13,14 @@
 
 If you searched for *rusqlite spatial*, *SQLite spatial functions without SpatiaLite*, *SpatiaLite alternative in Rust*, *GeoPackage in pure Rust*, or *spatial queries on Cloudflare D1 / Durable Objects*: this is that crate.
 
-**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~212 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
+**kenro is a spatial SQL engine for SQLite** covering the PostGIS function surface you actually use — predicates, overlay, repair, buffering, reprojection, vector tiles, spatial aggregates, ~221 functions — in pure Rust, golden-tested against PostGIS itself, with zero C dependencies and one-call registration:
 
-- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured, affine-transformed and flattened rather than silently lost — all first-class citizens
+- **Geometry I/O** — WKT, WKB, GeoJSON, GML 2/3 and GeoPackage blobs in and out, MVT vector tiles, KML and SVG out; 3D and POLYHEDRALSURFACE/TIN columns are read, measured, affine-transformed, reprojected and flattened rather than silently lost — all first-class citizens
 - **Predicates** — the full DE-9IM family: `ST_Intersects` / `ST_Contains` / `ST_Within` / `ST_Touches` / `ST_Crosses` / `ST_Overlaps` / `ST_Equals` / `ST_Covers` / `ST_Relate`, plus `ST_Distance` / `ST_DWithin` (via [georust/geo])
 - **Overlay & repair** (`full` feature) — `ST_Intersection` / `ST_Union` (scalar *and* aggregate) / `ST_Difference` / `ST_SymDifference` / `ST_Buffer` / `ST_MakeValid` / `ST_Split` in pure Rust, with the differences vs GEOS quantified by golden tests
 - **GeoPackage support** — the exact function set the spec's R-tree maintenance triggers require, plus the helper the (since-withdrawn) geometry-type triggers call, because files carrying them are still out there
 - **CRS transform** — pure-Rust [proj4rs]: WGS84, Web Mercator and every UTM zone built in, the full EPSG registry behind a feature flag, with [measured accuracy](docs/accuracy.md)
+- **3D** — a Z survives storage, transforms, reprojection and every derived geometry that can honestly keep it; `ST_3DDistance`/`ST_3DIntersects`/`ST_3DShortestLine` and the rest of the family core PostGIS has without SFCGAL, golden-tested against it
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …

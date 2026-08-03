@@ -837,6 +837,79 @@ fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
     })?;
 
     // New code, all of it small.
+    // ---- the core-PostGIS 3D metric family (functions::threed_metric) ----
+    use crate::functions::threed_metric as m3;
+    for (name, f) in [
+        (
+            "ST_3DDistance",
+            m3::st_3d_distance as fn(&[u8], &[u8]) -> crate::error::Result<Option<f64>>,
+        ),
+        ("ST_3DMaxDistance", m3::st_3d_max_distance),
+    ] {
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(a), Some(b)) = (blob_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            f(a, b).map(|v| v.map(Value::Real)).map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_3DIntersects", 2, FLAGS, |ctx| {
+        let (Some(a), Some(b)) = (
+            blob_or_null(ctx, 0, "ST_3DIntersects")?,
+            blob_or_null(ctx, 1, "ST_3DIntersects")?,
+        ) else {
+            return Ok(None);
+        };
+        m3::st_3d_intersects(a, b)
+            .map(|v| Some(Value::Integer(v as i64)))
+            .map_err(sql_err)
+    })?;
+    for (name, f) in [
+        (
+            "ST_3DDWithin",
+            m3::st_3d_dwithin as fn(&[u8], &[u8], f64) -> crate::error::Result<bool>,
+        ),
+        ("ST_3DDFullyWithin", m3::st_3d_dfully_within),
+    ] {
+        conn.create_scalar_function(name, 3, FLAGS, move |ctx| {
+            let (Some(a), Some(b), Some(d)) = (
+                blob_or_null(ctx, 0, name)?,
+                blob_or_null(ctx, 1, name)?,
+                real_or_null(ctx, 2, name)?,
+            ) else {
+                return Ok(None);
+            };
+            f(a, b, d)
+                .map(|v| Some(Value::Integer(v as i64)))
+                .map_err(sql_err)
+        })?;
+    }
+    for (name, f) in [
+        (
+            "ST_3DClosestPoint",
+            m3::st_3d_closest_point as fn(&[u8], &[u8]) -> crate::error::Result<Option<Vec<u8>>>,
+        ),
+        ("ST_3DShortestLine", m3::st_3d_shortest_line),
+        ("ST_3DLongestLine", m3::st_3d_longest_line),
+    ] {
+        conn.create_scalar_function(name, 2, FLAGS, move |ctx| {
+            let (Some(a), Some(b)) = (blob_or_null(ctx, 0, name)?, blob_or_null(ctx, 1, name)?)
+            else {
+                return Ok(None);
+            };
+            f(a, b).map(|v| v.map(Value::Blob)).map_err(sql_err)
+        })?;
+    }
+    conn.create_scalar_function("ST_3DLineInterpolatePoint", 2, FLAGS, |ctx| {
+        let (Some(g), Some(f)) = (
+            blob_or_null(ctx, 0, "ST_3DLineInterpolatePoint")?,
+            real_or_null(ctx, 1, "ST_3DLineInterpolatePoint")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(m3::st_3d_line_interpolate_point(g, f))
+    })?;
     register_geom_to_blob(conn, "ST_Force2D", compat::st_force_2d)?;
     // ST_Force3D / ST_Force3DZ, one and two arguments. The default zvalue is 0,
     // as in PostGIS.

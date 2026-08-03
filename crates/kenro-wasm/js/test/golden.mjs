@@ -893,6 +893,44 @@ export const SMOKE_SQL = {
   // The 3D form. A 2D geometry stays 2D: z is taken as 0 for the x'/y' rows
   // and the z' row is discarded (PostGIS 3.5, measured).
   // The only functions that create a Z: ST_Force3D and its PostGIS alias.
+  // The core-PostGIS 3D metric family. 3D operands are blob literals:
+  // ST_GeomFromText refuses a Z by design.
+  "ST_3DDistance/2": {
+    sql: "SELECT ST_3DDistance(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f')",
+    check: (v) => Math.abs(Number(v) - Math.sqrt(3)) < 1e-9,
+  },
+  "ST_3DMaxDistance/2": {
+    sql: "SELECT ST_3DMaxDistance(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f')",
+    check: (v) => Math.abs(Number(v) - Math.sqrt(3)) < 1e-9,
+  },
+  "ST_3DIntersects/2": {
+    sql: "SELECT ST_3DIntersects(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000000000000000000000000000000000000000')",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_3DDWithin/3": {
+    sql: "SELECT ST_3DDWithin(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f', 2)",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_3DDFullyWithin/3": {
+    sql: "SELECT ST_3DDFullyWithin(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f', 2)",
+    check: (v) => Number(v) === 1,
+  },
+  "ST_3DClosestPoint/2": {
+    sql: "SELECT ST_Z(ST_3DClosestPoint(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f'))",
+    check: (v) => Number(v) === 0,
+  },
+  "ST_3DShortestLine/2": {
+    sql: "SELECT ST_NDims(ST_3DShortestLine(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f'))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_3DLongestLine/2": {
+    sql: "SELECT ST_NDims(ST_3DLongestLine(x'01e9030000000000000000000000000000000000000000000000000000', x'01e9030000000000000000f03f000000000000f03f000000000000f03f'))",
+    check: (v) => Number(v) === 3,
+  },
+  "ST_3DLineInterpolatePoint/2": {
+    sql: "SELECT ST_Z(ST_3DLineInterpolatePoint(x'01ea03000002000000000000000000000000000000000000000000000000000000000000000000244000000000000000000000000000005940', 0.5))",
+    check: (v) => Math.abs(Number(v) - 50) < 1e-9,
+  },
   "ST_Force3D/1": {
     sql: "SELECT ST_NDims(ST_Force3D(ST_GeomFromText('POINT(1 2)')))",
     check: (v) => Number(v) === 3,

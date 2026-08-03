@@ -1,0 +1,197 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/threed.sql"}
+{"id":"cube_above:3dclosestpoint","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3dclosestpoint","expected":"POINT(0.5 0.5 1)","kenro_null":null,"note":null}
+{"id":"cube_above:3ddistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3ddistance","expected":2,"kenro_null":null,"note":null}
+{"id":"cube_above:3dintersects","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"cube_above:3dlongestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,0.5 0.5 3)","kenro_null":null,"note":null}
+{"id":"cube_above:3dmaxdistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3dmaxdistance","expected":3.082207001484488,"kenro_null":null,"note":null}
+{"id":"cube_above:3dshortestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 3)","fn":"3dshortestline","expected":"LINESTRING(0.5 0.5 1,0.5 0.5 3)","kenro_null":null,"note":null}
+{"id":"cube_centre:3dclosestpoint","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3dclosestpoint","expected":"POINT(0.5 0.5 0)","kenro_null":null,"note":null}
+{"id":"cube_centre:3ddistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3ddistance","expected":0.5,"kenro_null":null,"note":null}
+{"id":"cube_centre:3dintersects","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"cube_centre:3dlongestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,0.5 0.5 0.5)","kenro_null":null,"note":null}
+{"id":"cube_centre:3dmaxdistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3dmaxdistance","expected":0.8660254037844386,"kenro_null":null,"note":null}
+{"id":"cube_centre:3dshortestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((1 1 0,0 1 0,0 1 1,1 1 1,1 1 0)),((0 1 0,0 0 0,0 0 1,0 1 1,0 1 0)))","b":"POINT Z (0.5 0.5 0.5)","fn":"3dshortestline","expected":"LINESTRING(0.5 0.5 0,0.5 0.5 0.5)","kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3dclosestpoint","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3dclosestpoint","expected":"POINT(10 5 5)","kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3ddistance","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3dintersects","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3dlongestline","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3dlongestline","expected":"LINESTRING(0 0 5,15 15 5)","kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3dmaxdistance","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3dmaxdistance","expected":21.213203435596427,"kenro_null":null,"note":null}
+{"id":"face_face_coplanar:3dshortestline","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((5 5 5,15 5 5,15 15 5,5 15 5,5 5 5))","fn":"3dshortestline","expected":"LINESTRING(10 5 5,10 5 5)","kenro_null":null,"note":null}
+{"id":"face_face_nested:3dclosestpoint","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3dclosestpoint","expected":"POINT(2 2 5)","kenro_null":null,"note":null}
+{"id":"face_face_nested:3ddistance","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"face_face_nested:3dintersects","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"face_face_nested:3dlongestline","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3dlongestline","expected":"LINESTRING(10 10 5,2 2 5)","kenro_null":null,"note":null}
+{"id":"face_face_nested:3dmaxdistance","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3dmaxdistance","expected":11.313708498984761,"kenro_null":null,"note":null}
+{"id":"face_face_nested:3dshortestline","a":"POLYGON Z ((0 0 5,10 0 5,10 10 5,0 10 5,0 0 5))","b":"POLYGON Z ((2 2 5,4 2 5,4 4 5,2 4 5,2 2 5))","fn":"3dshortestline","expected":"LINESTRING(2 2 5,2 2 5)","kenro_null":null,"note":null}
+{"id":"face_face_stacked:3dclosestpoint","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"face_face_stacked:3ddistance","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3ddistance","expected":5,"kenro_null":null,"note":null}
+{"id":"face_face_stacked:3dintersects","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"face_face_stacked:3dlongestline","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3dlongestline","expected":"LINESTRING(0 0 0,1 1 5)","kenro_null":null,"note":null}
+{"id":"face_face_stacked:3dmaxdistance","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3dmaxdistance","expected":5.196152422706632,"kenro_null":null,"note":null}
+{"id":"face_face_stacked:3dshortestline","a":"POLYGON Z ((0 0 0,1 0 0,1 1 0,0 0 0))","b":"POLYGON Z ((0 0 5,1 0 5,1 1 5,0 0 5))","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 0 5)","kenro_null":null,"note":null}
+{"id":"line_line_collin:3dclosestpoint","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3dclosestpoint","expected":"POINT(5 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_collin:3ddistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"line_line_collin:3dintersects","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"line_line_collin:3dlongestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,15 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_collin:3dmaxdistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3dmaxdistance","expected":15,"kenro_null":null,"note":null}
+{"id":"line_line_collin:3dshortestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 0 0,15 0 0)","fn":"3dshortestline","expected":"LINESTRING(5 0 0,5 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_parallel:3dclosestpoint","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_parallel:3ddistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3ddistance","expected":3,"kenro_null":null,"note":null}
+{"id":"line_line_parallel:3dintersects","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"line_line_parallel:3dlongestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,10 0 3)","kenro_null":null,"note":null}
+{"id":"line_line_parallel:3dmaxdistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3dmaxdistance","expected":10.44030650891055,"kenro_null":null,"note":null}
+{"id":"line_line_parallel:3dshortestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (0 0 3,10 0 3)","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 0 3)","kenro_null":null,"note":null}
+{"id":"line_line_skew:3dclosestpoint","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3dclosestpoint","expected":"POINT(5 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_skew:3ddistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3ddistance","expected":4,"kenro_null":null,"note":null}
+{"id":"line_line_skew:3dintersects","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"line_line_skew:3dlongestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,5 -5 4)","kenro_null":null,"note":null}
+{"id":"line_line_skew:3dmaxdistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3dmaxdistance","expected":8.12403840463596,"kenro_null":null,"note":null}
+{"id":"line_line_skew:3dshortestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3dshortestline","expected":"LINESTRING(5 0 0,5 0 4)","kenro_null":null,"note":null}
+{"id":"line_line_touch:3dclosestpoint","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3dclosestpoint","expected":"POINT(5 0 0)","kenro_null":null,"note":null}
+{"id":"line_line_touch:3ddistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"line_line_touch:3dintersects","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"line_line_touch:3dlongestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,5 -5 0)","kenro_null":null,"note":null}
+{"id":"line_line_touch:3dmaxdistance","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3dmaxdistance","expected":7.0710678118654755,"kenro_null":null,"note":null}
+{"id":"line_line_touch:3dshortestline","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 0,5 5 0)","fn":"3dshortestline","expected":"LINESTRING(5 0 0,5 0 0)","kenro_null":null,"note":null}
+{"id":"line_over_face:3dclosestpoint","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(5 5 7)","kenro_null":null,"note":null}
+{"id":"line_over_face:3ddistance","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":7,"kenro_null":null,"note":null}
+{"id":"line_over_face:3dintersects","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"line_over_face:3dlongestline","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(6 6 7,0 0 0)","kenro_null":null,"note":null}
+{"id":"line_over_face:3dmaxdistance","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":11,"kenro_null":null,"note":null}
+{"id":"line_over_face:3dshortestline","a":"LINESTRING Z (5 5 7,6 6 7)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(5 5 7,5 5 0)","kenro_null":null,"note":null}
+{"id":"line_thru_face:3dclosestpoint","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(5 5 0)","kenro_null":null,"note":null}
+{"id":"line_thru_face:3ddistance","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"line_thru_face:3dintersects","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"line_thru_face:3dlongestline","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(5 5 -5,0 0 0)","kenro_null":null,"note":null}
+{"id":"line_thru_face:3dmaxdistance","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":8.660254037844387,"kenro_null":null,"note":null}
+{"id":"line_thru_face:3dshortestline","a":"LINESTRING Z (5 5 -5,5 5 5)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(5 5 0,5 5 0)","kenro_null":null,"note":null}
+{"id":"mline_pt:3dclosestpoint","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3dclosestpoint","expected":"POINT(12 12 8)","kenro_null":null,"note":null}
+{"id":"mline_pt:3ddistance","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"mline_pt:3dintersects","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"mline_pt:3dlongestline","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,12 12 8)","kenro_null":null,"note":null}
+{"id":"mline_pt:3dmaxdistance","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3dmaxdistance","expected":18.76166303929372,"kenro_null":null,"note":null}
+{"id":"mline_pt:3dshortestline","a":"MULTILINESTRING Z ((0 0 0,5 5 0),(10 10 8,15 15 8))","b":"POINT Z (12 12 8)","fn":"3dshortestline","expected":"LINESTRING(12 12 8,12 12 8)","kenro_null":null,"note":null}
+{"id":"mpt_line:3dclosestpoint","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dclosestpoint","expected":"POINT(0 0 5)","kenro_null":null,"note":null}
+{"id":"mpt_line:3ddistance","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3ddistance","expected":5,"kenro_null":null,"note":null}
+{"id":"mpt_line:3dintersects","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"mpt_line:3dlongestline","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dlongestline","expected":"LINESTRING(20 20 5,0 0 0)","kenro_null":null,"note":null}
+{"id":"mpt_line:3dmaxdistance","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dmaxdistance","expected":28.722813232690143,"kenro_null":null,"note":null}
+{"id":"mpt_line:3dshortestline","a":"MULTIPOINT Z ((0 0 5),(20 20 5))","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dshortestline","expected":"LINESTRING(0 0 5,0 0 0)","kenro_null":null,"note":null}
+{"id":"phs_pt:3dclosestpoint","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3dclosestpoint","expected":"POINT(0.5 0.5 0)","kenro_null":null,"note":null}
+{"id":"phs_pt:3ddistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3ddistance","expected":7,"kenro_null":null,"note":null}
+{"id":"phs_pt:3dintersects","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"phs_pt:3dlongestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,0.5 0.5 7)","kenro_null":null,"note":null}
+{"id":"phs_pt:3dmaxdistance","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3dmaxdistance","expected":7.035623639735144,"kenro_null":null,"note":null}
+{"id":"phs_pt:3dshortestline","a":"POLYHEDRALSURFACE Z(((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)))","b":"POINT Z (0.5 0.5 7)","fn":"3dshortestline","expected":"LINESTRING(0.5 0.5 0,0.5 0.5 7)","kenro_null":null,"note":null}
+{"id":"pt_empty:3dclosestpoint","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":true,"note":"PostGIS returns uninitialised memory for an empty operand; kenro returns NULL"}
+{"id":"pt_empty:3ddistance","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3ddistance","expected":null,"kenro_null":null,"note":null}
+{"id":"pt_empty:3dintersects","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_empty:3dlongestline","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3dlongestline","expected":"LINESTRING(0 0 0,0 4.63557111106545e-310 0)","kenro_null":true,"note":"PostGIS returns uninitialised memory for an empty operand; kenro returns NULL"}
+{"id":"pt_empty:3dmaxdistance","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3dmaxdistance","expected":null,"kenro_null":null,"note":null}
+{"id":"pt_empty:3dshortestline","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 4.63557111106545e-310 0)","kenro_null":true,"note":"PostGIS returns uninitialised memory for an empty operand; kenro returns NULL"}
+{"id":"pt_face_above:3dclosestpoint","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(5 5 10)","kenro_null":null,"note":null}
+{"id":"pt_face_above:3ddistance","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":9.999999999999998,"kenro_null":null,"note":null}
+{"id":"pt_face_above:3dintersects","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_face_above:3dlongestline","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(5 5 10,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_face_above:3dmaxdistance","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":12.24744871391589,"kenro_null":null,"note":null}
+{"id":"pt_face_above:3dshortestline","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(5 5 10,5 5 1.77635683940025e-15)","kenro_null":null,"note":null}
+{"id":"pt_face_edge:3dclosestpoint","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(10 5 0)","kenro_null":null,"note":null}
+{"id":"pt_face_edge:3ddistance","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"pt_face_edge:3dintersects","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"pt_face_edge:3dlongestline","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(10 5 0,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_face_edge:3dmaxdistance","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":11.180339887498949,"kenro_null":null,"note":null}
+{"id":"pt_face_edge:3dshortestline","a":"POINT Z (10 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(10 5 0,10 5 0)","kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3dclosestpoint","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3dclosestpoint","expected":"POINT(5 5 100)","kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3ddistance","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3ddistance","expected":90.27735042633894,"kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3dintersects","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3dlongestline","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(5 5 100,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3dmaxdistance","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3dmaxdistance","expected":100.2496882788171,"kenro_null":null,"note":null}
+{"id":"pt_face_nonplanar:3dshortestline","a":"POINT Z (5 5 100)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 10,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(5 5 100,0 10 10)","kenro_null":null,"note":null}
+{"id":"pt_face_on:3dclosestpoint","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(4 6 0)","kenro_null":null,"note":null}
+{"id":"pt_face_on:3ddistance","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"pt_face_on:3dintersects","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"pt_face_on:3dlongestline","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(4 6 0,10 0 0)","kenro_null":null,"note":null}
+{"id":"pt_face_on:3dmaxdistance","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":8.48528137423857,"kenro_null":null,"note":null}
+{"id":"pt_face_on:3dshortestline","a":"POINT Z (4 6 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(4 6 0,4 6 0)","kenro_null":null,"note":null}
+{"id":"pt_face_outside:3dclosestpoint","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(20 20 0)","kenro_null":null,"note":null}
+{"id":"pt_face_outside:3ddistance","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":14.142135623730951,"kenro_null":null,"note":null}
+{"id":"pt_face_outside:3dintersects","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_face_outside:3dlongestline","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(20 20 0,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_face_outside:3dmaxdistance","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dmaxdistance","expected":28.284271247461902,"kenro_null":null,"note":null}
+{"id":"pt_face_outside:3dshortestline","a":"POINT Z (20 20 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(20 20 0,10 10 0)","kenro_null":null,"note":null}
+{"id":"pt_line_above:3dclosestpoint","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dclosestpoint","expected":"POINT(0 0 10)","kenro_null":null,"note":null}
+{"id":"pt_line_above:3ddistance","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3ddistance","expected":10,"kenro_null":null,"note":null}
+{"id":"pt_line_above:3dintersects","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_line_above:3dlongestline","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dlongestline","expected":"LINESTRING(0 0 10,10 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_above:3dmaxdistance","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dmaxdistance","expected":14.142135623730951,"kenro_null":null,"note":null}
+{"id":"pt_line_above:3dshortestline","a":"POINT Z (0 0 10)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dshortestline","expected":"LINESTRING(0 0 10,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3dclosestpoint","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dclosestpoint","expected":"POINT(5 0 9)","kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3ddistance","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3ddistance","expected":9,"kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3dintersects","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3dlongestline","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dlongestline","expected":"LINESTRING(5 0 9,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3dmaxdistance","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dmaxdistance","expected":10.295630140987,"kenro_null":null,"note":null}
+{"id":"pt_line_mid_above:3dshortestline","a":"POINT Z (5 0 9)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dshortestline","expected":"LINESTRING(5 0 9,5 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_on:3dclosestpoint","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dclosestpoint","expected":"POINT(5 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_on:3ddistance","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"pt_line_on:3dintersects","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"pt_line_on:3dlongestline","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dlongestline","expected":"LINESTRING(5 0 0,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_on:3dmaxdistance","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dmaxdistance","expected":5,"kenro_null":null,"note":null}
+{"id":"pt_line_on:3dshortestline","a":"POINT Z (5 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dshortestline","expected":"LINESTRING(5 0 0,5 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3dclosestpoint","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dclosestpoint","expected":"POINT(20 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3ddistance","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3ddistance","expected":10,"kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3dintersects","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3dlongestline","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dlongestline","expected":"LINESTRING(20 0 0,0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3dmaxdistance","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dmaxdistance","expected":20,"kenro_null":null,"note":null}
+{"id":"pt_line_past_end:3dshortestline","a":"POINT Z (20 0 0)","b":"LINESTRING Z (0 0 0,10 0 0)","fn":"3dshortestline","expected":"LINESTRING(20 0 0,10 0 0)","kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3dclosestpoint","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3ddistance","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3ddistance","expected":1.7320508075688772,"kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3dintersects","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3dlongestline","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,1 1 1)","kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3dmaxdistance","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3dmaxdistance","expected":1.7320508075688772,"kenro_null":null,"note":null}
+{"id":"pt_pt_diag:3dshortestline","a":"POINT Z (0 0 0)","b":"POINT Z (1 1 1)","fn":"3dshortestline","expected":"LINESTRING(0 0 0,1 1 1)","kenro_null":null,"note":null}
+{"id":"pt_pt_same:3dclosestpoint","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3dclosestpoint","expected":"POINT(3 4 5)","kenro_null":null,"note":null}
+{"id":"pt_pt_same:3ddistance","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3ddistance","expected":0,"kenro_null":null,"note":null}
+{"id":"pt_pt_same:3dintersects","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3dintersects","expected":true,"kenro_null":null,"note":null}
+{"id":"pt_pt_same:3dlongestline","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3dlongestline","expected":"LINESTRING(3 4 5,3 4 5)","kenro_null":null,"note":null}
+{"id":"pt_pt_same:3dmaxdistance","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3dmaxdistance","expected":0,"kenro_null":null,"note":null}
+{"id":"pt_pt_same:3dshortestline","a":"POINT Z (3 4 5)","b":"POINT Z (3 4 5)","fn":"3dshortestline","expected":"LINESTRING(3 4 5,3 4 5)","kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3dclosestpoint","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3ddistance","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3ddistance","expected":9,"kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3dintersects","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3dlongestline","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3dlongestline","expected":"LINESTRING(0 0 0,0 0 9)","kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3dmaxdistance","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3dmaxdistance","expected":9,"kenro_null":null,"note":null}
+{"id":"pt_pt_vertical:3dshortestline","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 0 9)","kenro_null":null,"note":null}
+{"id":"pt_wall:3dclosestpoint","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3dclosestpoint","expected":"POINT(0 5 5)","kenro_null":null,"note":null}
+{"id":"pt_wall:3ddistance","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3ddistance","expected":4.999999999999999,"kenro_null":null,"note":null}
+{"id":"pt_wall:3dintersects","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"pt_wall:3dlongestline","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3dlongestline","expected":"LINESTRING(0 5 5,10 0 10)","kenro_null":null,"note":null}
+{"id":"pt_wall:3dmaxdistance","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3dmaxdistance","expected":12.24744871391589,"kenro_null":null,"note":null}
+{"id":"pt_wall:3dshortestline","a":"POINT Z (0 5 5)","b":"POLYGON Z ((0 0 0,0 0 10,10 0 10,10 0 0,0 0 0))","fn":"3dshortestline","expected":"LINESTRING(0 5 5,0 8.881784197001252e-16 5)","kenro_null":null,"note":null}
+{"id":"tin_pt:3dclosestpoint","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"tin_pt:3ddistance","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3ddistance","expected":5,"kenro_null":null,"note":null}
+{"id":"tin_pt:3dintersects","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"tin_pt:3dlongestline","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3dlongestline","expected":"LINESTRING(1 0 0,0 0 5)","kenro_null":null,"note":null}
+{"id":"tin_pt:3dmaxdistance","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3dmaxdistance","expected":5.0990195135927845,"kenro_null":null,"note":null}
+{"id":"tin_pt:3dshortestline","a":"TIN Z(((0 0 0,1 0 0,0 1 0,0 0 0)))","b":"POINT Z (0 0 5)","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 0 5)","kenro_null":null,"note":null}
+{"id":"tri_pt:3dclosestpoint","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3dclosestpoint","expected":"POINT(0 0 0)","kenro_null":null,"note":null}
+{"id":"tri_pt:3ddistance","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3ddistance","expected":5,"kenro_null":null,"note":null}
+{"id":"tri_pt:3dintersects","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3dintersects","expected":false,"kenro_null":null,"note":null}
+{"id":"tri_pt:3dlongestline","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3dlongestline","expected":"LINESTRING(1 0 0,0 0 5)","kenro_null":null,"note":null}
+{"id":"tri_pt:3dmaxdistance","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3dmaxdistance","expected":5.0990195135927845,"kenro_null":null,"note":null}
+{"id":"tri_pt:3dshortestline","a":"TRIANGLE Z((0 0 0,1 0 0,0 1 0,0 0 0))","b":"POINT Z (0 0 5)","fn":"3dshortestline","expected":"LINESTRING(0 0 0,0 0 5)","kenro_null":null,"note":null}
+{"id":"dw_empty:3ddwithin","a":"POINT Z (0 0 0)","b":"LINESTRING EMPTY","fn":"3ddwithin","arg":5.0,"expected":false}
+{"id":"dw_face_above:3ddwithin","a":"POINT Z (5 5 10)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddwithin","arg":10.0,"expected":true}
+{"id":"dw_skew_exact:3ddwithin","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3ddwithin","arg":4.0,"expected":true}
+{"id":"dw_skew_under:3ddwithin","a":"LINESTRING Z (0 0 0,10 0 0)","b":"LINESTRING Z (5 -5 4,5 5 4)","fn":"3ddwithin","arg":3.9,"expected":false}
+{"id":"dw_vertical:3ddwithin","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3ddwithin","arg":9.0,"expected":true}
+{"id":"dfw_face_corner:3ddfullywithin","a":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","b":"POINT Z (0 0 0)","fn":"3ddfullywithin","arg":14.15,"expected":true}
+{"id":"dfw_too_tight:3ddfullywithin","a":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","b":"POINT Z (0 0 0)","fn":"3ddfullywithin","arg":14.14,"expected":false}
+{"id":"dfw_vertical:3ddfullywithin","a":"POINT Z (0 0 0)","b":"POINT Z (0 0 9)","fn":"3ddfullywithin","arg":9.0,"expected":true}
+{"id":"lip_flat_half:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 5,10 0 5)","fn":"3dlineinterpolatepoint","arg":0.5,"expected":"POINT(5 0 5)"}
+{"id":"lip_multi_half:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 0,10 0 10,20 0 30)","fn":"3dlineinterpolatepoint","arg":0.5,"expected":"POINT(11.837722339831622 0 13.675444679663242)"}
+{"id":"lip_multi_qtr:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 0,10 0 10,20 0 30)","fn":"3dlineinterpolatepoint","arg":0.25,"expected":"POINT(6.452847075210474 0 6.452847075210474)"}
+{"id":"lip_steep_end:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 0,10 0 100)","fn":"3dlineinterpolatepoint","arg":1.0,"expected":"POINT(10 0 100)"}
+{"id":"lip_steep_half:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 0,10 0 100)","fn":"3dlineinterpolatepoint","arg":0.5,"expected":"POINT(5 0 50)"}
+{"id":"lip_steep_start:3dlineinterpolatepoint","a":"LINESTRING Z (0 0 0,10 0 100)","fn":"3dlineinterpolatepoint","arg":0.0,"expected":"POINT(0 0 0)"}
+{"id":"pt_face_centre:3ddistance","a":"POINT Z (5 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3ddistance","expected":7.0710678118654755,"kenro_expected":0}
+{"id":"pt_face_centre:3dintersects","a":"POINT Z (5 5 0)","b":"POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,0 0 0))","fn":"3dintersects","expected":false,"kenro_expected":true}

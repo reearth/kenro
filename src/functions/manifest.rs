@@ -416,6 +416,66 @@ pub const FUNCTIONS: &[FnEntry] = &[
         OptText,
         None
     ),
+    // The core-PostGIS 3D metric family (functions::threed_metric). Everything
+    // in the SFCGAL solid-modelling family is deliberately absent — see
+    // docs/functions.md and tmp/3d-predicates.md.
+    entry!("ST_3DDistance", "st3dDistance", [Blob, Blob], OptReal, None),
+    entry!(
+        "ST_3DDWithin",
+        "st3dDwithin",
+        [Blob, Blob, Real],
+        Bool,
+        None
+    ),
+    entry!(
+        "ST_3DDFullyWithin",
+        "st3dDfullyWithin",
+        [Blob, Blob, Real],
+        Bool,
+        None
+    ),
+    entry!(
+        "ST_3DMaxDistance",
+        "st3dMaxDistance",
+        [Blob, Blob],
+        OptReal,
+        None
+    ),
+    entry!(
+        "ST_3DIntersects",
+        "st3dIntersects",
+        [Blob, Blob],
+        Bool,
+        None
+    ),
+    entry!(
+        "ST_3DClosestPoint",
+        "st3dClosestPoint",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_3DShortestLine",
+        "st3dShortestLine",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_3DLongestLine",
+        "st3dLongestLine",
+        [Blob, Blob],
+        OptBlob,
+        None
+    ),
+    entry!(
+        "ST_3DLineInterpolatePoint",
+        "st3dLineInterpolatePoint",
+        [Blob, Real],
+        Blob,
+        None
+    ),
     entry!("ST_HasZ", "stHasZ", [Blob], Bool, None),
     entry!("ST_HasM", "stHasM", [Blob], Bool, None),
     entry!("ST_Z", "stZ", [Blob], OptReal, None),

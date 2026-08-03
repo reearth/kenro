@@ -63,5 +63,6 @@ pub mod surface;
 #[cfg(feature = "text-encodings")]
 pub mod svg;
 pub mod threed;
+pub mod threed_metric;
 #[cfg(feature = "transform")]
 pub mod transform;

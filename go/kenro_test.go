@@ -19,6 +19,12 @@ const (
 	line  = `ST_GeomFromText('LINESTRING(0 0,1 1,2 2)', 4326)`
 	pt    = `ST_GeomFromText('POINT(1 2)', 4326)`
 	pt2   = `ST_GeomFromText('POINT(4 6)', 4326)`
+	// 3D operands arrive as blob literals: ST_GeomFromText refuses a Z by
+	// design, which is a documented divergence, not an oversight.
+	ptZ  = `x'01e9030000000000000000000000000000000000000000000000000000'` // POINT Z (0 0 0)
+	ptZ2 = `x'01e9030000000000000000f03f000000000000f03f000000000000f03f'` // POINT Z (1 1 1)
+	// LINESTRING Z (0 0 0,10 0 100)
+	lineZ = `x'01ea03000002000000000000000000000000000000000000000000000000000000000000000000244000000000000000000000000000005940'`
 )
 
 func open(t *testing.T) *sql.DB {
@@ -99,6 +105,16 @@ var smokeCases = []smokeCase{
 	// The only functions that create a Z. ST_NDims reports it; ST_AsText would
 	// refuse, kenro having no 3D text writer.
 	{"ST_Force3D", `ST_NDims(ST_Force3D(` + pt + `))`, int64(3)},
+	// The core-PostGIS 3D metric family. Values measured on PostGIS 3.5.
+	{"ST_3DDistance", `ST_3DDistance(` + ptZ + `, ` + ptZ2 + `)`, nil},
+	{"ST_3DMaxDistance", `ST_3DMaxDistance(` + ptZ + `, ` + ptZ2 + `)`, nil},
+	{"ST_3DIntersects", `ST_3DIntersects(` + ptZ + `, ` + ptZ + `)`, int64(1)},
+	{"ST_3DDWithin", `ST_3DDWithin(` + ptZ + `, ` + ptZ2 + `, 100.0)`, int64(1)},
+	{"ST_3DDFullyWithin", `ST_3DDFullyWithin(` + ptZ + `, ` + ptZ2 + `, 100.0)`, int64(1)},
+	{"ST_3DClosestPoint", `ST_Z(ST_3DClosestPoint(` + ptZ + `, ` + ptZ2 + `))`, nil},
+	{"ST_3DShortestLine", `ST_NDims(ST_3DShortestLine(` + ptZ + `, ` + ptZ2 + `))`, int64(3)},
+	{"ST_3DLongestLine", `ST_NDims(ST_3DLongestLine(` + ptZ + `, ` + ptZ2 + `))`, int64(3)},
+	{"ST_3DLineInterpolatePoint", `ST_Z(ST_3DLineInterpolatePoint(` + lineZ + `, 0.5))`, nil},
 	{"ST_Force3DZ", `ST_Z(ST_Force3DZ(` + pt + `, 7))`, 7.0},
 	{"ST_Point", `ST_SRID(ST_Point(1, 2, 4326))`, int64(4326)},
 	{"ST_MakeEnvelope", `ST_AsText(ST_MakeEnvelope(0, 0, 1, 1, 4326))`, "POLYGON((0 0,0 1,1 1,1 0,0 0))"},

@@ -12,7 +12,7 @@ use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
     accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree,
-    surface, threed,
+    surface, threed, threed_metric,
 };
 use kenro::geom;
 
@@ -619,6 +619,53 @@ pub fn st_affine_3d(
     zoff: f64,
 ) -> R<Vec<u8>> {
     extra::st_affine_3d(geom, a, b, c, d, e, f, g, h, i, xoff, yoff, zoff).map_err(err)
+}
+
+// ---- the core-PostGIS 3D metric family (functions::threed_metric) ----
+
+#[wasm_bindgen(js_name = st3dDistance)]
+pub fn st_3d_distance(a: &[u8], b: &[u8]) -> R<Option<f64>> {
+    threed_metric::st_3d_distance(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dMaxDistance)]
+pub fn st_3d_max_distance(a: &[u8], b: &[u8]) -> R<Option<f64>> {
+    threed_metric::st_3d_max_distance(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dIntersects)]
+pub fn st_3d_intersects(a: &[u8], b: &[u8]) -> R<bool> {
+    threed_metric::st_3d_intersects(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dDwithin)]
+pub fn st_3d_dwithin(a: &[u8], b: &[u8], d: f64) -> R<bool> {
+    threed_metric::st_3d_dwithin(a, b, d).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dDfullyWithin)]
+pub fn st_3d_dfully_within(a: &[u8], b: &[u8], d: f64) -> R<bool> {
+    threed_metric::st_3d_dfully_within(a, b, d).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dClosestPoint)]
+pub fn st_3d_closest_point(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    threed_metric::st_3d_closest_point(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dShortestLine)]
+pub fn st_3d_shortest_line(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    threed_metric::st_3d_shortest_line(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dLongestLine)]
+pub fn st_3d_longest_line(a: &[u8], b: &[u8]) -> R<Option<Vec<u8>>> {
+    threed_metric::st_3d_longest_line(a, b).map_err(err)
+}
+
+#[wasm_bindgen(js_name = st3dLineInterpolatePoint)]
+pub fn st_3d_line_interpolate_point(geom: &[u8], fraction: f64) -> R<Vec<u8>> {
+    threed_metric::st_3d_line_interpolate_point(geom, fraction).map_err(err)
 }
 
 /// `ST_Force3D(geom)` / `ST_Force3DZ(geom)` — zvalue defaults to 0.
@@ -1862,6 +1909,15 @@ mod tests {
             "stForce3d",
             "stForce3dZ",
             "stMakePointZ",
+            "st3dDistance",
+            "st3dMaxDistance",
+            "st3dIntersects",
+            "st3dDwithin",
+            "st3dDfullyWithin",
+            "st3dClosestPoint",
+            "st3dShortestLine",
+            "st3dLongestLine",
+            "st3dLineInterpolatePoint",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(

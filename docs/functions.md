@@ -700,11 +700,17 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
 - **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
-- **3D geometry operations** — no `ST_3DIntersects`/`ST_3DDistance`, no
-  volumes, no SOLID type (which is SFCGAL's, not stock PostGIS's). Surface
-  collections are read and measured, never computed with, and the
-  [coordinate transforms](#3d-affine-transforms) move them without decoding
-  them; the design note behind that split is `tmp/3d-geometry-design.md`.
+- **The SFCGAL solid-modelling family** — no `ST_Volume`, `ST_3DArea`,
+  `ST_3DIntersection`, `ST_3DUnion`, `ST_3DDifference`, `ST_Extrude`,
+  `ST_Tesselate`, `ST_MakeSolid`, `ST_IsSolid`, `ST_3DConvexHull`,
+  `ST_ApproximateMedialAxis`, `ST_MinkowskiSum` or `ST_StraightSkeleton`, and no
+  SOLID type. All of those are SFCGAL's, over CGAL — none of them exists in a
+  PostGIS build without it, which is also the build kenro's golden vectors come
+  from. Reproducing them means choosing semantics with nothing to check them
+  against, and a reference *does* exist in principle (SFCGAL itself, the way
+  pgRouting is routing's reference rather than PostGIS) — bringing one into the
+  harness is its own project. The **3D metric family that core PostGIS does
+  have** is implemented: see [3D distance and predicates](#3d-distance-and-predicates).
 - **Guessing a Z** — extrapolating one past the end of a line, or averaging two
   that disagree (see [derived geometries](#derived-geometries-and-the-z)).
   Reading, measuring, transforming, carrying, *interpolating between two known
@@ -739,6 +745,63 @@ SQL function names, a `GPKG_` function would read as one the standard defines.
 - **Datum-grid transforms** — `ST_Transform` is gridless projection math
   ([accuracy](accuracy.md)); survey-grade work needs full PROJ.
 - Any claim of full SpatiaLite/PostGIS compatibility.
+
+## 3D distance and predicates
+
+The nine functions core PostGIS has **without** SFCGAL. What makes them possible
+without a 3D geometry model is a single measurement: a POLYHEDRALSURFACE is
+treated as a *set of faces*, never as a volume — a point at the dead centre of a
+closed unit cube gives `ST_3DIntersects = false`. So there is no point-in-solid
+test, no shell orientation and no topology, only primitives against primitives.
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `ST_3DDistance(a, b)` | REAL / NULL | ✅ | ❌ | ✅ | NULL for an empty operand |
+| `ST_3DDWithin(a, b, d)` | INTEGER | ✅ | ❌ | ✅ | `false` for an empty operand, not NULL |
+| `ST_3DDFullyWithin(a, b, d)` | INTEGER | ✅ | ❌ | ✅ | the maximum distance is at most `d` |
+| `ST_3DMaxDistance(a, b)` | REAL / NULL | ✅ | ❌ | ✅ | **vertex to vertex** — measured |
+| `ST_3DIntersects(a, b)` | INTEGER | ✅ | ❌ | ✅ | faces are filled, solids are not |
+| `ST_3DClosestPoint(a, b)` | geometry / NULL | ✅ | ❌ | ✅ | the point on `a` |
+| `ST_3DShortestLine(a, b)` | geometry / NULL | ✅ | ❌ | ✅ | a 3D LINESTRING |
+| `ST_3DLongestLine(a, b)` | geometry / NULL | ✅ | ❌ | ✅ | the vertex pair |
+| `ST_3DLineInterpolatePoint(line, f)` | geometry | ✅ | ❌ | ❌ | the fraction is by **3D** length, unlike the 2D sibling |
+
+Points, linestrings, polygons, MULTI\* and the surface collections
+(POLYHEDRALSURFACE, TIN, TRIANGLE) are all accepted — the CityGML shapes
+included, which core PostGIS supports too. 196 golden vectors from the reference
+cover every type pair; the suite is `tests/golden/threed.jsonl`.
+
+Why they differ from their 2D namesakes, in one example: two lines that cross in
+plan but sit 4 apart in height give `ST_Intersects = true` and
+`ST_3DIntersects = false`.
+
+Three behaviours are copied deliberately, because each is wrong by default:
+
+- **A missing Z means "any value", not zero.** PostGIS says so in a notice, and
+  `ST_3DDistance(POINT Z (0 0 10), POINT(0 0))` is **0** — the Z-less operand
+  behaves as a vertical line. kenro delegates to the 2D functions there, which is
+  exactly equivalent.
+- **`ST_3DMaxDistance` measures vertices**, not interiors: a 10×10 face against
+  its own corner is √200.
+- **A non-planar ring is triangulated**, not flattened to a best-fit plane. A
+  ring whose corners sit at z = 0, 0, 0, 10 answers 90.27735042633894 against a
+  point at z = 100, where a planar ring answers exactly 100. kenro fans from the
+  ring's first vertex; on that case every candidate diagonal gives the same
+  minimum.
+
+⚠️ **Two documented divergences, both where the reference contradicts itself.**
+
+- **An empty operand.** `ST_3DShortestLine(POINT Z (0 0 0), LINESTRING EMPTY)`
+  returns `LINESTRING(0 0 0,0 4.63557111106545e-310 0)` in PostGIS 3.5 — that
+  subnormal is uninitialised memory. kenro returns NULL, which is what its own
+  `ST_3DDistance` answers for the same pair.
+- **A point at the exact centre of a coplanar face.**
+  `ST_3DDistance(POINT Z (5 5 0), POLYGON Z ((0 0 0,10 0 0,10 10 0,0 10 0,…)))`
+  is 7.0710678118654755 there — the distance to a corner — while
+  `ST_3DClosestPoint` on the same pair returns `POINT(5 5 0)`, i.e. distance 0,
+  and `ST_3DIntersects` returns `false`. Three answers that cannot all be right.
+  Nearby interior coplanar points all answer 0 and `true`. kenro answers 0 and
+  `true`, which is what the reference's own `ST_3DClosestPoint` implies.
 
 ## Getting N rows out
 
