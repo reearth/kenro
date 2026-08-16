@@ -40,6 +40,10 @@ jobs:
             lib: kenro_ext.dll
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -126,6 +130,10 @@ jobs:
   wasm:
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -161,6 +169,10 @@ jobs:
     needs: [ext, wasm]
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2
+        with:
+          egress-policy: audit
       - uses: actions/download-artifact@v4
         with:
           path: assets
@@ -199,6 +211,10 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Tag must match the crate version
@@ -221,6 +237,10 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
