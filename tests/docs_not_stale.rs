@@ -47,6 +47,7 @@ const PROSE: &[&str] = &[
     "docs/functions.md",
     "docs/3d.md",
     "docs/scope.md",
+    "docs/routing.md",
     "docs/wasm.md",
     "docs/quickstart.md",
     "src/functions/threed.rs",

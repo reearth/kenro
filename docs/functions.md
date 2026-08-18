@@ -1,8 +1,8 @@
 # Function reference
 
 > **Related:** [3D geometry](3d.md) · [Scope and semantics](scope.md) ·
-> [Quickstart](quickstart.md) · [Transform accuracy](accuracy.md) ·
-> [WebAssembly hosts](wasm.md)
+> [Routing](routing.md) · [Quickstart](quickstart.md) ·
+> [Transform accuracy](accuracy.md) · [WebAssembly hosts](wasm.md)
 
 Every SQL function kenro registers, with its support status in PostGIS, DuckDB
 Spatial and SpatiaLite for comparison. **Function names link to their PostGIS
@@ -14,6 +14,7 @@ cell live next door:
 | | |
 |---|---|
 | **[3D geometry](3d.md)** | What happens to a Z through storage, coordinate transforms, reprojection, derived geometries, interpolation and the `ST_3D*` metric family — plus surface collections (POLYHEDRALSURFACE / TIN / TRIANGLE). Every 3D function table is there, beside the semantics it needs |
+| **[Routing](routing.md)** | The `kenro_dijkstra` family: shortest paths over an edge table, with pgRouting rather than PostGIS as the reference. Signatures, the trailing-`reverse_cost` divergence, the `json_each` recipe that turns a path into rows, and a `pgr_createTopology` replacement in plain SQL |
 | **[Scope and semantics](scope.md)** | What kenro deliberately leaves out and why, how to get N rows out of a MULTI\* result, and what "PostGIS is the reference" means in practice |
 
 **Reading the columns.** ✅ = present with the same name and compatible
@@ -22,8 +23,8 @@ Verified against PostGIS 3.5, a live DuckDB 1.4.0 + spatial session, and a live
 mod_spatialite 5.1 session, July–August 2026.
 
 **Feature gates.** Functions marked `overlay`, `spheroid`, `concave-hull`,
-`delaunay`, `gml`, `text-encodings` or `voronoi` need a `full` build — a default
-build registers them as stubs that name the missing feature. Everything else,
+`delaunay`, `gml`, `routing`, `text-encodings` or `voronoi` need a `full` build
+— a default build registers them as stubs that name the missing feature. Everything else,
 MVT included, is in the default set (see
 [Cargo features](../README.md#cargo-features)).
 
@@ -352,6 +353,23 @@ written. Aliases share their original's implementation and wasm export.
 | [`ST_Summary(geom)`](https://postgis.net/docs/ST_Summary.html) | TEXT | ✅ | ❌ | ✅ | ⚠️ PostGIS prints a tree with byte offsets; kenro keeps the leading token (`Point[S]`) and adds its vertex count |
 | [`ST_MemSize(geom)`](https://postgis.net/docs/ST_MemSize.html) | INTEGER | ✅ | ❌ | ✅ | ⚠️ the length of the GeoPackage blob kenro would store — the number that means something for a SQLite column, not PostGIS's in-memory size |
 | [`ST_Normalize(geom)`](https://postgis.net/docs/ST_Normalize.html) | geometry | ✅ | ❌ | ❌ | Rings oriented, parts ordered by bounding box. ⚠️ PostGIS orders by its own internal comparison, so the two agree on orientation but not always on part order |
+
+## Routing — see [Routing](routing.md)
+
+kenro-only, and the one family whose reference is **pgRouting** rather than
+PostGIS, which has no routing at all. Both are aggregates over an edge table:
+one input row per edge, the query's `WHERE` clause playing the part of
+pgRouting's SQL-string argument. Needs the `routing` feature (in `full`).
+
+| Function | Returns | PostGIS | DuckDB Spatial | SpatiaLite | Notes |
+|---|---|---|---|---|---|
+| `kenro_dijkstra(id, source, target, cost, start_vid, end_vid [, reverse_cost])` | TEXT / NULL | ❌ (pgRouting `pgr_dijkstra`) | ❌ | ⚠️ VirtualRouting, a virtual table | Aggregate. The `pgr_dijkstra` row shape as a JSON array — `json_each` turns it into rows. ⚠️ `reverse_cost` is the **trailing** argument, not an edge-query column; ids are i32 |
+| `kenro_dijkstra_cost(source, target, cost, start_vid, end_vid [, reverse_cost])` | REAL / NULL | ❌ (pgRouting `pgr_dijkstraCost`) | ❌ | ⚠️ VirtualRouting | Aggregate. The total cost only, without materializing the path |
+
+Directed graph; a negative `cost` closes that direction, `reverse_cost` is the
+`target → source` cost. Zero rows, no path, a missing endpoint and
+`start_vid = end_vid` are all NULL — pgRouting returns the empty set for each,
+and the golden vectors pin it. Full semantics in [Routing](routing.md).
 
 ## 3D — see [3D geometry](3d.md)
 

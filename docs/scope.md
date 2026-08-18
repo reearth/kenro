@@ -1,8 +1,8 @@
 # Scope and semantics
 
 > **Related:** [Function reference](functions.md) · [3D geometry](3d.md) ·
-> [Quickstart](quickstart.md) · [Transform accuracy](accuracy.md) ·
-> [WebAssembly hosts](wasm.md)
+> [Routing](routing.md) · [Quickstart](quickstart.md) ·
+> [Transform accuracy](accuracy.md) · [WebAssembly hosts](wasm.md)
 
 What kenro deliberately does not do and what to reach for instead, the practical
 way around the biggest of those omissions, and the rule that settles every
@@ -32,11 +32,16 @@ question of behaviour.
 - **PostGIS's Topology extension** — none of the ~18 `ST_AddEdge*` /
   `ST_CreateTopoGeo` / `ST_ModEdge*` family: that is a topology store, not a
   function set.
-- **Topology / network analysis** — no `ST_Node`, `ST_Polygonize` or
-  `ST_Snap`, and no routing (SpatiaLite's librttopo topology and
-  VirtualRouting). These need a noding engine kenro does not carry.
-  (`ST_Split` and `ST_LineMerge` were once on this list and are now
-  implemented — see "Line structure" above; neither actually needed one.)
+- **Noding** — no `ST_Node`, `ST_Polygonize` or `ST_Snap` (SpatiaLite's
+  librttopo topology). These need a noding engine kenro does not carry: an
+  algorithm that finds every crossing in a line collection and splits the
+  lines there. (`ST_Split` and `ST_LineMerge` were once on this list and are
+  now implemented — see "Line structure" above; neither actually needed one.)
+  Routing was on this list too and is now implemented — `kenro_dijkstra` and
+  `kenro_dijkstra_cost`, golden-tested against pgRouting, see
+  [Routing](routing.md). Shortest paths over an edge table
+  need no noding engine; building that edge table from crossing lines still
+  does.
 - **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`/`ST_DumpRings`,
   and no grid generators (`ST_SquareGrid`, `ST_HexagonGrid`). kenro registers
   scalars and aggregates, not table-valued functions. Two things this does
@@ -151,10 +156,12 @@ reaches inside a nested collection.
 
 Function names, signatures, and semantics follow PostGIS (SQL/MM `ST_`
 prefix). Results are validated against PostGIS-generated golden vectors
-committed in this repo (`tests/golden/*.jsonl` — 700+ vectors across nine
+committed in this repo (`tests/golden/*.jsonl` — 700+ vectors across ten
 suites: predicates, transforms, GeoJSON, accessors, processing, overlay,
-buffer, and MVT; H3 vectors come from the reference C library, MVT tiles
-are cross-decoded by two independent decoders). Where kenro deviates, it
+buffer, 3D and MVT; H3 vectors come from the reference C library, MVT tiles
+are cross-decoded by two independent decoders, and the routing suite's
+reference is pgRouting rather than PostGIS — see [Routing](routing.md)).
+Where kenro deviates, it
 does so **loudly and documentedly** — never a silently different result.
 The cross-cutting divergences:
 

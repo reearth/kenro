@@ -377,3 +377,56 @@ fn json_each_expands_the_path_into_rows() {
         .collect();
     assert_eq!(rows, vec![(1, 1, 1), (2, 2, 2), (3, 3, 3), (4, 4, -1)]);
 }
+
+#[test]
+fn the_documented_topology_recipe_builds_a_routable_edge_table() {
+    // docs/routing.md's pgr_createTopology replacement, verbatim enough that
+    // a rename of any function it uses fails here rather than in a reader's
+    // terminal. Three roads: 0→1→2 in two hops, or 0→2 in one dear one.
+    let conn = Connection::open_in_memory().unwrap();
+    kenro::register(&conn).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE roads (id INTEGER, geom BLOB);
+         INSERT INTO roads VALUES
+           (1, ST_GeomFromText('LINESTRING(0 0,1 0)')),
+           (2, ST_GeomFromText('LINESTRING(1 0,3 0)')),
+           (3, ST_GeomFromText('LINESTRING(0 0,3 0)'));
+         CREATE TEMP TABLE ends AS
+         SELECT id, 'start' AS which,
+                ST_AsBinary(ST_SnapToGrid(ST_StartPoint(geom), 0.001)) AS pt
+         FROM roads
+         UNION ALL
+         SELECT id, 'end', ST_AsBinary(ST_SnapToGrid(ST_EndPoint(geom), 0.001))
+         FROM roads;
+         CREATE TEMP TABLE vertices AS
+         SELECT pt, DENSE_RANK() OVER (ORDER BY pt) AS vid
+         FROM (SELECT DISTINCT pt FROM ends);
+         CREATE TABLE edges AS
+         SELECT r.id, vs.vid AS source, ve.vid AS target, ST_Length(r.geom) AS cost
+         FROM roads r
+         JOIN ends es ON es.id = r.id AND es.which = 'start'
+         JOIN ends ee ON ee.id = r.id AND ee.which = 'end'
+         JOIN vertices vs ON vs.pt = es.pt
+         JOIN vertices ve ON ve.pt = ee.pt;",
+    )
+    .unwrap();
+    // Three lines, three distinct endpoints, so three vertices.
+    let n: i64 = conn
+        .query_row("SELECT count(*) FROM vertices", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(n, 3);
+    // The two-hop route and the direct one cost the same 3.0 here, so ask
+    // for the cost rather than a path — see the tie note in docs/routing.md.
+    let (start, end): (i64, i64) = conn
+        .query_row(
+            "SELECT (SELECT vid FROM vertices WHERE pt = ST_AsBinary(ST_GeomFromText('POINT(0 0)'))),
+                    (SELECT vid FROM vertices WHERE pt = ST_AsBinary(ST_GeomFromText('POINT(3 0)')))",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    let sql =
+        format!("SELECT kenro_dijkstra_cost(source, target, cost, {start}, {end}) FROM edges");
+    let cost: f64 = conn.query_row(&sql, [], |r| r.get(0)).unwrap();
+    assert!((cost - 3.0).abs() < 1e-12, "{cost}");
+}
