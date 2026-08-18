@@ -33,6 +33,26 @@ fi
 CHANGED="$(git diff --name-only "$BASE" "$HEAD_REF")"
 
 CORE_CHANGED="$(printf '%s\n' "$CHANGED" | grep -E "$SOURCES_RE" || true)"
+
+# Cargo.toml needs a second look: `[[example]]`/`[[test]]`/`[[bench]]`
+# blocks and `[dev-dependencies]` never reach the wasm build, and an
+# edit confined to them cannot be answered by a rebuild — the rebuilt
+# artifact is identical, so there is nothing to commit. Strip those
+# sections from both versions; if the rest matches, the change is inert.
+strip_inert_sections() {
+    awk '
+        /^\[/ { inert = /^\[\[(example|test|bench)\]\]/ || /^\[dev-dependencies\]/ }
+        !inert
+    '
+}
+if printf '%s\n' "$CORE_CHANGED" | grep -qx 'Cargo\.toml'; then
+    if cmp -s \
+        <(git show "$BASE:Cargo.toml" | strip_inert_sections) \
+        <(git show "$HEAD_REF:Cargo.toml" | strip_inert_sections); then
+        echo "Cargo.toml changed only in example/test/bench/dev-dependency sections — inert for the wasm module"
+        CORE_CHANGED="$(printf '%s\n' "$CORE_CHANGED" | grep -vx 'Cargo\.toml' || true)"
+    fi
+fi
 if [ -z "$CORE_CHANGED" ]; then
     echo "no changes under the kenro core or kenro-abi — $ARTIFACT is fine as is"
     exit 0
