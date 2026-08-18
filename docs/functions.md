@@ -14,7 +14,7 @@ cell live next door:
 | | |
 |---|---|
 | **[3D geometry](3d.md)** | What happens to a Z through storage, coordinate transforms, reprojection, derived geometries, interpolation and the `ST_3D*` metric family — plus surface collections (POLYHEDRALSURFACE / TIN / TRIANGLE). Every 3D function table is there, beside the semantics it needs |
-| **[Routing](routing.md)** | The `kenro_dijkstra` family: shortest paths over an edge table, with pgRouting rather than PostGIS as the reference. Signatures, the trailing-`reverse_cost` divergence, the `json_each` recipe that turns a path into rows, and a `pgr_createTopology` replacement in plain SQL |
+| **[Routing](routing.md)** | The `kenro_dijkstra` family: shortest paths and reachable sets over an edge table, with pgRouting rather than PostGIS as the reference. Signatures, the trailing-`reverse_cost` divergence, the `json_each` recipe that turns a path into rows, and a `pgr_createTopology` replacement in plain SQL |
 | **[Scope and semantics](scope.md)** | What kenro deliberately leaves out and why, how to get N rows out of a MULTI\* result, and what "PostGIS is the reference" means in practice |
 
 **Reading the columns.** ✅ = present with the same name and compatible
@@ -365,6 +365,7 @@ pgRouting's SQL-string argument. Needs the `routing` feature (in `full`).
 |---|---|---|---|---|---|
 | `kenro_dijkstra(id, source, target, cost, start_vid, end_vid [, reverse_cost])` | TEXT / NULL | ❌ (pgRouting `pgr_dijkstra`) | ❌ | ⚠️ VirtualRouting, a virtual table | Aggregate. The `pgr_dijkstra` row shape as a JSON array — `json_each` turns it into rows. ⚠️ `reverse_cost` is the **trailing** argument, not an edge-query column; ids are i32 |
 | `kenro_dijkstra_cost(source, target, cost, start_vid, end_vid [, reverse_cost])` | REAL / NULL | ❌ (pgRouting `pgr_dijkstraCost`) | ❌ | ⚠️ VirtualRouting | Aggregate. The total cost only, without materializing the path |
+| `kenro_drivingdistance(id, source, target, cost, start_vid, limit [, reverse_cost])` | TEXT / NULL | ❌ (pgRouting `pgr_drivingDistance`) | ❌ | ❌ | Aggregate. Every node within `limit` of `start_vid`, in `pgr_drivingDistance`'s row shape (`node`, `pred`, `depth`, `edge`, `cost`, `agg_cost`). ⚠️ sorted nearest-first, and without pgRouting's constant `start_vid` column |
 
 Directed graph; a negative `cost` closes that direction, `reverse_cost` is the
 `target → source` cost. Zero rows, no path, a missing endpoint and

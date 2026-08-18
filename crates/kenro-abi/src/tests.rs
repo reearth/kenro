@@ -159,6 +159,28 @@ fn dijkstra_aggregate_handle_lifecycle() {
     assert_eq!(k_agg_finish(h), NULL);
     let h = k_agg_new(AGG_DIJKSTRA_COST);
     assert_eq!(k_agg_finish(h), NULL);
+
+    // Driving distance: 1 →(1.1) 2 →(0.7) 3, limit 1.5, so node 3 is out.
+    let h = k_agg_new(AGG_DRIVING_DIST);
+    assert_eq!(
+        k_agg_drivingdistance_step(h, 10, 1, 2, 1.1, 1, 1.5, 0, 0.0),
+        OK
+    );
+    assert_eq!(
+        k_agg_drivingdistance_step(h, 11, 2, 3, 0.7, 1, 1.5, 0, 0.0),
+        OK
+    );
+    assert_eq!(k_agg_finish(h), OK);
+    let reach = out_str();
+    assert!(reach.contains("\"node\":2"), "{reach}");
+    assert!(!reach.contains("\"node\":3"), "{reach}");
+    // A negative limit is the empty set, which is SQL NULL.
+    let h = k_agg_new(AGG_DRIVING_DIST);
+    assert_eq!(
+        k_agg_drivingdistance_step(h, 10, 1, 2, 1.1, 1, -1.0, 0, 0.0),
+        OK
+    );
+    assert_eq!(k_agg_finish(h), NULL);
 }
 
 #[test]

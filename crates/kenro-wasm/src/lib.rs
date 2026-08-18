@@ -1706,6 +1706,57 @@ impl DijkstraCostAgg {
     }
 }
 
+/// Accumulator for `kenro_drivingdistance(id, source, target, cost,
+/// start_vid, limit [, reverse_cost])`.
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+pub struct DrivingDistAgg {
+    inner: Option<kenro::functions::routing::DrivingDistanceAggregate>,
+}
+
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+impl DrivingDistAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> DrivingDistAgg {
+        DrivingDistAgg {
+            inner: Some(kenro::functions::routing::DrivingDistanceAggregate::new()),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn step(
+        &mut self,
+        id: i32,
+        source: i32,
+        target: i32,
+        cost: f64,
+        start_vid: i32,
+        limit: f64,
+        reverse_cost: Option<f64>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| {
+                JsError::new("kenro: kenro_drivingdistance accumulator already finished")
+            })?
+            .step(id, source, target, cost, start_vid, limit, reverse_cost)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows, or a negative limit).
+    pub fn finish(&mut self) -> Result<Option<String>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| {
+                JsError::new("kenro: kenro_drivingdistance accumulator already finished")
+            })?
+            .finish()
+            .map_err(err)
+    }
+}
+
 // ---- Manifest ----
 
 fn kind_str(k: manifest::Kind) -> &'static str {
@@ -2027,6 +2078,7 @@ mod tests {
             "Extent3DAgg",
             "DijkstraAgg",
             "DijkstraCostAgg",
+            "DrivingDistAgg",
         ];
         for entry in kenro::functions::manifest::active_aggregates() {
             assert!(

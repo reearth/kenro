@@ -23,7 +23,7 @@ If you searched for *rusqlite spatial*, *SQLite spatial functions without Spatia
 - **3D** — a Z survives storage, transforms, reprojection and every derived geometry that can honestly keep it; `ST_3DDistance`/`ST_3DIntersects`/`ST_3DShortestLine` and the rest of the family core PostGIS has without SFCGAL, golden-tested against it
 - **H3 cells** — mesh aggregation in `GROUP BY` ([h3-pg] naming)
 - **Vector tiles** — `ST_AsMVTGeom` + the `ST_AsMVT` aggregate with a hand-rolled, dependency-free encoder
-- **Routing** (`full` feature) — Dijkstra shortest paths over an edge table as SQL aggregates (`kenro_dijkstra`, `kenro_dijkstra_cost`), golden-tested against [pgRouting](https://pgrouting.org/); the query's `WHERE` clause is the edge query — see [Routing](docs/routing.md)
+- **Routing** (`full` feature) — Dijkstra shortest paths and reachable sets over an edge table, as SQL aggregates (`kenro_dijkstra`, `kenro_dijkstra_cost`, `kenro_drivingdistance`), golden-tested against [pgRouting](https://pgrouting.org/); the query's `WHERE` clause is the edge query — see [Routing](docs/routing.md)
 - **Accessors, measures, processing** — area, length, centroid, convex hull, line interpolation, simplification, affine transforms, …
 - **Tiny** — the loadable extension is a single **~2 MB** file with zero dependencies, EPSG registry included, where mod_spatialite's GEOS/PROJ/proj.db chain is ~25 MB across 9 files (**~12× smaller**, measured); the wasm build starts at 595 KB (232 KB wire), and the everything-included tier is 2.2 MB (669 KB wire) against DuckDB-WASM spatial's ~23.5 MB. Two honest reasons: a [deliberately narrower scope](docs/scope.md#deliberately-out-of-scope) (no topology store, no XML machinery beyond geometry encodings, no spreadsheet import, no datum grids) *and* a statically-linked binary that only carries what you enable — a dynamic-library chain ships everything to everyone
 
@@ -269,8 +269,8 @@ largest single contributor to binary size) and `spheroid`
 refinement over the always-available spherical `ST_DistanceSphere`), plus
 `concave-hull` (+41 KB) and `delaunay` (+81 KB, pulling [spade]) — the two
 functions whose algorithms cost more than any other single entry —
-`gml` (GML 2/3 I/O, +13 KB for quick-xml), `routing` (the Dijkstra
-aggregates — pure code, no dependency), `voronoi`
+`gml` (GML 2/3 I/O, +13 KB for quick-xml), `routing` (the Dijkstra and
+driving-distance aggregates — pure code, no dependency), `voronoi`
 (`ST_VoronoiPolygons`/`ST_VoronoiLines`, +52 KB — it needs `delaunay` for the
 triangulation and `overlay` to clip the cells, so the feature names both),
 `text-encodings`

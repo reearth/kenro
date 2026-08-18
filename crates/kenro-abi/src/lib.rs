@@ -826,6 +826,8 @@ const AGG_EXTENT_3D: i32 = 3;
 const AGG_DIJKSTRA: i32 = 4;
 #[cfg(feature = "routing")]
 const AGG_DIJKSTRA_COST: i32 = 5;
+#[cfg(feature = "routing")]
+const AGG_DRIVING_DIST: i32 = 6;
 
 enum Agg {
     #[cfg(feature = "overlay")]
@@ -838,6 +840,8 @@ enum Agg {
     Dijkstra(kenro::functions::routing::DijkstraAggregate),
     #[cfg(feature = "routing")]
     DijkstraCost(kenro::functions::routing::DijkstraCostAggregate),
+    #[cfg(feature = "routing")]
+    DrivingDist(kenro::functions::routing::DrivingDistanceAggregate),
 }
 
 static AGGS: Slot<Vec<Option<Agg>>> = Slot::new(Vec::new());
@@ -862,6 +866,10 @@ pub extern "C" fn k_agg_new(kind: i32) -> i32 {
         #[cfg(feature = "routing")]
         AGG_DIJKSTRA_COST => {
             Agg::DijkstraCost(kenro::functions::routing::DijkstraCostAggregate::new())
+        }
+        #[cfg(feature = "routing")]
+        AGG_DRIVING_DIST => {
+            Agg::DrivingDist(kenro::functions::routing::DrivingDistanceAggregate::new())
         }
         _ => return -1,
     };
@@ -1025,6 +1033,38 @@ pub extern "C" fn k_agg_dijkstra_cost_step(
     }
 }
 
+/// `kenro_drivingdistance(id, source, target, cost, start_vid, limit
+/// [, reverse_cost])` — same presence-flag convention as the two above.
+#[cfg(feature = "routing")]
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn k_agg_drivingdistance_step(
+    h: i32,
+    id: i32,
+    source: i32,
+    target: i32,
+    cost: f64,
+    start_vid: i32,
+    limit: f64,
+    has_rev: i32,
+    reverse_cost: f64,
+) -> i32 {
+    let rev = if has_rev != 0 {
+        Some(reverse_cost)
+    } else {
+        None
+    };
+    match aggs().get_mut(h as usize).and_then(Option::as_mut) {
+        Some(Agg::DrivingDist(a)) => {
+            match a.step(id, source, target, cost, start_vid, limit, rev) {
+                Ok(()) => OK,
+                Err(e) => fail(e),
+            }
+        }
+        _ => agg_gone(),
+    }
+}
+
 /// Finish an accumulator and release its handle. `NULL` = zero rows
 /// aggregated.
 #[unsafe(no_mangle)]
@@ -1045,6 +1085,8 @@ pub extern "C" fn k_agg_finish(h: i32) -> i32 {
         Some(Agg::Dijkstra(a)) => opt_text(a.finish()),
         #[cfg(feature = "routing")]
         Some(Agg::DijkstraCost(a)) => opt_real(a.finish()),
+        #[cfg(feature = "routing")]
+        Some(Agg::DrivingDist(a)) => opt_text(a.finish()),
         None => agg_gone(),
     }
 }
@@ -2317,6 +2359,7 @@ pub extern "C" fn k_manifest() -> i32 {
             "Extent3DAgg" => "3",
             "DijkstraAgg" => "4",
             "DijkstraCostAgg" => "5",
+            "DrivingDistAgg" => "6",
             // MvtAgg, which is the only aggregate left.
             _ => "1",
         });

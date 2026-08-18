@@ -4,7 +4,9 @@
 //! pgRouting itself does with the rows its query returns.
 //!
 //! `kenro_dijkstra(id, source, target, cost, start_vid, end_vid
-//! [, reverse_cost])` deliberately diverges from `pgr_dijkstra`'s column
+//! [, reverse_cost])` and its `kenro_dijkstra_cost` /
+//! `kenro_drivingdistance` siblings deliberately diverge from
+//! `pgr_dijkstra`'s column
 //! order: `reverse_cost` is trailing because every kenro host treats
 //! trailing arguments as the optional ones (the same accommodation
 //! `ST_AsMVT` makes for the missing record type). Semantics follow
@@ -183,6 +185,148 @@ impl DijkstraCostAggregate {
     }
 }
 
+/// Aggregate accumulator for `kenro_drivingdistance` — every node reachable
+/// from `start_vid` within `limit`, rather than one route to one node.
+pub struct DrivingDistanceAggregate {
+    edges: Vec<Edge>,
+    params: Option<(i32, f64)>,
+}
+
+impl DrivingDistanceAggregate {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        DrivingDistanceAggregate {
+            edges: Vec::new(),
+            params: None,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn step(
+        &mut self,
+        id: i32,
+        source: i32,
+        target: i32,
+        cost: f64,
+        start_vid: i32,
+        limit: f64,
+        reverse_cost: Option<f64>,
+    ) -> Result<()> {
+        const FUNC: &str = "kenro_drivingdistance";
+        check_finite(FUNC, "cost", cost)?;
+        check_finite(FUNC, "limit", limit)?;
+        if let Some(rc) = reverse_cost {
+            check_finite(FUNC, "reverse_cost", rc)?;
+        }
+        match self.params {
+            None => self.params = Some((start_vid, limit)),
+            Some(existing) => {
+                if existing.0 != start_vid || existing.1.total_cmp(&limit) != Ordering::Equal {
+                    return Err(Error::Unsupported {
+                        func: FUNC,
+                        reason: "start_vid and limit must be constant within one \
+                                 aggregation group"
+                            .into(),
+                    });
+                }
+            }
+        }
+        self.edges.push(Edge {
+            id,
+            source,
+            target,
+            cost,
+            reverse_cost,
+        });
+        Ok(())
+    }
+
+    /// `None` = SQL NULL: zero input rows, or a negative `limit` — both of
+    /// which make `pgr_drivingDistance` return the empty set. Note what is
+    /// *not* on that list: a `start_vid` absent from the edge set still
+    /// answers with its own row, because a vertex is always within any
+    /// non-negative distance of itself. That is measured pgRouting
+    /// behaviour, not a choice.
+    pub fn finish(self) -> Result<Option<String>> {
+        let Some((start, limit)) = self.params else {
+            return Ok(None);
+        };
+        Ok(driving_distance(&self.edges, start, limit).map(|rows| reach_json(&rows)))
+    }
+}
+
+/// One row of the `pgr_drivingDistance`-shaped result.
+struct ReachStep {
+    depth: u32,
+    pred: i32,
+    node: i32,
+    edge: i64,
+    cost: f64,
+    agg_cost: f64,
+}
+
+/// Every node whose shortest-path cost from `start` is at most `limit`.
+/// `None` only for a negative `limit`; an unknown `start` still yields its
+/// own row, as `pgr_drivingDistance` does.
+fn driving_distance(edges: &[Edge], start: i32, limit: f64) -> Option<Vec<ReachStep>> {
+    if limit < 0.0 {
+        return None;
+    }
+    // The start node's own row, which is present whether or not any edge
+    // mentions it.
+    let mut rows = vec![ReachStep {
+        depth: 0,
+        pred: start,
+        node: start,
+        edge: -1,
+        cost: 0.0,
+        agg_cost: 0.0,
+    }];
+    let g = Graph::build(edges);
+    if let Some(&start_ix) = g.index.get(&start) {
+        // No early exit: the sweep has to settle everything within reach.
+        let r = g.dijkstra(start_ix, None);
+        for ix in 0..g.by_index.len() {
+            if ix == start_ix || !r.settled[ix] || r.dist[ix] > limit {
+                continue;
+            }
+            let (from, id, cost) = r.prev[ix].expect("a settled node has a trail");
+            rows.push(ReachStep {
+                depth: r.depth[ix],
+                pred: g.by_index[from],
+                node: g.by_index[ix],
+                edge: id as i64,
+                cost,
+                agg_cost: r.dist[ix],
+            });
+        }
+    }
+    // pgRouting emits these in the order its own tree traversal happens to
+    // reach them, which is not a contract. Nearest-first, ties by node id,
+    // is at least an order a caller can rely on.
+    rows.sort_by(|a, b| a.agg_cost.total_cmp(&b.agg_cost).then(a.node.cmp(&b.node)));
+    Some(rows)
+}
+
+fn reach_json(rows: &[ReachStep]) -> String {
+    let rows: Vec<serde_json::Value> = rows
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            serde_json::json!({
+                "seq": i + 1,
+                "depth": s.depth,
+                "pred": s.pred,
+                "node": s.node,
+                "edge": s.edge,
+                "cost": s.cost,
+                "agg_cost": s.agg_cost,
+            })
+        })
+        .collect();
+    serde_json::Value::Array(rows).to_string()
+}
+
 fn path_json(steps: &[PathStep]) -> String {
     let rows: Vec<serde_json::Value> = steps
         .iter()
@@ -200,6 +344,126 @@ fn path_json(steps: &[PathStep]) -> String {
     serde_json::Value::Array(rows).to_string()
 }
 
+/// The edge set as an adjacency list over densely-numbered nodes. One
+/// direction per traversable orientation: `cost >= 0` gives source→target,
+/// `reverse_cost >= 0` gives target→source, and either being negative simply
+/// omits that arc — which is how pgRouting spells a one-way street.
+struct Graph {
+    /// node id → dense index. A `BTreeMap` so the numbering, and therefore
+    /// the heap's tie-break, is deterministic whatever order the rows
+    /// arrived in.
+    index: BTreeMap<i32, usize>,
+    by_index: Vec<i32>,
+    adj: Vec<Vec<(usize, f64, i32)>>,
+}
+
+/// What Dijkstra learned about one node: its distance, whether it was
+/// reached at all, and the arc it was reached by.
+struct Reached {
+    dist: Vec<f64>,
+    settled: Vec<bool>,
+    /// (previous node, edge id taken, that edge's cost)
+    prev: Vec<Option<(usize, i32, f64)>>,
+    depth: Vec<u32>,
+}
+
+impl Graph {
+    fn build(edges: &[Edge]) -> Graph {
+        let mut index: BTreeMap<i32, usize> = BTreeMap::new();
+        for e in edges {
+            let n = index.len();
+            index.entry(e.source).or_insert(n);
+            let n = index.len();
+            index.entry(e.target).or_insert(n);
+        }
+        let mut adj: Vec<Vec<(usize, f64, i32)>> = vec![Vec::new(); index.len()];
+        for e in edges {
+            let s = index[&e.source];
+            let t = index[&e.target];
+            if e.cost >= 0.0 {
+                adj[s].push((t, e.cost, e.id));
+            }
+            if let Some(rc) = e.reverse_cost
+                && rc >= 0.0
+            {
+                adj[t].push((s, rc, e.id));
+            }
+        }
+        let mut by_index = vec![0; index.len()];
+        for (&node, &ix) in &index {
+            by_index[ix] = node;
+        }
+        Graph {
+            index,
+            by_index,
+            adj,
+        }
+    }
+
+    /// Dijkstra from `start_ix`. `stop_at` ends the search as soon as that
+    /// node is settled — an optimization for a point-to-point query, and
+    /// exactly what a driving-distance sweep must not do.
+    fn dijkstra(&self, start_ix: usize, stop_at: Option<usize>) -> Reached {
+        struct Item {
+            dist: f64,
+            node: usize,
+        }
+        impl PartialEq for Item {
+            fn eq(&self, o: &Self) -> bool {
+                self.cmp(o) == Ordering::Equal
+            }
+        }
+        impl Eq for Item {}
+        impl PartialOrd for Item {
+            fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
+                Some(self.cmp(o))
+            }
+        }
+        impl Ord for Item {
+            // Reversed for a min-heap; ties broken on node index so the
+            // exploration order is deterministic.
+            fn cmp(&self, o: &Self) -> Ordering {
+                o.dist
+                    .total_cmp(&self.dist)
+                    .then_with(|| o.node.cmp(&self.node))
+            }
+        }
+
+        let n = self.index.len();
+        let mut r = Reached {
+            dist: vec![f64::INFINITY; n],
+            settled: vec![false; n],
+            prev: vec![None; n],
+            depth: vec![0; n],
+        };
+        let mut heap = BinaryHeap::new();
+        r.dist[start_ix] = 0.0;
+        heap.push(Item {
+            dist: 0.0,
+            node: start_ix,
+        });
+        while let Some(Item { dist: d, node }) = heap.pop() {
+            if r.settled[node] {
+                continue;
+            }
+            r.settled[node] = true;
+            if Some(node) == stop_at {
+                break;
+            }
+            for &(to, cost, id) in &self.adj[node] {
+                let nd = d + cost;
+                if nd < r.dist[to] {
+                    r.dist[to] = nd;
+                    r.prev[to] = Some((node, id, cost));
+                    r.depth[to] = r.depth[node] + 1;
+                    heap.push(Item { dist: nd, node: to });
+                }
+            }
+        }
+        r
+    }
+}
+
 /// Textbook Dijkstra with a predecessor trail. `None` when `start` or `end`
 /// does not appear in the edge set, or no path exists. `start == end`
 /// returns `None` too, matching `pgr_dijkstra`'s empty set.
@@ -207,102 +471,20 @@ fn shortest_path(edges: &[Edge], start: i32, end: i32) -> Option<Vec<PathStep>> 
     if start == end {
         return None;
     }
-    // Dense-remap node ids; BTreeMap so the numbering — and therefore the
-    // heap tie-break — is deterministic whatever the row order was.
-    let mut index: BTreeMap<i32, usize> = BTreeMap::new();
-    for e in edges {
-        let n = index.len();
-        index.entry(e.source).or_insert(n);
-        let n = index.len();
-        index.entry(e.target).or_insert(n);
-    }
-    let start_ix = *index.get(&start)?;
-    let end_ix = *index.get(&end)?;
-
-    let mut adj: Vec<Vec<(usize, f64, i32)>> = vec![Vec::new(); index.len()];
-    for e in edges {
-        let s = index[&e.source];
-        let t = index[&e.target];
-        if e.cost >= 0.0 {
-            adj[s].push((t, e.cost, e.id));
-        }
-        if let Some(rc) = e.reverse_cost
-            && rc >= 0.0
-        {
-            adj[t].push((s, rc, e.id));
-        }
-    }
-
-    struct Item {
-        dist: f64,
-        node: usize,
-    }
-    impl PartialEq for Item {
-        fn eq(&self, o: &Self) -> bool {
-            self.cmp(o) == Ordering::Equal
-        }
-    }
-    impl Eq for Item {}
-    impl PartialOrd for Item {
-        fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
-            Some(self.cmp(o))
-        }
-    }
-    impl Ord for Item {
-        // Reversed for a min-heap; ties broken on node index so the
-        // exploration order is deterministic.
-        fn cmp(&self, o: &Self) -> Ordering {
-            o.dist
-                .total_cmp(&self.dist)
-                .then_with(|| o.node.cmp(&self.node))
-        }
-    }
-
-    let n = index.len();
-    let mut dist = vec![f64::INFINITY; n];
-    let mut settled = vec![false; n];
-    // (previous node, edge id taken, that edge's cost)
-    let mut prev: Vec<Option<(usize, i32, f64)>> = vec![None; n];
-    let mut heap = BinaryHeap::new();
-    dist[start_ix] = 0.0;
-    heap.push(Item {
-        dist: 0.0,
-        node: start_ix,
-    });
-    while let Some(Item { dist: d, node }) = heap.pop() {
-        if settled[node] {
-            continue;
-        }
-        settled[node] = true;
-        if node == end_ix {
-            break;
-        }
-        for &(to, cost, id) in &adj[node] {
-            let nd = d + cost;
-            if nd < dist[to] {
-                dist[to] = nd;
-                prev[to] = Some((node, id, cost));
-                heap.push(Item { dist: nd, node: to });
-            }
-        }
-    }
-    if !settled[end_ix] {
+    let g = Graph::build(edges);
+    let start_ix = *g.index.get(&start)?;
+    let end_ix = *g.index.get(&end)?;
+    let r = g.dijkstra(start_ix, Some(end_ix));
+    if !r.settled[end_ix] {
         return None;
     }
 
     // Walk the trail back, then emit rows front-to-back: each row is the
     // node reached and the edge leaving it, the terminal row carries -1.
-    let by_index: Vec<i32> = {
-        let mut v = vec![0; n];
-        for (&node, &ix) in &index {
-            v[ix] = node;
-        }
-        v
-    };
     let mut hops = Vec::new(); // (from index, edge id, edge cost)
     let mut at = end_ix;
     while at != start_ix {
-        let (from, id, cost) = prev[at].expect("settled node has a trail");
+        let (from, id, cost) = r.prev[at].expect("settled node has a trail");
         hops.push((from, id, cost));
         at = from;
     }
@@ -311,7 +493,7 @@ fn shortest_path(edges: &[Edge], start: i32, end: i32) -> Option<Vec<PathStep>> 
     let mut agg = 0.0;
     for (from, id, cost) in hops {
         steps.push(PathStep {
-            node: by_index[from],
+            node: g.by_index[from],
             edge: id as i64,
             cost,
             agg_cost: agg,
@@ -468,5 +650,75 @@ mod tests {
             .step(1, 1, 2, 1.0, 1, 2, Some(f64::INFINITY))
             .unwrap_err();
         assert!(err.to_string().contains("finite"), "{err}");
+    }
+
+    fn driving(
+        rows: &[(i32, i32, i32, f64, Option<f64>)],
+        start: i32,
+        limit: f64,
+    ) -> Option<serde_json::Value> {
+        let mut acc = DrivingDistanceAggregate::new();
+        for &(id, s, t, c, rc) in rows {
+            acc.step(id, s, t, c, start, limit, rc).unwrap();
+        }
+        acc.finish()
+            .unwrap()
+            .map(|j| serde_json::from_str(&j).unwrap())
+    }
+
+    #[test]
+    fn driving_distance_stops_at_the_limit() {
+        let rows = [
+            (10, 1, 2, 1.1, None),
+            (11, 2, 3, 0.7, None),
+            (12, 3, 4, 2.9, None),
+        ];
+        // Inclusive: 1.8 is exactly node 3's cost.
+        let v = driving(&rows, 1, 1.8).unwrap();
+        let nodes: Vec<i64> = v
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["node"].as_i64().unwrap())
+            .collect();
+        assert_eq!(nodes, vec![1, 2, 3]);
+        assert_eq!(v[0]["edge"], -1);
+        assert_eq!(v[0]["pred"], 1);
+        assert_eq!(v[0]["depth"], 0);
+        assert_eq!(v[2]["depth"], 2);
+        assert_eq!(v[2]["pred"], 2);
+        assert_eq!(v[2]["edge"], 11);
+        // A hair under, and node 3 falls out.
+        assert_eq!(
+            driving(&rows, 1, 1.79).unwrap().as_array().unwrap().len(),
+            2
+        );
+    }
+
+    #[test]
+    fn driving_distance_always_reaches_itself() {
+        let rows = [(10, 1, 2, 1.1, None)];
+        // A limit of zero, and a start the edge set never mentions, both
+        // still answer with the start's own row (measured pgRouting).
+        for (start, limit) in [(1, 0.0), (99, 5.0)] {
+            let v = driving(&rows, start, limit).unwrap();
+            assert_eq!(v.as_array().unwrap().len(), 1, "{start}/{limit}");
+            assert_eq!(v[0]["node"], start);
+            assert_eq!(v[0]["agg_cost"], 0.0);
+        }
+    }
+
+    #[test]
+    fn driving_distance_nulls_are_zero_rows_and_a_negative_limit() {
+        assert_eq!(DrivingDistanceAggregate::new().finish().unwrap(), None);
+        assert_eq!(driving(&[(10, 1, 2, 1.1, None)], 1, -1.0), None);
+    }
+
+    #[test]
+    fn driving_distance_endpoints_must_be_constant() {
+        let mut acc = DrivingDistanceAggregate::new();
+        acc.step(1, 1, 2, 1.0, 1, 5.0, None).unwrap();
+        let err = acc.step(2, 2, 3, 1.0, 1, 6.0, None).unwrap_err();
+        assert!(err.to_string().contains("must be constant"), "{err}");
     }
 }

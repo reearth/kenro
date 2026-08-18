@@ -15,7 +15,9 @@
 mod common;
 
 use common::Vector;
-use kenro::functions::routing::{DijkstraAggregate, DijkstraCostAggregate};
+use kenro::functions::routing::{
+    DijkstraAggregate, DijkstraCostAggregate, DrivingDistanceAggregate,
+};
 use rusqlite::Connection;
 use rusqlite::types::Value as SqlValue;
 use serde_json::Value;
@@ -53,12 +55,15 @@ fn edge_rows(v: &Vector) -> Vec<EdgeRow> {
         .collect()
 }
 
-fn endpoints(v: &Vector) -> (i32, i32) {
+/// `args` is `[start_vid, end_vid]` for the dijkstra vectors and
+/// `[start_vid, limit]` for the driving-distance ones — hence both spellings
+/// of the second element.
+fn endpoints(v: &Vector) -> (i32, i32, f64) {
     let a = v
         .args
         .as_ref()
         .unwrap_or_else(|| panic!("{}: no args", v.id));
-    (a[0] as i32, a[1] as i32)
+    (a[0] as i32, a[1] as i32, a[1])
 }
 
 fn has_reverse(rows: &[EdgeRow]) -> bool {
@@ -94,6 +99,51 @@ fn check_path(id: &str, got: Option<&str>, want: &Value) {
     }
 }
 
+/// Compare a driving-distance result against pgRouting's rows. Order is not
+/// compared: pgRouting emits them in whatever order its own tree traversal
+/// reached them, which is not a documented contract — the rows are matched by
+/// node instead, and `seq` is checked only for being 1..n.
+fn check_reach(id: &str, got: Option<&str>, want: &Value) {
+    match (got, want) {
+        (None, Value::Null) => {}
+        (Some(g), Value::Array(rows)) => {
+            let parsed: Value = serde_json::from_str(g).unwrap();
+            let parsed = parsed.as_array().unwrap();
+            assert_eq!(parsed.len(), rows.len(), "{id}: row count: {g} vs {want}");
+            let seqs: Vec<i64> = parsed.iter().map(|r| r["seq"].as_i64().unwrap()).collect();
+            let mut sorted = seqs.clone();
+            sorted.sort_unstable();
+            assert_eq!(
+                sorted,
+                (1..=rows.len() as i64).collect::<Vec<_>>(),
+                "{id}: seq must be 1..n, got {seqs:?}"
+            );
+            for w in rows {
+                let node = w["node"].as_i64().unwrap();
+                let g = parsed
+                    .iter()
+                    .find(|r| r["node"].as_i64() == Some(node))
+                    .unwrap_or_else(|| panic!("{id}: node {node} is missing from {parsed:?}"));
+                for key in ["depth", "pred", "node", "edge"] {
+                    assert_eq!(
+                        g[key].as_i64(),
+                        w[key].as_i64(),
+                        "{id}[node {node}]: {key}: {g} vs {w}"
+                    );
+                }
+                for key in ["cost", "agg_cost"] {
+                    common::assert_number(
+                        &format!("{id}[node {node}].{key}"),
+                        g[key].as_f64().unwrap(),
+                        w[key].as_f64().unwrap(),
+                    );
+                }
+            }
+        }
+        (got, want) => panic!("{id}: got {got:?}, want {want}"),
+    }
+}
+
 fn check_cost(id: &str, got: Option<f64>, want: &Value) {
     match (got, want) {
         (None, Value::Null) => {}
@@ -108,7 +158,7 @@ fn check_cost(id: &str, got: Option<f64>, want: &Value) {
 fn golden_routing_through_pure_functions() {
     for v in common::load("routing") {
         let rows = edge_rows(&v);
-        let (start, end) = endpoints(&v);
+        let (start, end, limit) = endpoints(&v);
         match v.func.as_str() {
             "dijkstra" => {
                 let mut acc = DijkstraAggregate::new();
@@ -128,6 +178,24 @@ fn golden_routing_through_pure_functions() {
                 let got = acc.finish().unwrap_or_else(|e| panic!("{}: {e}", v.id));
                 check_cost(&v.id, got, v.effective());
             }
+            // args[1] is the limit here, not an end vertex.
+            "drivingdistance" => {
+                let mut acc = DrivingDistanceAggregate::new();
+                for r in &rows {
+                    acc.step(
+                        r.id,
+                        r.source,
+                        r.target,
+                        r.cost,
+                        start,
+                        limit,
+                        r.reverse_cost,
+                    )
+                    .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                }
+                let got = acc.finish().unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_reach(&v.id, got.as_deref(), v.effective());
+            }
             other => panic!("{}: unknown fn {other}", v.id),
         }
     }
@@ -143,7 +211,7 @@ fn golden_routing_through_sql() {
     .unwrap();
     for v in common::load("routing") {
         let rows = edge_rows(&v);
-        let (start, end) = endpoints(&v);
+        let (start, end, limit) = endpoints(&v);
         conn.execute("DELETE FROM e", []).unwrap();
         for r in &rows {
             conn.execute(
@@ -171,6 +239,16 @@ fn golden_routing_through_sql() {
                     .query_row(&sql, [], |r| r.get(0))
                     .unwrap_or_else(|e| panic!("{}: {e}", v.id));
                 check_cost(&v.id, got, v.effective());
+            }
+            "drivingdistance" => {
+                let sql = format!(
+                    "SELECT kenro_drivingdistance(id, source, target, cost, {start}, {limit}{rev}) \
+                     FROM e"
+                );
+                let got: Option<String> = conn
+                    .query_row(&sql, [], |r| r.get(0))
+                    .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_reach(&v.id, got.as_deref(), v.effective());
             }
             other => panic!("{}: unknown fn {other}", v.id),
         }

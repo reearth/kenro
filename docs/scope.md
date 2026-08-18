@@ -37,9 +37,9 @@ question of behaviour.
   algorithm that finds every crossing in a line collection and splits the
   lines there. (`ST_Split` and `ST_LineMerge` were once on this list and are
   now implemented — see "Line structure" above; neither actually needed one.)
-  Routing was on this list too and is now implemented — `kenro_dijkstra` and
-  `kenro_dijkstra_cost`, golden-tested against pgRouting, see
-  [Routing](routing.md). Shortest paths over an edge table
+  Routing was on this list too and is now implemented — `kenro_dijkstra`,
+  `kenro_dijkstra_cost` and `kenro_drivingdistance`, golden-tested against
+  pgRouting, see [Routing](routing.md). Shortest paths over an edge table
   need no noding engine; building that edge table from crossing lines still
   does.
 - **Set-returning functions** — no `ST_Dump`/`ST_DumpPoints`/`ST_DumpRings`,

@@ -27,6 +27,7 @@ const (
 	aggExtent3D     = 3
 	aggDijkstra     = 4
 	aggDijkstraCost = 5
+	aggDrivingDist  = 6
 )
 
 // runtime owns the compiled wasm module and a pool of instances.
@@ -129,6 +130,7 @@ type instance struct {
 	mvtStep          api.Function
 	dijkstraStep     api.Function
 	dijkstraCostStep api.Function
+	drivingDistStep  api.Function
 
 	fns map[string]api.Function
 
@@ -173,6 +175,7 @@ func newInstance(mod api.Module) (*instance, error) {
 	in.mvtStep = mod.ExportedFunction("k_agg_mvt_step")
 	in.dijkstraStep = mod.ExportedFunction("k_agg_dijkstra_step")
 	in.dijkstraCostStep = mod.ExportedFunction("k_agg_dijkstra_cost_step")
+	in.drivingDistStep = mod.ExportedFunction("k_agg_drivingdistance_step")
 	return in, nil
 }
 

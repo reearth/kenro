@@ -180,6 +180,8 @@ func aggStepExport(kind int) string {
 		return "k_agg_dijkstra_step"
 	case aggDijkstraCost:
 		return "k_agg_dijkstra_cost_step"
+	case aggDrivingDist:
+		return "k_agg_drivingdistance_step"
 	default:
 		return ""
 	}
@@ -522,7 +524,7 @@ func (a *aggregate) step(ctx context.Context, e aggEntry, args []driver.Value) e
 		}
 		return nil
 
-	case aggDijkstra, aggDijkstraCost:
+	case aggDijkstra, aggDijkstraCost, aggDrivingDist:
 		return a.stepRouting(ctx, e, args)
 
 	default:
@@ -536,8 +538,11 @@ func (a *aggregate) step(ctx context.Context, e aggEntry, args []driver.Value) e
 // ST_AsMVT does.
 func (a *aggregate) stepRouting(ctx context.Context, e aggEntry, args []driver.Value) error {
 	step, base := a.in.dijkstraStep, 6
-	if e.AggKind == aggDijkstraCost {
+	switch e.AggKind {
+	case aggDijkstraCost:
 		step, base = a.in.dijkstraCostStep, 5
+	case aggDrivingDist:
+		step = a.in.drivingDistStep
 	}
 	if step == nil {
 		return errf("kenro: %s is unavailable in this wasm module (built without the `routing` cargo feature)", a.name)
@@ -601,7 +606,7 @@ func (a *aggregate) WindowValue(*sqlite.FunctionContext) (driver.Value, error) {
 	// JSON path array) and kenro_dijkstra_cost (REAL).
 	ret := "opt_blob"
 	switch a.kind {
-	case aggExtent3D, aggDijkstra:
+	case aggExtent3D, aggDijkstra, aggDrivingDist:
 		ret = "opt_text"
 	case aggDijkstraCost:
 		ret = "opt_real"

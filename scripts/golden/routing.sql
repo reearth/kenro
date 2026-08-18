@@ -137,6 +137,41 @@ SELECT row_to_json(t)::text FROM (
   FROM cases c WHERE c.paths ORDER BY c.id
 ) t;
 
+-- pgr_drivingDistance: every node within `limit` of `start_vid`. Its own
+-- `seq` order is a traversal order of the shortest-path tree, not a contract
+-- — the Rust harness compares the rows as a set keyed by node — so the
+-- vectors are emitted sorted by node to keep the file diffable.
+--
+-- `start_vid` here is the args[0] the other suites use, and args[1] is the
+-- limit rather than an end vertex.
+CREATE TABLE dd_cases(id text, fixture text, has_rev bool, start_vid bigint, lim float8);
+INSERT INTO dd_cases VALUES
+  ('dd_chain_all',      'chain',        false, 1,  10),
+  ('dd_chain_cut',      'chain',        false, 1,  1.8),
+  ('dd_chain_just_shy', 'chain',        false, 1,  1.79),
+  ('dd_chain_zero',     'chain',        false, 2,  0),
+  ('dd_chain_negative', 'chain',        false, 1,  -1),
+  ('dd_chain_missing',  'chain',        false, 99, 5),
+  ('dd_grid9_wide',     'grid9',        true,  1,  4),
+  ('dd_grid9_tight',    'grid9',        true,  5,  2.5),
+  ('dd_grid9_corner',   'grid9',        true,  9,  3),
+  ('dd_oneway',         'oneway',       true,  1,  8),
+  ('dd_disconnected',   'disconnected', false, 1,  100),
+  ('dd_parallel',       'parallel',     false, 1,  3),
+  ('dd_self_loop',      'self_loop',    false, 1,  2);
+
+SELECT row_to_json(t)::text FROM (
+  SELECT c.id || ':drivingdistance' AS id, 'drivingdistance' AS "fn", c.fixture AS mode,
+    jsonb_build_array(c.start_vid, c.lim) AS args,
+    fx_rows(c.fixture, c.has_rev) AS rows,
+    (SELECT jsonb_agg(jsonb_build_object(
+              'depth', d.depth, 'pred', d.pred, 'node', d.node, 'edge', d.edge,
+              'cost', d.cost, 'agg_cost', d.agg_cost) ORDER BY d.node)
+     FROM pgr_drivingDistance(fx_sql(c.fixture, c.has_rev), c.start_vid, c.lim, true) d
+    ) AS expected
+  FROM dd_cases c ORDER BY c.id
+) t;
+
 -- pgr_dijkstraCost: the total only, which is well defined even where the
 -- path is not.
 SELECT row_to_json(t)::text FROM (

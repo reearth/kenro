@@ -1312,6 +1312,36 @@ pub const AGGREGATES: &[AggEntry] = &[
         ],
         feature: Some("routing"),
     },
+    AggEntry {
+        // kenro_drivingdistance(id, source, target, cost, start_vid, limit)
+        // — `limit` is a cost, hence Real where kenro_dijkstra takes the
+        // end vertex.
+        sql_name: "kenro_drivingdistance",
+        ctor_export: "DrivingDistAgg",
+        args: &[
+            Kind::Int,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+            Kind::Int,
+            Kind::Real,
+        ],
+        feature: Some("routing"),
+    },
+    AggEntry {
+        sql_name: "kenro_drivingdistance",
+        ctor_export: "DrivingDistAgg",
+        args: &[
+            Kind::Int,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+            Kind::Int,
+            Kind::Real,
+            Kind::Real,
+        ],
+        feature: Some("routing"),
+    },
 ];
 
 /// The aggregate entries active under the current feature set.
@@ -1381,6 +1411,7 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("h3_string_to_cell", &[1]),
     ("kenro_dijkstra", &[6, 7]),
     ("kenro_dijkstra_cost", &[5, 6]),
+    ("kenro_drivingdistance", &[6, 7]),
 ];
 
 pub const DEFAULT_STUB_ARITIES: &[i32] = &[1, 2];

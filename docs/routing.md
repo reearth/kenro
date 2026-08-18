@@ -12,7 +12,7 @@ PostGIS has no routing at all — and the golden vectors in
 
 | | |
 |---|---|
-| [The functions](#the-functions) | signatures, arities and what each returns |
+| [The functions](#the-functions) | signatures, arities and what each returns — shortest path, its cost, and the reachable set |
 | [Why the aggregate](#why-an-aggregate-and-not-a-table-valued-function) | the `WHERE` clause is pgRouting's SQL-string argument |
 | [Semantics](#semantics) | direction, closed edges, NULL rows, constant arguments, i32 ids |
 | [Getting rows out](#getting-rows-out-of-a-path) | the `json_each` recipe |
@@ -30,10 +30,14 @@ registers the names as stubs that say so.
 |---|---|---|
 | `kenro_dijkstra(id, source, target, cost, start_vid, end_vid [, reverse_cost])` | TEXT (JSON array) / NULL | `pgr_dijkstra` |
 | `kenro_dijkstra_cost(source, target, cost, start_vid, end_vid [, reverse_cost])` | REAL / NULL | `pgr_dijkstraCost` |
+| `kenro_drivingdistance(id, source, target, cost, start_vid, limit [, reverse_cost])` | TEXT (JSON array) / NULL | `pgr_drivingDistance` |
 
-Both are **aggregates**. Each input row is one edge; `start_vid` and
-`end_vid` are constants repeated on every row (SQLite has no other way to
-pass a scalar to an aggregate).
+All three are **aggregates**. Each input row is one edge; `start_vid`,
+`end_vid` and `limit` are constants repeated on every row (SQLite has no
+other way to pass a scalar to an aggregate).
+
+`kenro_dijkstra` and `kenro_drivingdistance` return JSON arrays;
+`kenro_dijkstra_cost` returns a single REAL.
 
 `kenro_dijkstra` returns the `pgr_dijkstra` row shape as a JSON array:
 
@@ -47,6 +51,27 @@ pass a scalar to an aggregate).
 row — `cost` that edge's cost, and `agg_cost` the running total *on arrival*.
 The last row's `agg_cost` is the total, which is exactly what
 `kenro_dijkstra_cost` returns without materializing the path.
+
+`kenro_drivingdistance` answers a different question — *everything* reachable
+within a cost budget, the isochrone's node set — and so returns
+`pgr_drivingDistance`'s row shape instead: one row per reachable node, with
+`agg_cost` its shortest-path cost from `start_vid`, `pred` the node before it,
+`depth` its hop count, and `edge`/`cost` the arc it was reached by. The start's
+own row carries `depth: 0`, `pred: start_vid`, `edge: -1` and `agg_cost: 0`.
+
+```sql
+-- every junction within 500 m of junction 1
+SELECT kenro_drivingdistance(id, source, target, cost, 1, 500.0) FROM edges;
+```
+
+Two documented divergences from `pgr_drivingDistance`, both harmless:
+
+- kenro leaves out the constant `start_vid` column, since the caller passed it.
+- The rows come back sorted **nearest first, ties by node id**.
+  `pgr_drivingDistance` emits them in whatever order its internal traversal of
+  the shortest-path tree reached them, which is not a documented order — the
+  golden harness compares the two as sets keyed by node for exactly that
+  reason.
 
 > ⚠️ **`reverse_cost` is the last argument**, where `pgr_dijkstra` has it as a
 > column of the edge query between `cost` and the rest. Every kenro host
@@ -108,7 +133,16 @@ returns the empty result set for each of them and makes no distinction; kenro
 returns SQL NULL. That includes `start_vid = end_vid`, which is not a
 zero-length path but an empty answer — pinned by golden vectors, not chosen.
 
-**`start_vid` and `end_vid` must be constant within a group.** They are
+`kenro_drivingdistance` is the exception that proves it, and again by
+measurement: a `start_vid` no edge mentions still answers with its own single
+row, because a vertex is within any non-negative distance of itself. What
+*does* give NULL there is zero input rows, or a **negative** `limit`, which
+`pgr_drivingDistance` answers with the empty set. A `limit` of exactly 0 gives
+the one start row, and the comparison is inclusive: a node whose cost equals
+the limit is in.
+
+**`start_vid` and `end_vid` — and `kenro_drivingdistance`'s `limit` — must be
+constant within a group.** They are
 scalar parameters wearing a column's clothes; a group where they change is an
 error, not a silently-chosen winner. (`ST_AsMVT`'s layer name and extent work
 the same way.)

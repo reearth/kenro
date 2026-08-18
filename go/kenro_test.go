@@ -280,6 +280,9 @@ var smokeCases = []smokeCase{
 	// …and the 7-argument form, where the trailing reverse_cost is the only
 	// reason 3 → 1 exists at all.
 	{"kenro_dijkstra_cost", `(SELECT kenro_dijkstra_cost(source, target, cost, 3, 1, rcost) FROM (SELECT 1 AS source, 2 AS target, 1.1 AS cost, 2.5 AS rcost UNION ALL SELECT 2, 3, 0.7, 4.0))`, 6.5},
+	// Driving distance: a limit of 1.5 reaches node 2 but not node 3, so the
+	// answer has two rows (the start's own row included).
+	{"kenro_drivingdistance", `(SELECT json_array_length(kenro_drivingdistance(id, source, target, cost, 1, 1.5)) FROM (SELECT 1 AS id, 1 AS source, 2 AS target, 1.1 AS cost UNION ALL SELECT 2, 2, 3, 0.7))`, int64(2)},
 
 	// --- the tail (functions::misc) ---
 	{"ST_Box2dFromGeoHash", `ST_GeometryType(ST_Box2dFromGeoHash('xn76f'))`, "ST_Polygon"},

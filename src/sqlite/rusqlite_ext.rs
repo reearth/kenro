@@ -472,6 +472,58 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         for arity in 5..=6 {
             conn.create_aggregate_function("kenro_dijkstra_cost", arity, FLAGS, DijkstraCostAgg)?;
         }
+
+        struct DrivingDistAgg;
+        impl rusqlite::functions::Aggregate<routing::DrivingDistanceAggregate, Option<Value>>
+            for DrivingDistAgg
+        {
+            fn init(
+                &self,
+                _: &mut Context<'_>,
+            ) -> rusqlite::Result<routing::DrivingDistanceAggregate> {
+                Ok(routing::DrivingDistanceAggregate::new())
+            }
+            fn step(
+                &self,
+                ctx: &mut Context<'_>,
+                acc: &mut routing::DrivingDistanceAggregate,
+            ) -> rusqlite::Result<()> {
+                const NAME: &str = "kenro_drivingdistance";
+                let (Some(id), Some(source), Some(target), Some(cost), Some(start), Some(limit)) = (
+                    int_or_null(ctx, 0, NAME)?,
+                    int_or_null(ctx, 1, NAME)?,
+                    int_or_null(ctx, 2, NAME)?,
+                    real_or_null(ctx, 3, NAME)?,
+                    int_or_null(ctx, 4, NAME)?,
+                    real_or_null(ctx, 5, NAME)?,
+                ) else {
+                    return Ok(());
+                };
+                let reverse = if ctx.len() > 6 {
+                    match real_or_null(ctx, 6, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                acc.step(id, source, target, cost, start, limit, reverse)
+                    .map_err(sql_err)
+            }
+            fn finalize(
+                &self,
+                _: &mut Context<'_>,
+                acc: Option<routing::DrivingDistanceAggregate>,
+            ) -> rusqlite::Result<Option<Value>> {
+                match acc {
+                    None => Ok(None),
+                    Some(agg) => agg.finish().map(|o| o.map(Value::Text)).map_err(sql_err),
+                }
+            }
+        }
+        for arity in 6..=7 {
+            conn.create_aggregate_function("kenro_drivingdistance", arity, FLAGS, DrivingDistAgg)?;
+        }
     }
 
     // Processing + affine.
