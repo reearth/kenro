@@ -102,6 +102,62 @@ test("ST_Union aggregate works through the __finalize shim", () => {
   }
 });
 
+test("the routing aggregates run over an edge table", () => {
+  const db = openDb();
+  try {
+    db.exec(`
+      CREATE TABLE edges (id INTEGER, source INTEGER, target INTEGER, cost REAL, rcost REAL);
+      INSERT INTO edges VALUES (1, 1, 2, 1.1, 2.5), (2, 2, 3, 0.7, 4.0);
+    `);
+    // The 6-argument form: one-way, and the path comes back as JSON.
+    const path = JSON.parse(
+      selectValue(
+        db,
+        "SELECT kenro_dijkstra(id, source, target, cost, 1, 3) FROM edges",
+      ),
+    );
+    assert.deepEqual(
+      path.map((r) => r.node),
+      [1, 2, 3],
+    );
+    assert.equal(path.at(-1).edge, -1);
+    assert.ok(Math.abs(path.at(-1).agg_cost - 1.8) < 1e-9);
+    // The 7-argument form: the trailing reverse_cost is the only reason
+    // 3 -> 1 exists.
+    assert.ok(
+      Math.abs(
+        selectValue(
+          db,
+          "SELECT kenro_dijkstra_cost(source, target, cost, 3, 1, rcost) FROM edges",
+        ) - 6.5,
+      ) < 1e-9,
+    );
+    // No path is SQL NULL, not an error.
+    assert.equal(
+      selectValue(
+        db,
+        "SELECT kenro_dijkstra(id, source, target, cost, 3, 1) FROM edges",
+      ),
+      null,
+    );
+    // Driving distance: a limit of 1.5 reaches node 2 but not node 3.
+    const reach = JSON.parse(
+      selectValue(
+        db,
+        "SELECT kenro_drivingdistance(id, source, target, cost, 1, 1.5) FROM edges",
+      ),
+    );
+    assert.deepEqual(
+      reach.map((r) => r.node),
+      [1, 2],
+    );
+    db.close();
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+});
+
 test("h3 functions fail loudly, never lossily", () => {
   const db = openDb();
   try {
