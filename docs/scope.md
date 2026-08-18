@@ -61,11 +61,13 @@ question of behaviour.
   `ST_Tesselate`, `ST_MakeSolid`, `ST_IsSolid`, `ST_3DConvexHull`,
   `ST_ApproximateMedialAxis`, `ST_MinkowskiSum` or `ST_StraightSkeleton`, and no
   SOLID type. All of those are SFCGAL's, over CGAL — none of them exists in a
-  PostGIS build without it, which is also the build kenro's golden vectors come
-  from. Reproducing them means choosing semantics with nothing to check them
-  against, and a reference *does* exist in principle (SFCGAL itself, the way
-  pgRouting is routing's reference rather than PostGIS) — bringing one into the
-  harness is its own project. The **3D metric family that core PostGIS does
+  plain `CREATE EXTENSION postgis`. **The reference is no longer missing**: the
+  same image kenro's golden vectors have always come from ships
+  `postgis_sfcgal` (SFCGAL 1.3.8), `scripts/golden/generate.sh` now loads it,
+  and `tests/golden/threed_sfcgal.jsonl` holds the vectors it produces —
+  measured to leave every pre-existing suite byte-identical. What still blocks
+  the rest of the family is therefore not the measurement but the arithmetic.
+  The **3D metric family that core PostGIS does
   have** is implemented: see [3D distance and predicates](3d.md#3d-distance-and-predicates).
 - **Guessing a Z** — extrapolating one past the end of a line, or averaging two
   that disagree (see [derived geometries](3d.md#derived-geometries-and-the-z)).
@@ -156,11 +158,13 @@ reaches inside a nested collection.
 
 Function names, signatures, and semantics follow PostGIS (SQL/MM `ST_`
 prefix). Results are validated against PostGIS-generated golden vectors
-committed in this repo (`tests/golden/*.jsonl` — 700+ vectors across ten
+committed in this repo (`tests/golden/*.jsonl` — 700+ vectors across twelve
 suites: predicates, transforms, GeoJSON, accessors, processing, overlay,
-buffer, 3D and MVT; H3 vectors come from the reference C library, MVT tiles
-are cross-decoded by two independent decoders, and the routing suite's
-reference is pgRouting rather than PostGIS — see [Routing](routing.md)).
+buffer, 3D, 3D-SFCGAL, H3, MVT and routing. H3 vectors come from the reference
+C library, MVT tiles are cross-decoded by two independent decoders, the
+3D-SFCGAL suite's reference is the `postgis_sfcgal` extension of the same
+image, and the routing suite's reference is pgRouting rather than PostGIS —
+see [Routing](routing.md)).
 Where kenro deviates, it
 does so **loudly and documentedly** — never a silently different result.
 The cross-cutting divergences:

@@ -11,7 +11,14 @@ cd "$(dirname "$0")"
 
 IMAGE=postgis/postgis:17-3.5
 CONTAINER=kenro-golden-postgis
-SUITES=(predicates transform geojson accessors processing bool_ops buffer threed)
+SUITES=(predicates transform geojson accessors processing bool_ops buffer threed threed_sfcgal)
+
+# threed_sfcgal needs ST_3DArea/ST_Volume, which live in the `postgis_sfcgal`
+# extension. The image has shipped it all along (SFCGAL 1.3.8 over CGAL); this
+# script simply never asked for it, which is why the suite is new rather than
+# the image being. Loading it was measured to leave all eight pre-existing
+# suites byte-identical, so it is loaded once, up front, for every suite —
+# PostGIS 3.x has no backend-switching GUC for SFCGAL to take over with.
 
 # --platform: the reference image is amd64-only; runs under emulation on
 # arm64 hosts (fine — this script is run rarely, offline from CI).
@@ -25,13 +32,19 @@ echo "waiting for postgres..." >&2
 until docker logs "$CONTAINER" 2>&1 | grep -q "PostgreSQL init process complete"; do sleep 1; done
 until docker exec "$CONTAINER" psql -U postgres -tAc 'SELECT 1' >/dev/null 2>&1; do sleep 1; done
 docker exec "$CONTAINER" psql -U postgres -q -c 'CREATE EXTENSION IF NOT EXISTS postgis;' 2>/dev/null
+docker exec "$CONTAINER" psql -U postgres -q -c 'CREATE EXTENSION IF NOT EXISTS postgis_sfcgal;' 2>/dev/null
 
 VERSION=$(docker exec "$CONTAINER" psql -U postgres -tA -c "SELECT split_part(postgis_full_version(), '\"', 2)")
+SFCGAL=$(docker exec "$CONTAINER" psql -U postgres -tA -c "SELECT postgis_sfcgal_version()")
 for suite in "${SUITES[@]}"; do
   OUT=../../tests/golden/$suite.jsonl
+  # Only the SFCGAL suite's answers come from SFCGAL, so only its provenance
+  # names the version — the rest stay on the header they have always had.
+  PROV="PostGIS $VERSION"
+  [ "$suite" = threed_sfcgal ] && PROV="PostGIS $VERSION + SFCGAL $SFCGAL"
   {
-    printf '{"_generated_by":"PostGIS %s (%s)","_script":"scripts/golden/%s.sql"}\n' \
-      "$VERSION" "$IMAGE" "$suite"
+    printf '{"_generated_by":"%s (%s)","_script":"scripts/golden/%s.sql"}\n' \
+      "$PROV" "$IMAGE" "$suite"
     docker exec -i "$CONTAINER" psql -U postgres -q -tA -v ON_ERROR_STOP=1 <"$suite.sql"
   } >"$OUT"
   echo "wrote $OUT ($(grep -c '"fn"' "$OUT") vectors)" >&2
