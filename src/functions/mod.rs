@@ -66,5 +66,6 @@ pub mod surface;
 pub mod svg;
 pub mod threed;
 pub mod threed_metric;
+pub mod threed_solid;
 #[cfg(feature = "transform")]
 pub mod transform;

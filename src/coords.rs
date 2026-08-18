@@ -64,7 +64,7 @@ pub struct Coord3 {
 /// verbatim and re-wrapped, which is what lets a 3D or surface payload
 /// survive a round trip that the 2D encoders would refuse.
 pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8>> {
-    rewrite_blob(bytes, None, &mut |c, _first, _base| f(c))
+    rewrite_blob(bytes, None, &mut |c, _first, _base, _ring| f(c))
 }
 
 /// As [`map_coords`], but labelling the result with a different SRID.
@@ -78,7 +78,7 @@ pub fn map_coords_relabelled(
     srid: i32,
     f: &mut dyn FnMut(&mut Coord3),
 ) -> Result<Vec<u8>> {
-    rewrite_blob(bytes, Some(srid), &mut |c, _first, _base| f(c))
+    rewrite_blob(bytes, Some(srid), &mut |c, _first, _base, _ring| f(c))
 }
 
 fn rewrite_blob(bytes: &[u8], srid_override: Option<i32>, f: &mut Visitor<'_>) -> Result<Vec<u8>> {
@@ -129,13 +129,27 @@ pub mod base {
 /// As [`for_each_coord_in_runs`], but also reporting the WKB base type code of
 /// the geometry each run belongs to — see [`base`].
 pub fn for_each_coord_typed(bytes: &[u8], f: &mut dyn FnMut(&Coord3, bool, u32)) -> Result<()> {
+    for_each_ring_run(bytes, &mut |c, first, base, _ring| f(c, first, base))
+}
+
+/// As [`for_each_coord_typed`], but also numbering each polygon ring.
+///
+/// Ring 0 is the shell and 1.. are its holes, so a reader can tell where one
+/// polygon ends and the next begins — which the base code alone cannot say,
+/// since two adjacent polygons and a polygon with a hole both arrive as two
+/// consecutive POLYGON runs. `ST_3DArea` needs exactly that boundary: a hole's
+/// area is subtracted from its own polygon and from nothing else. Non-polygon
+/// runs always report 0.
+pub fn for_each_ring_run(bytes: &[u8], f: &mut dyn FnMut(&Coord3, bool, u32, u32)) -> Result<()> {
     let mut scratch = if gpb::is_gpb(bytes) {
         let header = GpbHeader::parse(bytes)?;
         bytes[header.wkb_offset..].to_vec()
     } else {
         bytes.to_vec()
     };
-    rewrite(&mut scratch, &mut |c, first, base| f(c, first, base))?;
+    rewrite(&mut scratch, &mut |c, first, base, ring| {
+        f(c, first, base, ring)
+    })?;
     Ok(())
 }
 
@@ -148,7 +162,7 @@ pub fn for_each_coord_typed(bytes: &[u8], f: &mut dyn FnMut(&Coord3, bool, u32))
 /// the start of the next. That distinction is the only shape knowledge the
 /// interpolating index needs, and the walker already has it.
 pub fn for_each_coord_in_runs(bytes: &[u8], f: &mut dyn FnMut(&Coord3, bool)) -> Result<()> {
-    for_each_coord_typed(bytes, &mut |c, first, _base| f(c, first))
+    for_each_ring_run(bytes, &mut |c, first, _base, _ring| f(c, first))
 }
 
 /// Every Z in an encoded geometry, keyed by the (x, y) it belongs to.
@@ -574,7 +588,7 @@ impl Scan {
 /// a linestring (a chain of segments) from a lone point — the distinction 3D
 /// metrics need and 2D coordinate rewriting does not. It is free: the walker has
 /// just matched on it.
-type Visitor<'a> = dyn FnMut(&mut Coord3, bool, u32) + 'a;
+type Visitor<'a> = dyn FnMut(&mut Coord3, bool, u32, u32) + 'a;
 
 fn rewrite(buf: &mut [u8], f: &mut Visitor<'_>) -> Result<Scan> {
     let mut scan = Scan {
@@ -624,17 +638,29 @@ fn walk(
     let top_level = depth == 0;
     let base = (ty & 0x0000_FFFF) % 1000;
     match base {
-        1 => run(buf, pos, 1, dims, has_z, le, f, scan, top_level, base)?,
+        1 => run(buf, pos, 1, dims, has_z, le, f, scan, top_level, base, 0)?,
         2 => {
             let n = count(buf, pos, le)?;
-            run(buf, pos, n, dims, has_z, le, f, scan, false, base)?;
+            run(buf, pos, n, dims, has_z, le, f, scan, false, base, 0)?;
         }
-        // Polygon and Triangle: rings, each a point run.
+        // Polygon and Triangle: rings, each a point run. Ring 0 is the shell.
         3 | 17 => {
             let rings = count(buf, pos, le)?;
-            for _ in 0..rings {
+            for ring in 0..rings {
                 let n = count(buf, pos, le)?;
-                run(buf, pos, n, dims, has_z, le, f, scan, false, base)?;
+                run(
+                    buf,
+                    pos,
+                    n,
+                    dims,
+                    has_z,
+                    le,
+                    f,
+                    scan,
+                    false,
+                    base,
+                    ring as u32,
+                )?;
             }
         }
         // Multi/collection, plus PolyhedralSurface (15) and TIN (16): a
@@ -663,6 +689,7 @@ fn run(
     scan: &mut Scan,
     top_level: bool,
     base: u32,
+    ring: u32,
 ) -> Result<()> {
     let stride = 8 * dims;
     let run_start = *pos;
@@ -684,7 +711,7 @@ fn run(
         if top_level && c.x.is_nan() && c.y.is_nan() {
             scan.nan_point = true;
         }
-        f(&mut c, *pos == run_start, base);
+        f(&mut c, *pos == run_start, base, ring);
         wr_f64(buf, at, le, c.x);
         wr_f64(buf, at + 8, le, c.y);
         // Gated on the *encoding's* Z, not the visitor's: a visitor that

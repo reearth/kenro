@@ -6,7 +6,7 @@
 
 Every SQL function kenro registers, with its support status in PostGIS, DuckDB
 Spatial and SpatiaLite for comparison. **Function names link to their PostGIS
-documentation page** — all 183 links verified live.
+documentation page** — all 184 links verified live.
 
 This file is the comparison table. The two topics that need more than a table
 cell live next door:
@@ -377,7 +377,8 @@ and the golden vectors pin it. Full semantics in [Routing](routing.md).
 Every 3D function table lives there rather than here: pass-through accessors
 (`ST_HasZ`, `ST_ZMin`, `ST_NDims`, …), surface collections (`ST_NumPatches`,
 `ST_PatchN`, `ST_IsClosed`), the affine transforms, `ST_Force3D` /
-`ST_MakePoint(x, y, z)`, and the nine `ST_3D*` metric functions.
+`ST_MakePoint(x, y, z)`, the nine `ST_3D*` metric functions, and the two
+SFCGAL measurements kenro implements (`ST_3DArea` and `kenro_volume`).
 
 They are there because each carries measured caveats — which functions keep a
 Z, which refuse, where PostGIS contradicts itself — and a table cell cannot hold

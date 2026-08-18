@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod mvt_decode;
+pub mod wkt_z;
 
 use serde::Deserialize;
 

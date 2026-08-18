@@ -419,6 +419,12 @@ pub const FUNCTIONS: &[FnEntry] = &[
     // The core-PostGIS 3D metric family (functions::threed_metric). Everything
     // in the SFCGAL solid-modelling family is deliberately absent — see
     // docs/functions.md and tmp/3d-predicates.md.
+    // The two SFCGAL measurements kenro implements (functions::threed_solid).
+    // ST_3DArea wears the PostGIS name because it matches; the volume does not,
+    // because SFCGAL's ST_Volume answers 0 for a POLYHEDRALSURFACE and kenro has
+    // no SOLID type — see the module doc and tests/golden/threed_sfcgal.jsonl.
+    entry!("ST_3DArea", "st3dArea", [Blob], Real, None),
+    entry!("kenro_volume", "kenroVolume", [Blob], OptReal, None),
     entry!("ST_3DDistance", "st3dDistance", [Blob, Blob], OptReal, None),
     entry!(
         "ST_3DDWithin",

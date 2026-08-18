@@ -66,7 +66,6 @@ const PROSE: &[&str] = &[
 const KNOWN_ABSENT: &[&str] = &[
     // SFCGAL's solid-modelling family: see docs/scope.md.
     "ST_Volume",
-    "ST_3DArea",
     "ST_3DIntersection",
     "ST_3DUnion",
     "ST_3DDifference",

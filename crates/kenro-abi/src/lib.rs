@@ -55,7 +55,7 @@ use kenro::functions::hull;
 use kenro::functions::overlay;
 use kenro::functions::{
     accessors, affine, compat, edit, extra, geodesic, io, linear, manifest, measures, misc,
-    predicates, processing, rtree, surface, threed, threed_metric,
+    predicates, processing, rtree, surface, threed, threed_metric, threed_solid,
 };
 
 // ---------------------------------------------------------------- status
@@ -1490,6 +1490,18 @@ pub extern "C" fn k_stAffine3d(
         yoff,
         zoff,
     ))
+}
+
+// ---- the two SFCGAL measurements (functions::threed_solid) ----
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_st3dArea(p: *const u8, l: u32) -> i32 {
+    real(threed_solid::st_3d_area(s(p, l)))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_kenroVolume(p: *const u8, l: u32) -> i32 {
+    opt_real(threed_solid::kenro_volume(s(p, l)))
 }
 
 // ---- the core-PostGIS 3D metric family (functions::threed_metric) ----

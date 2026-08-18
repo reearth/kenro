@@ -999,6 +999,18 @@ fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
     })?;
 
     // New code, all of it small.
+    // ---- the two SFCGAL measurements (functions::threed_solid) ----
+    use crate::functions::threed_solid;
+    register_geom_to_real(conn, "ST_3DArea", threed_solid::st_3d_area)?;
+    conn.create_scalar_function("kenro_volume", 1, FLAGS, |ctx| {
+        let Some(b) = blob_or_null(ctx, 0, "kenro_volume")? else {
+            return Ok(None);
+        };
+        threed_solid::kenro_volume(b)
+            .map(|v| v.map(Value::Real))
+            .map_err(sql_err)
+    })?;
+
     // ---- the core-PostGIS 3D metric family (functions::threed_metric) ----
     use crate::functions::threed_metric as m3;
     for (name, f) in [

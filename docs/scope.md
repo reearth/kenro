@@ -56,17 +56,21 @@ question of behaviour.
 - **Window functions** — no `ST_ClusterDBSCAN`/`ST_ClusterKMeans`.
 - **Curved geometries** — no `CIRCULARSTRING`/`COMPOUNDCURVE` family, and so
   no `ST_CurveToLine`/`ST_HasArc`/`ST_LineToCurve`.
-- **The SFCGAL solid-modelling family** — no `ST_Volume`, `ST_3DArea`,
-  `ST_3DIntersection`, `ST_3DUnion`, `ST_3DDifference`, `ST_Extrude`,
-  `ST_Tesselate`, `ST_MakeSolid`, `ST_IsSolid`, `ST_3DConvexHull`,
-  `ST_ApproximateMedialAxis`, `ST_MinkowskiSum` or `ST_StraightSkeleton`, and no
-  SOLID type. All of those are SFCGAL's, over CGAL — none of them exists in a
-  plain `CREATE EXTENSION postgis`. **The reference is no longer missing**: the
-  same image kenro's golden vectors have always come from ships
-  `postgis_sfcgal` (SFCGAL 1.3.8), `scripts/golden/generate.sh` now loads it,
-  and `tests/golden/threed_sfcgal.jsonl` holds the vectors it produces —
-  measured to leave every pre-existing suite byte-identical. What still blocks
-  the rest of the family is therefore not the measurement but the arithmetic.
+- **The SFCGAL solid-modelling family** — no `ST_3DIntersection`, `ST_3DUnion`,
+  `ST_3DDifference`, `ST_Extrude`, `ST_Tesselate`, `ST_MakeSolid`, `ST_IsSolid`,
+  `ST_3DConvexHull`, `ST_ApproximateMedialAxis`, `ST_MinkowskiSum` or
+  `ST_StraightSkeleton`, and no SOLID type. (`ST_3DArea` and an enclosed volume
+  were once on this list and are now implemented — see [3D area and enclosed
+  volume](3d.md#3d-area-and-enclosed-volume); those two are theorems rather
+  than library conventions, which is exactly why they could graduate and the
+  rest cannot.) **The reference is no longer what blocks them**: the same image
+  kenro's golden vectors have always come from ships `postgis_sfcgal`
+  (SFCGAL 1.3.8), `scripts/golden/generate.sh` now loads it, and
+  `tests/golden/threed_sfcgal.jsonl` holds the vectors — measured to leave every
+  pre-existing suite byte-identical. What blocks the rest is the arithmetic:
+  CGAL-grade exact predicates, robust construction and a topology model, in pure
+  Rust. That is a different project from a SQLite extension, and having a
+  reference to check it against does not make it smaller.
   The **3D metric family that core PostGIS does
   have** is implemented: see [3D distance and predicates](3d.md#3d-distance-and-predicates).
 - **Guessing a Z** — extrapolating one past the end of a line, or averaging two

@@ -12,7 +12,7 @@ use wasm_bindgen::prelude::*;
 
 use kenro::functions::{
     accessors, compat, edit, extra, geodesic, io, linear, manifest, misc, predicates, rtree,
-    surface, threed, threed_metric,
+    surface, threed, threed_metric, threed_solid,
 };
 use kenro::geom;
 
@@ -619,6 +619,18 @@ pub fn st_affine_3d(
     zoff: f64,
 ) -> R<Vec<u8>> {
     extra::st_affine_3d(geom, a, b, c, d, e, f, g, h, i, xoff, yoff, zoff).map_err(err)
+}
+
+// ---- the two SFCGAL measurements (functions::threed_solid) ----
+
+#[wasm_bindgen(js_name = st3dArea)]
+pub fn st_3d_area(geom: &[u8]) -> R<f64> {
+    threed_solid::st_3d_area(geom).map_err(err)
+}
+
+#[wasm_bindgen(js_name = kenroVolume)]
+pub fn kenro_volume(geom: &[u8]) -> R<Option<f64>> {
+    threed_solid::kenro_volume(geom).map_err(err)
 }
 
 // ---- the core-PostGIS 3D metric family (functions::threed_metric) ----
@@ -2063,6 +2075,8 @@ mod tests {
             "st3dShortestLine",
             "st3dLongestLine",
             "st3dLineInterpolatePoint",
+            "st3dArea",
+            "kenroVolume",
         ];
         for entry in kenro::functions::manifest::active_functions() {
             assert!(
