@@ -21,10 +21,12 @@ const (
 
 // Aggregate kinds, matching k_agg_new in kenro-abi.
 const (
-	aggUnion    = 0
-	aggMVT      = 1
-	aggExtent   = 2
-	aggExtent3D = 3
+	aggUnion        = 0
+	aggMVT          = 1
+	aggExtent       = 2
+	aggExtent3D     = 3
+	aggDijkstra     = 4
+	aggDijkstraCost = 5
 )
 
 // runtime owns the compiled wasm module and a pool of instances.
@@ -118,13 +120,15 @@ type instance struct {
 	retI64 api.Function
 	retF64 api.Function
 
-	aggNew       api.Function
-	aggFinish    api.Function
-	aggDrop      api.Function
-	unionStep    api.Function
-	extentStep   api.Function
-	extent3dStep api.Function
-	mvtStep      api.Function
+	aggNew           api.Function
+	aggFinish        api.Function
+	aggDrop          api.Function
+	unionStep        api.Function
+	extentStep       api.Function
+	extent3dStep     api.Function
+	mvtStep          api.Function
+	dijkstraStep     api.Function
+	dijkstraCostStep api.Function
 
 	fns map[string]api.Function
 
@@ -167,6 +171,8 @@ func newInstance(mod api.Module) (*instance, error) {
 	in.extentStep = mod.ExportedFunction("k_agg_extent_step")
 	in.extent3dStep = mod.ExportedFunction("k_agg_extent3d_step")
 	in.mvtStep = mod.ExportedFunction("k_agg_mvt_step")
+	in.dijkstraStep = mod.ExportedFunction("k_agg_dijkstra_step")
+	in.dijkstraCostStep = mod.ExportedFunction("k_agg_dijkstra_cost_step")
 	return in, nil
 }
 

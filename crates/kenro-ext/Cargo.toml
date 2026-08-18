@@ -23,6 +23,7 @@ default = [
     "delaunay",
     "crs-full",
     "gml",
+    "routing",
 ]
 transform = ["kenro/transform"]
 h3 = ["kenro/h3"]
@@ -34,6 +35,9 @@ delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
 gml = ["kenro/gml"]
+# Pure code, no dependency and no measurable size: the loadable extension
+# carries the routing aggregates by default.
+routing = ["kenro/routing"]
 
 [dependencies]
 kenro = { path = "../..", default-features = false, features = ["rusqlite"] }

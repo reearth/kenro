@@ -1612,6 +1612,100 @@ impl MvtAgg {
     }
 }
 
+/// Accumulator for `kenro_dijkstra(id, source, target, cost, start_vid,
+/// end_vid [, reverse_cost])`. `reverse_cost` is last precisely so that the
+/// 6-argument call can leave it `undefined` here — wasm-bindgen only makes
+/// trailing arguments optional.
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+pub struct DijkstraAgg {
+    inner: Option<kenro::functions::routing::DijkstraAggregate>,
+}
+
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+impl DijkstraAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> DijkstraAgg {
+        DijkstraAgg {
+            inner: Some(kenro::functions::routing::DijkstraAggregate::new()),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn step(
+        &mut self,
+        id: i32,
+        source: i32,
+        target: i32,
+        cost: f64,
+        start_vid: i32,
+        end_vid: i32,
+        reverse_cost: Option<f64>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: kenro_dijkstra accumulator already finished"))?
+            .step(id, source, target, cost, start_vid, end_vid, reverse_cost)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows, or no path).
+    pub fn finish(&mut self) -> Result<Option<String>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: kenro_dijkstra accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
+}
+
+/// Accumulator for `kenro_dijkstra_cost(source, target, cost, start_vid,
+/// end_vid [, reverse_cost])` — the same search, total cost only.
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+pub struct DijkstraCostAgg {
+    inner: Option<kenro::functions::routing::DijkstraCostAggregate>,
+}
+
+#[cfg(feature = "routing")]
+#[wasm_bindgen]
+impl DijkstraCostAgg {
+    #[wasm_bindgen(constructor)]
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> DijkstraCostAgg {
+        DijkstraCostAgg {
+            inner: Some(kenro::functions::routing::DijkstraCostAggregate::new()),
+        }
+    }
+
+    pub fn step(
+        &mut self,
+        source: i32,
+        target: i32,
+        cost: f64,
+        start_vid: i32,
+        end_vid: i32,
+        reverse_cost: Option<f64>,
+    ) -> Result<(), JsError> {
+        self.inner
+            .as_mut()
+            .ok_or_else(|| JsError::new("kenro: kenro_dijkstra_cost accumulator already finished"))?
+            .step(source, target, cost, start_vid, end_vid, reverse_cost)
+            .map_err(err)
+    }
+
+    /// `undefined` = SQL NULL (zero rows, or no path).
+    pub fn finish(&mut self) -> Result<Option<f64>, JsError> {
+        self.inner
+            .take()
+            .ok_or_else(|| JsError::new("kenro: kenro_dijkstra_cost accumulator already finished"))?
+            .finish()
+            .map_err(err)
+    }
+}
+
 // ---- Manifest ----
 
 fn kind_str(k: manifest::Kind) -> &'static str {
@@ -1926,7 +2020,14 @@ mod tests {
                 entry.export
             );
         }
-        let known_aggregates = ["UnionAgg", "MvtAgg", "ExtentAgg", "Extent3DAgg"];
+        let known_aggregates = [
+            "UnionAgg",
+            "MvtAgg",
+            "ExtentAgg",
+            "Extent3DAgg",
+            "DijkstraAgg",
+            "DijkstraCostAgg",
+        ];
         for entry in kenro::functions::manifest::active_aggregates() {
             assert!(
                 known_aggregates.contains(&entry.ctor_export),

@@ -29,6 +29,7 @@ full = [
     "gml",
     "text-encodings",
     "voronoi",
+    "routing",
 ]
 transform = ["kenro/transform"]
 text-encodings = ["kenro/text-encodings"]
@@ -42,6 +43,7 @@ delaunay = ["kenro/delaunay"]
 mvt = ["kenro/mvt"]
 crs-full = ["kenro/crs-full"]
 gml = ["kenro/gml"]
+routing = ["kenro/routing"]
 
 [dependencies]
 # No rusqlite anywhere in this graph: the host SQLite lives in JS, and these

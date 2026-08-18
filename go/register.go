@@ -176,6 +176,10 @@ func aggStepExport(kind int) string {
 		return "k_agg_extent_step"
 	case aggExtent3D:
 		return "k_agg_extent3d_step"
+	case aggDijkstra:
+		return "k_agg_dijkstra_step"
+	case aggDijkstraCost:
+		return "k_agg_dijkstra_cost_step"
 	default:
 		return ""
 	}
@@ -518,9 +522,56 @@ func (a *aggregate) step(ctx context.Context, e aggEntry, args []driver.Value) e
 		}
 		return nil
 
+	case aggDijkstra, aggDijkstraCost:
+		return a.stepRouting(ctx, e, args)
+
 	default:
 		return errf("kenro: unknown aggregate kind %d", e.AggKind)
 	}
+}
+
+// stepRouting handles both dijkstra aggregates. Their signatures differ only
+// in the leading edge-id column, and both put reverse_cost last so the
+// omitted 6th/7th argument can be padded out with a presence flag, the way
+// ST_AsMVT does.
+func (a *aggregate) stepRouting(ctx context.Context, e aggEntry, args []driver.Value) error {
+	step, base := a.in.dijkstraStep, 6
+	if e.AggKind == aggDijkstraCost {
+		step, base = a.in.dijkstraCostStep, 5
+	}
+	if step == nil {
+		return errf("kenro: %s is unavailable in this wasm module (built without the `routing` cargo feature)", a.name)
+	}
+	// e.Args is the arity SQL actually called; the long form ends in
+	// reverse_cost, the short one has to be padded out with a zero.
+	hasRev := len(args) > base
+	kinds := make([]string, base+1)
+	copy(kinds, e.Args)
+	kinds[base] = "real" // reverse_cost
+	padded := make([]driver.Value, base+1)
+	copy(padded, args)
+	if !hasRev {
+		padded[base] = float64(0)
+	}
+	params, err := marshalArgs(ctx, a.in, a.name, kinds, padded)
+	if err != nil {
+		return err
+	}
+	// k_agg_dijkstra_step(h, id, source, target, cost, start_vid, end_vid,
+	//                     has_rev, reverse_cost) — and the cost twin without
+	//                     the id, so the flag always sits second from last.
+	call := make([]uint64, 0, len(params)+2)
+	call = append(call, api.EncodeI32(a.handle))
+	call = append(call, params[:len(params)-1]...)
+	call = append(call, boolParam(hasRev), params[len(params)-1])
+	status, err := a.in.call(ctx, step, call...)
+	if err != nil {
+		return err
+	}
+	if status == statusErr {
+		return a.in.errFromOut(ctx)
+	}
+	return nil
 }
 
 func (a *aggregate) WindowInverse(*sqlite.FunctionContext, []driver.Value) error {
@@ -545,11 +596,15 @@ func (a *aggregate) WindowValue(*sqlite.FunctionContext) (driver.Value, error) {
 		a.err = err
 		return nil, err
 	}
-	// ST_3DExtent is the one aggregate whose result is TEXT (`BOX3D(…)`),
-	// SQLite having no box3d type; every other one returns a geometry blob.
+	// Most aggregates return a geometry blob; the exceptions are ST_3DExtent
+	// (TEXT `BOX3D(…)`, SQLite having no box3d type), kenro_dijkstra (TEXT, a
+	// JSON path array) and kenro_dijkstra_cost (REAL).
 	ret := "opt_blob"
-	if a.kind == aggExtent3D {
+	switch a.kind {
+	case aggExtent3D, aggDijkstra:
 		ret = "opt_text"
+	case aggDijkstraCost:
+		ret = "opt_real"
 	}
 	v, err := readResult(ctx, a.in, status, ret)
 	if err != nil {

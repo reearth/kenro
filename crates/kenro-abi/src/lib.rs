@@ -822,6 +822,10 @@ const AGG_UNION: i32 = 0;
 const AGG_MVT: i32 = 1;
 const AGG_EXTENT: i32 = 2;
 const AGG_EXTENT_3D: i32 = 3;
+#[cfg(feature = "routing")]
+const AGG_DIJKSTRA: i32 = 4;
+#[cfg(feature = "routing")]
+const AGG_DIJKSTRA_COST: i32 = 5;
 
 enum Agg {
     #[cfg(feature = "overlay")]
@@ -830,6 +834,10 @@ enum Agg {
     Mvt(kenro::functions::mvt::MvtAggregate),
     Extent(extra::ExtentAggregate),
     Extent3D(extra::Extent3DAggregate),
+    #[cfg(feature = "routing")]
+    Dijkstra(kenro::functions::routing::DijkstraAggregate),
+    #[cfg(feature = "routing")]
+    DijkstraCost(kenro::functions::routing::DijkstraCostAggregate),
 }
 
 static AGGS: Slot<Vec<Option<Agg>>> = Slot::new(Vec::new());
@@ -849,6 +857,12 @@ pub extern "C" fn k_agg_new(kind: i32) -> i32 {
         AGG_MVT => Agg::Mvt(kenro::functions::mvt::MvtAggregate::new()),
         AGG_EXTENT => Agg::Extent(extra::ExtentAggregate::new()),
         AGG_EXTENT_3D => Agg::Extent3D(extra::Extent3DAggregate::new()),
+        #[cfg(feature = "routing")]
+        AGG_DIJKSTRA => Agg::Dijkstra(kenro::functions::routing::DijkstraAggregate::new()),
+        #[cfg(feature = "routing")]
+        AGG_DIJKSTRA_COST => {
+            Agg::DijkstraCost(kenro::functions::routing::DijkstraCostAggregate::new())
+        }
         _ => return -1,
     };
     let slot = aggs().iter().position(Option::is_none);
@@ -950,6 +964,67 @@ pub extern "C" fn k_agg_mvt_step(
     }
 }
 
+/// `kenro_dijkstra(id, source, target, cost, start_vid, end_vid
+/// [, reverse_cost])`. The trailing `reverse_cost` the SQL call omits is
+/// marked absent with a `has_*` flag, the same way `ST_AsMVT` does, so one
+/// export serves both arities.
+#[cfg(feature = "routing")]
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn k_agg_dijkstra_step(
+    h: i32,
+    id: i32,
+    source: i32,
+    target: i32,
+    cost: f64,
+    start_vid: i32,
+    end_vid: i32,
+    has_rev: i32,
+    reverse_cost: f64,
+) -> i32 {
+    let rev = if has_rev != 0 {
+        Some(reverse_cost)
+    } else {
+        None
+    };
+    match aggs().get_mut(h as usize).and_then(Option::as_mut) {
+        Some(Agg::Dijkstra(a)) => match a.step(id, source, target, cost, start_vid, end_vid, rev) {
+            Ok(()) => OK,
+            Err(e) => fail(e),
+        },
+        _ => agg_gone(),
+    }
+}
+
+/// `kenro_dijkstra_cost(source, target, cost, start_vid, end_vid
+/// [, reverse_cost])` — no edge-id column, and a REAL result.
+#[cfg(feature = "routing")]
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn k_agg_dijkstra_cost_step(
+    h: i32,
+    source: i32,
+    target: i32,
+    cost: f64,
+    start_vid: i32,
+    end_vid: i32,
+    has_rev: i32,
+    reverse_cost: f64,
+) -> i32 {
+    let rev = if has_rev != 0 {
+        Some(reverse_cost)
+    } else {
+        None
+    };
+    match aggs().get_mut(h as usize).and_then(Option::as_mut) {
+        Some(Agg::DijkstraCost(a)) => match a.step(source, target, cost, start_vid, end_vid, rev) {
+            Ok(()) => OK,
+            Err(e) => fail(e),
+        },
+        _ => agg_gone(),
+    }
+}
+
 /// Finish an accumulator and release its handle. `NULL` = zero rows
 /// aggregated.
 #[unsafe(no_mangle)]
@@ -965,6 +1040,11 @@ pub extern "C" fn k_agg_finish(h: i32) -> i32 {
         Some(Agg::Extent(a)) => opt_blob(a.finish()),
         // TEXT, not a blob: `BOX3D(…)`, since SQLite has no box3d type.
         Some(Agg::Extent3D(a)) => opt_text(a.finish()),
+        // TEXT: the path is a JSON array, expanded with `json_each`.
+        #[cfg(feature = "routing")]
+        Some(Agg::Dijkstra(a)) => opt_text(a.finish()),
+        #[cfg(feature = "routing")]
+        Some(Agg::DijkstraCost(a)) => opt_real(a.finish()),
         None => agg_gone(),
     }
 }
@@ -2235,6 +2315,9 @@ pub extern "C" fn k_manifest() -> i32 {
             "UnionAgg" => "0",
             "ExtentAgg" => "2",
             "Extent3DAgg" => "3",
+            "DijkstraAgg" => "4",
+            "DijkstraCostAgg" => "5",
+            // MvtAgg, which is the only aggregate left.
             _ => "1",
         });
         j.push_str(",\"args\":");

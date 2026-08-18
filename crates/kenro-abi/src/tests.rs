@@ -129,6 +129,38 @@ fn aggregate_handles_are_recycled() {
     k_agg_drop(h);
 }
 
+#[cfg(feature = "routing")]
+#[test]
+fn dijkstra_aggregate_handle_lifecycle() {
+    let _g = serial();
+    let h = k_agg_new(AGG_DIJKSTRA);
+    assert!(h >= 0);
+    // 1 →(1.1) 2 →(0.7) 3, no reverse_cost: the 6-argument call form.
+    assert_eq!(k_agg_dijkstra_step(h, 10, 1, 2, 1.1, 1, 3, 0, 0.0), OK);
+    assert_eq!(k_agg_dijkstra_step(h, 11, 2, 3, 0.7, 1, 3, 0, 0.0), OK);
+    assert_eq!(k_agg_finish(h), OK);
+    let path = out_str();
+    assert!(path.contains("\"edge\":10"), "{path}");
+    assert!(path.contains("\"agg_cost\":1.8"), "{path}");
+    assert_eq!(k_agg_finish(h), ERR);
+    assert!(out_str().contains("already finished"));
+
+    // The cost twin, this time with a reverse_cost present: 3 → 1 the long
+    // way back, which only exists because has_rev is set.
+    let h = k_agg_new(AGG_DIJKSTRA_COST);
+    assert_eq!(k_agg_dijkstra_cost_step(h, 1, 2, 1.1, 3, 1, 1, 2.5), OK);
+    assert_eq!(k_agg_dijkstra_cost_step(h, 2, 3, 0.7, 3, 1, 1, 4.0), OK);
+    assert_eq!(k_agg_finish(h), OK);
+    assert_eq!(kenro_ret_f64(), 6.5);
+
+    // No path, and no rows at all, are both SQL NULL.
+    let h = k_agg_new(AGG_DIJKSTRA);
+    assert_eq!(k_agg_dijkstra_step(h, 10, 1, 2, 1.1, 1, 9, 0, 0.0), OK);
+    assert_eq!(k_agg_finish(h), NULL);
+    let h = k_agg_new(AGG_DIJKSTRA_COST);
+    assert_eq!(k_agg_finish(h), NULL);
+}
+
 #[test]
 fn zero_row_aggregate_is_null() {
     let _g = serial();

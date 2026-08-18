@@ -274,6 +274,12 @@ var smokeCases = []smokeCase{
 	// ST_3DExtent is the one aggregate returning TEXT, so it exercises the
 	// binding's opt_text path. 2D rows contribute Z = 0, as in PostGIS.
 	{"ST_3DExtent", `(SELECT ST_3DExtent(g) FROM (SELECT ST_GeomFromText('POINT(1 2)') AS g UNION ALL SELECT ST_GeomFromText('POINT(5 0)')))`, "BOX3D(1 0 0,5 2 0)"},
+	// The routing aggregates: an edge table spelled as a subquery, the path
+	// read back with json_extract. The 6-argument form (no reverse_cost).
+	{"kenro_dijkstra", `(SELECT json_extract(kenro_dijkstra(id, source, target, cost, 1, 3), '$[2].agg_cost') FROM (SELECT 1 AS id, 1 AS source, 2 AS target, 1.1 AS cost UNION ALL SELECT 2, 2, 3, 0.7))`, 1.8},
+	// …and the 7-argument form, where the trailing reverse_cost is the only
+	// reason 3 → 1 exists at all.
+	{"kenro_dijkstra_cost", `(SELECT kenro_dijkstra_cost(source, target, cost, 3, 1, rcost) FROM (SELECT 1 AS source, 2 AS target, 1.1 AS cost, 2.5 AS rcost UNION ALL SELECT 2, 3, 0.7, 4.0))`, 6.5},
 
 	// --- the tail (functions::misc) ---
 	{"ST_Box2dFromGeoHash", `ST_GeometryType(ST_Box2dFromGeoHash('xn76f'))`, "ST_Polygon"},
