@@ -275,12 +275,157 @@ fn tri_tri(t1: ([f64; 3], [f64; 3], [f64; 3]), t2: ([f64; 3], [f64; 3], [f64; 3]
     best
 }
 
+/// An axis-aligned box around one primitive — the whole of the prefilter's
+/// state. Without it the sweep below is a full cross product of both operands'
+/// points, segments and triangles, which two meshes turn quadratic.
+#[derive(Clone, Copy)]
+struct Aabb {
+    lo: [f64; 3],
+    hi: [f64; 3],
+}
+
+/// The bounds are computed in floating point, so they are loosened by a few
+/// ULPs before they are believed: a lower bound a hair too high — or an upper
+/// bound a hair too low — would prune the pair that owns the answer.
+const SLACK: f64 = 8.0 * f64::EPSILON;
+
+impl Aabb {
+    fn point(p: [f64; 3]) -> Self {
+        Self { lo: p, hi: p }
+    }
+
+    fn of(points: impl IntoIterator<Item = [f64; 3]>) -> Option<Self> {
+        let mut it = points.into_iter();
+        let mut b = Self::point(it.next()?);
+        for p in it {
+            b.add(p);
+        }
+        Some(b)
+    }
+
+    fn add(&mut self, p: [f64; 3]) {
+        for (i, c) in p.iter().enumerate() {
+            self.lo[i] = self.lo[i].min(*c);
+            self.hi[i] = self.hi[i].max(*c);
+        }
+    }
+
+    fn union(self, other: Self) -> Self {
+        let mut b = self;
+        b.add(other.lo);
+        b.add(other.hi);
+        b
+    }
+
+    /// The squared distance no pair of points, one drawn from each box, can go
+    /// below. Zero for boxes that touch or overlap.
+    fn min_dist_sq(&self, other: &Self) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..3 {
+            // `max` on a NaN operand returns the other, so a NaN coordinate
+            // yields a zero gap — no pruning, which is the safe direction.
+            let gap = (self.lo[i] - other.hi[i])
+                .max(other.lo[i] - self.hi[i])
+                .max(0.0);
+            sum += gap * gap;
+        }
+        sum
+    }
+
+    /// The squared distance no such pair can exceed.
+    fn max_dist_sq(&self, other: &Self) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..3 {
+            let span = (self.hi[i] - other.lo[i])
+                .abs()
+                .max((other.hi[i] - self.lo[i]).abs());
+            sum += span * span;
+        }
+        sum
+    }
+}
+
+/// A `Parts` with its per-primitive boxes, and its triangles materialised —
+/// [`Parts::triangles`] is walked once per primitive of the other operand
+/// otherwise.
+struct Boxed<'a> {
+    parts: &'a Parts,
+    segments: Vec<Aabb>,
+    triangles: Vec<([f64; 3], [f64; 3], [f64; 3])>,
+    triangle_boxes: Vec<Aabb>,
+    /// Every primitive's box, or `None` when there are no primitives at all.
+    all: Option<Aabb>,
+}
+
+impl<'a> Boxed<'a> {
+    fn new(parts: &'a Parts) -> Self {
+        let segments: Vec<Aabb> = parts
+            .segments
+            .iter()
+            .map(|(a, b)| Aabb::point(*a).union(Aabb::point(*b)))
+            .collect();
+        let triangles: Vec<_> = parts.triangles().collect();
+        let triangle_boxes: Vec<Aabb> = triangles
+            .iter()
+            .map(|t| {
+                Aabb::point(t.0)
+                    .union(Aabb::point(t.1))
+                    .union(Aabb::point(t.2))
+            })
+            .collect();
+        let all = parts
+            .points
+            .iter()
+            .map(|p| Aabb::point(*p))
+            .chain(segments.iter().copied())
+            .chain(triangle_boxes.iter().copied())
+            .reduce(Aabb::union);
+        Self {
+            parts,
+            segments,
+            triangles,
+            triangle_boxes,
+            all,
+        }
+    }
+}
+
+/// Can a pair whose boxes are `lb_sq` apart at the very closest still beat
+/// `best`? Ties are prunable because [`Witness::min`] keeps the incumbent on
+/// one — see the ordering note on [`closest`].
+fn no_closer(best: Option<Witness>, lb_sq: f64) -> bool {
+    best.is_some_and(|w| lb_sq * (1.0 - SLACK) >= w.d * w.d)
+}
+
 /// The closest pair of points between two geometries.
 ///
 /// `stop_at_zero` lets the predicates leave early: `ST_3DIntersects` only needs
 /// to know whether the minimum reaches zero.
+///
+/// An AABB prefilter skips a pair whose boxes are already at least `best` apart.
+/// **The sweep order is exactly the unfiltered one**, deliberately: `min` keeps
+/// the first witness of an equal distance, and `ST_3DClosestPoint` /
+/// `ST_3DShortestLine` return that witness as geometry, so reordering the pairs
+/// — or seeding `best` out of order to make the pruning bite sooner — would
+/// change the answer on a tie rather than only its cost. Pruning alone cannot:
+/// a skipped pair is one that could only have tied or lost.
 fn closest(a: &Parts, b: &Parts, stop_at_zero: bool) -> Option<Witness> {
+    closest_inner(a, b, stop_at_zero, true)
+}
+
+fn closest_inner(a: &Parts, b: &Parts, stop_at_zero: bool, prefilter: bool) -> Option<Witness> {
+    let (a, b) = (Boxed::new(a), Boxed::new(b));
+    let (Some(_), Some(b_all)) = (a.all, b.all) else {
+        return None; // nothing to pair off; the sweep would find nothing either
+    };
     let mut best: Option<Witness> = None;
+    // Skip this pair? Never when the prefilter is off, which is how the tests
+    // compare the two sweeps.
+    macro_rules! skip {
+        ($outer:expr, $inner:expr) => {
+            prefilter && no_closer(best, $outer.min_dist_sq($inner))
+        };
+    }
     macro_rules! offer {
         ($w:expr) => {{
             let w = $w;
@@ -293,25 +438,50 @@ fn closest(a: &Parts, b: &Parts, stop_at_zero: bool) -> Option<Witness> {
             }
         }};
     }
-    for &p in &a.points {
-        for &q in &b.points {
+    for &p in &a.parts.points {
+        let pb = Aabb::point(p);
+        if skip!(pb, &b_all) {
+            continue;
+        }
+        for &q in &b.parts.points {
+            if skip!(pb, &Aabb::point(q)) {
+                continue;
+            }
             offer!(Witness::between(p, q));
         }
-        for &(s, e) in &b.segments {
+        for (&(s, e), sb) in b.parts.segments.iter().zip(&b.segments) {
+            if skip!(pb, sb) {
+                continue;
+            }
             offer!(pt_seg(p, s, e));
         }
-        for t in b.triangles() {
+        for (t, tb) in b.triangles.iter().zip(&b.triangle_boxes) {
+            if skip!(pb, tb) {
+                continue;
+            }
             offer!(pt_tri(p, t.0, t.1, t.2));
         }
     }
-    for &(s, e) in &a.segments {
-        for &q in &b.points {
+    for (&(s, e), ab) in a.parts.segments.iter().zip(&a.segments) {
+        if skip!(ab, &b_all) {
+            continue;
+        }
+        for &q in &b.parts.points {
+            if skip!(ab, &Aabb::point(q)) {
+                continue;
+            }
             offer!(pt_seg(q, s, e).flipped());
         }
-        for &(s2, e2) in &b.segments {
+        for (&(s2, e2), sb) in b.parts.segments.iter().zip(&b.segments) {
+            if skip!(ab, sb) {
+                continue;
+            }
             offer!(seg_seg(s, e, s2, e2));
         }
-        for t in b.triangles() {
+        for (t, tb) in b.triangles.iter().zip(&b.triangle_boxes) {
+            if skip!(ab, tb) {
+                continue;
+            }
             // A segment against a filled triangle: its ends against the face,
             // and the face's edges against the segment.
             offer!(pt_tri(s, t.0, t.1, t.2));
@@ -321,18 +491,30 @@ fn closest(a: &Parts, b: &Parts, stop_at_zero: bool) -> Option<Witness> {
             }
         }
     }
-    for t1 in a.triangles() {
-        for &q in &b.points {
+    for (&t1, ab) in a.triangles.iter().zip(&a.triangle_boxes) {
+        if skip!(ab, &b_all) {
+            continue;
+        }
+        for &q in &b.parts.points {
+            if skip!(ab, &Aabb::point(q)) {
+                continue;
+            }
             offer!(pt_tri(q, t1.0, t1.1, t1.2).flipped());
         }
-        for &(s2, e2) in &b.segments {
+        for (&(s2, e2), sb) in b.parts.segments.iter().zip(&b.segments) {
+            if skip!(ab, sb) {
+                continue;
+            }
             offer!(pt_tri(s2, t1.0, t1.1, t1.2).flipped());
             offer!(pt_tri(e2, t1.0, t1.1, t1.2).flipped());
             for (u, v) in [(t1.0, t1.1), (t1.1, t1.2), (t1.2, t1.0)] {
                 offer!(seg_seg(u, v, s2, e2));
             }
         }
-        for t2 in b.triangles() {
+        for (&t2, tb) in b.triangles.iter().zip(&b.triangle_boxes) {
+            if skip!(ab, tb) {
+                continue;
+            }
             offer!(tri_tri(t1, t2));
         }
     }
@@ -400,9 +582,28 @@ pub fn st_3d_max_distance(a: &[u8], b: &[u8]) -> Result<Option<f64>> {
     Ok(farthest(&pa, &pb).map(|w| w.d))
 }
 
+/// The farthest pair of *vertices*, which is what PostGIS measures.
+///
+/// The prefilter inverts here: a vertex is skipped when even the far corner of
+/// the other operand's box is no farther than the best seen. Ties are again
+/// prunable because the incumbent wins them, and again nothing is reordered —
+/// `ST_3DLongestLine` returns the winning pair as geometry. The box is the
+/// whole of the other operand rather than one per primitive: this loop is
+/// vertex-to-vertex, so there are no primitives to box, and a single box is
+/// what keeps the guard to one test per vertex.
 fn farthest(a: &Parts, b: &Parts) -> Option<Witness> {
+    farthest_inner(a, b, true)
+}
+
+fn farthest_inner(a: &Parts, b: &Parts, prefilter: bool) -> Option<Witness> {
+    let b_all = Aabb::of(b.vertices())?;
     let mut best: Option<Witness> = None;
     for p in a.vertices() {
+        if prefilter
+            && best.is_some_and(|w| Aabb::point(p).max_dist_sq(&b_all) * (1.0 + SLACK) <= w.d * w.d)
+        {
+            continue;
+        }
         for q in b.vertices() {
             let w = Witness::between(p, q);
             best = Some(match best {
@@ -707,6 +908,153 @@ mod tests {
         );
         let two = crate::functions::io::st_geom_from_text("POINT(3 4)", None).unwrap();
         near(st_3d_distance(&flat, &two).unwrap(), 5.0, "both 2d");
+    }
+
+    // ---- the AABB prefilter ----
+    //
+    // Every case here is stated the same way: the prefiltered sweep must return
+    // the *same witness*, not merely the same distance — `ST_3DClosestPoint`
+    // and `ST_3DShortestLine` hand the witness back as geometry.
+
+    fn parts_of(b: &[u8]) -> Parts {
+        parts(b, "test").unwrap()
+    }
+
+    /// Both sweeps, asserted identical down to the two witness points.
+    fn agrees(a: &Parts, b: &Parts, what: &str) -> Option<Witness> {
+        let naive = closest_inner(a, b, false, false);
+        let filtered = closest_inner(a, b, false, true);
+        match (naive, filtered) {
+            (None, None) => None,
+            (Some(n), Some(f)) => {
+                assert_eq!(
+                    (n.d, n.a, n.b),
+                    (f.d, f.a, f.b),
+                    "{what}: the prefilter changed the winning pair"
+                );
+                Some(f)
+            }
+            (n, f) => panic!("{what}: naive {n:?} against filtered {f:?}"),
+        }
+    }
+
+    /// One box wholly inside another: no gap on any axis, so the bound is zero
+    /// and the prefilter must prune nothing.
+    #[test]
+    fn nested_boxes_prune_nothing_and_agree() {
+        let outer = crate::functions::surface::fixtures::cube(6);
+        let inner = poly(&[
+            [0.4, 0.4, 0.5],
+            [0.6, 0.4, 0.5],
+            [0.6, 0.6, 0.5],
+            [0.4, 0.6, 0.5],
+            [0.4, 0.4, 0.5],
+        ]);
+        let (po, pi) = (parts_of(&outer), parts_of(&inner));
+        let w = agrees(&po, &pi, "nested").unwrap();
+        // The small face floats at z = 0.5 inside the unit cube, so the nearest
+        // shell face is 0.4 away in x.
+        assert!((w.d - 0.4).abs() < 1e-9, "nested distance {}", w.d);
+    }
+
+    /// Touching boxes: the bound is exactly zero everywhere, which is the case
+    /// a `>` prune would get right and a wrongly-signed one would not.
+    #[test]
+    fn touching_boxes_still_find_the_zero() {
+        let a = square();
+        let b = poly(&[
+            [10., 0., 0.],
+            [20., 0., 0.],
+            [20., 10., 0.],
+            [10., 10., 0.],
+            [10., 0., 0.],
+        ]);
+        let (pa, pb) = (parts_of(&a), parts_of(&b));
+        let w = agrees(&pa, &pb, "touching").unwrap();
+        assert_eq!(w.d, 0.0);
+        assert!(st_3d_intersects(&a, &b).unwrap(), "stop_at_zero path");
+    }
+
+    /// Two candidates at exactly the same distance. The first in sweep order
+    /// wins, and the prefilter — which prunes ties — must not move it.
+    #[test]
+    fn a_tie_keeps_the_same_witness() {
+        let p = pt(0., 0., 0.);
+        // Segment one lies at y = 5, segment two at x = 5; both are 5 away.
+        let l = line(&[[-5., 5., 0.], [5., 5., 0.], [5., -5., 0.]]);
+        let (pa, pb) = (parts_of(&p), parts_of(&l));
+        let w = agrees(&pa, &pb, "tie").unwrap();
+        assert_eq!(w.d, 5.0);
+        assert_eq!(w.b, [0., 5., 0.], "the first segment must keep the tie");
+        // And through the public geometry-returning face of it.
+        let cp = st_3d_closest_point(&l, &p).unwrap().unwrap();
+        assert_eq!(crate::functions::rtree::st_min_x(&cp).unwrap(), Some(0.0));
+        let sl = st_3d_shortest_line(&p, &l).unwrap().unwrap();
+        assert_eq!(crate::functions::rtree::st_max_y(&sl).unwrap(), Some(5.0));
+    }
+
+    /// The max path, where the bound inverts.
+    #[test]
+    fn the_max_path_agrees_too() {
+        let a = crate::functions::surface::fixtures::cube(6);
+        let b = line(&[[7., 7., 7.], [9., 1., 3.], [2., 8., 6.]]);
+        let (pa, pb) = (parts_of(&a), parts_of(&b));
+        let (naive, filtered) = (
+            farthest_inner(&pa, &pb, false),
+            farthest_inner(&pa, &pb, true),
+        );
+        let (n, f) = (naive.unwrap(), filtered.unwrap());
+        assert_eq!((n.d, n.a, n.b), (f.d, f.a, f.b), "max witness moved");
+        // A tie on the max path: a square against a point equidistant from two
+        // of its corners.
+        let (sq, p) = (parts_of(&square()), parts_of(&pt(5., 5., 0.)));
+        let (n, f) = (
+            farthest_inner(&sq, &p, false).unwrap(),
+            farthest_inner(&sq, &p, true).unwrap(),
+        );
+        assert_eq!((n.d, n.a, n.b), (f.d, f.a, f.b), "max tie moved");
+    }
+
+    /// A grid of quads, `n` by `n`, offset by `(dx, dy, dz)`.
+    fn grid(n: usize, dx: f64, dy: f64, dz: f64) -> Parts {
+        let mut p = Parts::default();
+        for i in 0..n {
+            for j in 0..n {
+                let (x, y) = (i as f64 + dx, j as f64 + dy);
+                p.faces.push(vec![
+                    [x, y, dz],
+                    [x + 1., y, dz],
+                    [x + 1., y + 1., dz],
+                    [x, y + 1., dz],
+                    [x, y, dz],
+                ]);
+            }
+        }
+        p
+    }
+
+    /// The reason the prefilter exists: two meshes whose cross product is the
+    /// whole cost. Timed rather than asserted tightly — the assertion is
+    /// generous on purpose, and the agreement is the part that must hold.
+    #[test]
+    fn two_meshes_are_much_cheaper_with_the_prefilter() {
+        let (a, b) = (grid(14, 0., 0., 0.), grid(14, 40., 40., 10.));
+        let t0 = std::time::Instant::now();
+        let naive = closest_inner(&a, &b, false, false).unwrap();
+        let naive_ms = t0.elapsed();
+        let t1 = std::time::Instant::now();
+        let filtered = closest_inner(&a, &b, false, true).unwrap();
+        let filtered_ms = t1.elapsed();
+        assert_eq!(
+            (naive.d, naive.a, naive.b),
+            (filtered.d, filtered.a, filtered.b),
+            "the mesh answer moved"
+        );
+        println!("closest: naive {naive_ms:?}, prefiltered {filtered_ms:?}");
+        assert!(
+            filtered_ms <= naive_ms,
+            "the prefilter should not cost more: naive {naive_ms:?}, filtered {filtered_ms:?}"
+        );
     }
 
     #[test]
