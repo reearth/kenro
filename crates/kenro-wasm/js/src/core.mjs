@@ -26,6 +26,13 @@ function convertArg(entry, i, v) {
         );
       }
       throw fail(name, `expected a geometry BLOB, got ${typeof v}`);
+    case "blob_or_text":
+      // The box accessors (ST_MinX … ST_ZMax). Both forms cross as bytes —
+      // TEXT as its UTF-8 — because kenro tells them apart by content, and a
+      // geometry encoding never starts with `B`.
+      if (v instanceof Uint8Array) return v;
+      if (typeof v === "string") return new TextEncoder().encode(v);
+      throw fail(name, `expected a geometry BLOB or box text, got ${typeof v}`);
     case "text":
       if (typeof v === "string") return v;
       throw fail(name, `expected TEXT, got ${typeof v}`);

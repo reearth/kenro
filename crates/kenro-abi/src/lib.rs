@@ -16,7 +16,7 @@
 //!
 //! | kind | wasm params |
 //! |---|---|
-//! | `Blob` / `Text` / `TextOrInt` | `ptr: u32, len: u32` |
+//! | `Blob` / `Text` / `TextOrInt` / `BlobOrText` | `ptr: u32, len: u32` |
 //! | `Int` | `i32` |
 //! | `I64` | `i64` |
 //! | `Real` | `f64` |
@@ -2303,6 +2303,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::OptInt => "opt_int",
         Kind::OptText => "opt_text",
         Kind::TextOrInt => "text_or_int",
+        Kind::BlobOrText => "blob_or_text",
     }
 }
 

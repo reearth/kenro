@@ -3,16 +3,28 @@
 //! `ST_MaxY`. Contract: NULL on NULL input (handled in the binding layer);
 //! min/max return NULL for empty geometries; `ST_IsEmpty` returns 1/0.
 //!
-//! Order of attack per call: header envelope present → answer from the
-//! header without parsing WKB (the fast path the triggers hit on well-formed
-//! gpkg data); empty flag set → NULL / 1; otherwise decode the WKB payload
-//! and compute the bounding rect.
+//! Order of attack per call: box text → answer from the six numbers (see
+//! `functions::box3d`); header envelope present → answer from the header
+//! without parsing WKB (the fast path the triggers hit on well-formed gpkg
+//! data); empty flag set → NULL / 1; otherwise decode the WKB payload and
+//! compute the bounding rect.
+//!
+//! The four min/max functions are `Kind::BlobOrText`, matching the only
+//! overload PostGIS gives `ST_XMin` and friends — `box3d`, which a geometry
+//! reaches through an implicit cast SQLite has no equivalent of. A geometry
+//! encoding never begins with a printable character that is not the `GP`
+//! magic, so the R-tree triggers' path through here is byte-for-byte the one
+//! it always was.
 
 use crate::error::Result;
+use crate::functions::box3d;
 use crate::geom;
 use crate::gpb::{self, Envelope, GpbHeader};
 
 pub fn st_min_x(blob: &[u8]) -> Result<Option<f64>> {
+    if box3d::looks_like_text(blob) {
+        return box3d::min_ordinate(blob, 0, "ST_MinX");
+    }
     if let Some((minx, ..)) = crate::functions::surface::envelope(blob)? {
         return Ok(Some(minx));
     }
@@ -20,6 +32,9 @@ pub fn st_min_x(blob: &[u8]) -> Result<Option<f64>> {
 }
 
 pub fn st_max_x(blob: &[u8]) -> Result<Option<f64>> {
+    if box3d::looks_like_text(blob) {
+        return box3d::max_ordinate(blob, 0, "ST_MaxX");
+    }
     if let Some((_, _, maxx, _)) = crate::functions::surface::envelope(blob)? {
         return Ok(Some(maxx));
     }
@@ -27,6 +42,9 @@ pub fn st_max_x(blob: &[u8]) -> Result<Option<f64>> {
 }
 
 pub fn st_min_y(blob: &[u8]) -> Result<Option<f64>> {
+    if box3d::looks_like_text(blob) {
+        return box3d::min_ordinate(blob, 1, "ST_MinY");
+    }
     if let Some((_, miny, ..)) = crate::functions::surface::envelope(blob)? {
         return Ok(Some(miny));
     }
@@ -34,6 +52,9 @@ pub fn st_min_y(blob: &[u8]) -> Result<Option<f64>> {
 }
 
 pub fn st_max_y(blob: &[u8]) -> Result<Option<f64>> {
+    if box3d::looks_like_text(blob) {
+        return box3d::max_ordinate(blob, 1, "ST_MaxY");
+    }
     if let Some((.., maxy)) = crate::functions::surface::envelope(blob)? {
         return Ok(Some(maxy));
     }

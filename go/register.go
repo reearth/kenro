@@ -260,6 +260,18 @@ func marshalArgs(ctx context.Context, in *instance, name string, kinds []string,
 			blobs = append(blobs, bs)
 			total += uint32(len(bs))
 			params = append(params, 0, api.EncodeU32(uint32(len(bs))))
+		case "blob_or_text":
+			// The box accessors (ST_MinX … ST_ZMax). Both forms cross as
+			// bytes — TEXT as its UTF-8 — because kenro tells them apart by
+			// content, and a geometry encoding never starts with `B`.
+			bs, err := asBlobOrText(name, v)
+			if err != nil {
+				return nil, err
+			}
+			blobSlot = append(blobSlot, len(params))
+			blobs = append(blobs, bs)
+			total += uint32(len(bs))
+			params = append(params, 0, api.EncodeU32(uint32(len(bs))))
 		case "text", "text_or_int":
 			s, err := asText(name, kind, v)
 			if err != nil {
@@ -658,6 +670,21 @@ func asBlob(name string, v driver.Value) ([]byte, error) {
 		return nil, errf("kenro: %s: got TEXT where a geometry BLOB was expected (did you mean ST_GeomFromText?)", name)
 	default:
 		return nil, errf("kenro: %s: expected a geometry BLOB, got %s", name, typeName(v))
+	}
+}
+
+// asBlobOrText accepts either form of a Kind::BlobOrText argument and hands
+// it on as bytes. Unlike asBlob it does not reject a string: for these six
+// functions TEXT is a box literal, and the parse error kenro raises for an
+// unparseable one carries the "did you mean ST_GeomFromText?" help instead.
+func asBlobOrText(name string, v driver.Value) ([]byte, error) {
+	switch t := v.(type) {
+	case []byte:
+		return t, nil
+	case string:
+		return []byte(t), nil
+	default:
+		return nil, errf("kenro: %s: expected a geometry BLOB or box text, got %s", name, typeName(v))
 	}
 }
 

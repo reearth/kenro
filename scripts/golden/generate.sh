@@ -6,12 +6,30 @@
 # The output files are committed; CI never touches Docker/PostGIS. Re-run
 # only when adding vectors or bumping the reference PostGIS, and diff the
 # result against the committed files to detect reference drift.
+#
+# Name suites on the command line to regenerate only those:
+#
+#     ./generate.sh box_text
+#
+# Prefer that to a blind full run. Several committed suites carry hand-edits
+# a regeneration would clobber — `transform.jsonl` and `geojson.jsonl` have
+# hand-added `needs_feature` / version notes, and `threed.jsonl` has two
+# vectors whose reference values come from uninitialised memory and are not
+# reproducible run to run.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 IMAGE=postgis/postgis:17-3.5
 CONTAINER=kenro-golden-postgis
-SUITES=(predicates transform geojson accessors processing bool_ops buffer threed threed_sfcgal)
+ALL_SUITES=(predicates transform geojson accessors processing bool_ops buffer threed threed_sfcgal box_text)
+if [ $# -gt 0 ]; then
+  SUITES=("$@")
+  for s in "${SUITES[@]}"; do
+    [ -f "$s.sql" ] || { echo "no such suite: $s" >&2; exit 1; }
+  done
+else
+  SUITES=("${ALL_SUITES[@]}")
+fi
 
 # threed_sfcgal needs ST_3DArea/ST_Volume, which live in the `postgis_sfcgal`
 # extension. The image has shipped it all along (SFCGAL 1.3.8 over CGAL); this

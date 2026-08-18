@@ -366,3 +366,24 @@ test("mvt asmvtgeom vectors", () => {
     }
   }
 });
+
+// Kind::BlobOrText: the box accessors' TEXT argument, replayed through the
+// raw exports. Nothing about the export signatures changes for it — a
+// geometry and a box literal both cross as bytes — so what this pins is that
+// the *core* tells them apart from the content alone, on wasm as in native.
+test("box_text vectors", () => {
+  const encode = (s) => new TextEncoder().encode(s);
+  const call = {
+    xmin: (b) => wasm.stMinX(b),
+    xmax: (b) => wasm.stMaxX(b),
+    ymin: (b) => wasm.stMinY(b),
+    ymax: (b) => wasm.stMaxY(b),
+    zmin: (b) => wasm.stZMin(b),
+    zmax: (b) => wasm.stZMax(b),
+  };
+  for (const v of loadVectors("box_text")) {
+    const run = () => call[v.fn](encode(v.a));
+    if (runExpectingError(v, run)) continue;
+    assertNumberClose(v.id, run(), effective(v));
+  }
+});

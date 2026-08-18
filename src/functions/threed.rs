@@ -157,11 +157,21 @@ fn single_ordinate(
 /// `WHERE ST_ZMax(g) > 100` should behave the same on both. (`ST_Z` differs —
 /// it is per-vertex, and NULL when the vertex has no Z. Verified live.)
 /// An empty geometry, having no coordinates at all, is NULL.
+///
+/// Like the four X/Y accessors these are `Kind::BlobOrText`: PostGIS's only
+/// overload takes a `box3d`, so `BOX3D(…)` text — `ST_3DExtent`'s own
+/// output — answers here too.
 pub fn st_zmin(bytes: &[u8]) -> Result<Option<f64>> {
+    if crate::functions::box3d::looks_like_text(bytes) {
+        return crate::functions::box3d::min_ordinate(bytes, 2, "ST_ZMin");
+    }
     z_extent(bytes, "ST_ZMin", f64::min)
 }
 
 pub fn st_zmax(bytes: &[u8]) -> Result<Option<f64>> {
+    if crate::functions::box3d::looks_like_text(bytes) {
+        return crate::functions::box3d::max_ordinate(bytes, 2, "ST_ZMax");
+    }
     z_extent(bytes, "ST_ZMax", f64::max)
 }
 

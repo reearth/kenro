@@ -91,7 +91,7 @@ works directly on a gpkg column.
 | [`ST_Translate(geom, dx, dy)`](https://postgis.net/docs/ST_Translate.html) | geometry | ✅ | ✅ | ✅ | Z/M and surface collections ride through — [3D affine transforms](3d.md#3d-affine-transforms) |
 | [`ST_Scale(geom, xf, yf)`](https://postgis.net/docs/ST_Scale.html) | geometry | ✅ | ✅ | ⚠️ named `ScaleCoords` | About the origin, like PostGIS. Z is **not** scaled by this arity (measured); the 3-argument form is not implemented |
 | **GeoPackage triggers** | | | | | |
-| [`ST_MinX`](https://postgis.net/docs/ST_XMin.html) / [`ST_MaxX`](https://postgis.net/docs/ST_XMax.html) / [`ST_MinY`](https://postgis.net/docs/ST_YMin.html) / [`ST_MaxY`](https://postgis.net/docs/ST_YMax.html) | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | ✅ | kenro uses the GeoPackage spec's R-tree trigger names — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin` |
+| [`ST_MinX`](https://postgis.net/docs/ST_XMin.html) / [`ST_MaxX`](https://postgis.net/docs/ST_XMax.html) / [`ST_MinY`](https://postgis.net/docs/ST_YMin.html) / [`ST_MaxY`](https://postgis.net/docs/ST_YMax.html) | REAL | ⚠️ named `ST_XMin` … | ⚠️ named `ST_XMin` … | ✅ | kenro uses the GeoPackage spec's R-tree trigger names — required verbatim for gpkg index maintenance; the other two spell it `ST_XMin`. The argument is a geometry **or** `BOX3D(…)`/`BOX(…)` text, matching PostGIS, whose only overload takes a `box3d` — see [`ST_3DExtent`](3d.md#st_3dextent) |
 | [`ST_IsEmpty(geom)`](https://postgis.net/docs/ST_IsEmpty.html) | 0/1 | ✅ | ✅ | ✅ | gpkg R-tree contract; NULL on NULL |
 | `GPKG_IsAssignable(expected, actual)` | 0/1 | ❌ | ❌ | ✅ | The geometry-type-trigger helper. ⚠️ that extension was **removed from the GeoPackage standard in 2016** over interoperability concerns and now survives only in the 1.1.0 archive — kenro keeps the function because files carrying those triggers are still out there. Accepts both `'POINT'` and `'ST_Point'` spellings so the old DDL works with kenro's `ST_GeometryType` |
 | **H3 cells** (`h3` feature) | | | | | |
@@ -298,7 +298,7 @@ is the DE-9IM pattern `T**FF*FF*` read by `ST_RelateMatch`).
 | [`ST_OrderingEquals(a, b)`](https://postgis.net/docs/ST_OrderingEquals.html) | INTEGER | ✅ | ❌ | ✅ | Same geometry *and* same vertex order, unlike the topological `ST_Equals` |
 | [`ST_GeoHash(geom [, maxchars])`](https://postgis.net/docs/ST_GeoHash.html) | TEXT / NULL | ✅ | ❌ | ✅ | 20 characters by default. An extended geometry keeps only the prefix its bbox corners agree on (PostGIS's behavior); non-lon/lat input is an error |
 | `ST_Extent(geom)` **aggregate** | geometry / NULL | ✅ | ✅ | ✅ | ⚠️ returns a **POLYGON**: PostGIS returns its `box2d` type, which SQLite has no equivalent for. NULL rows are skipped; an all-NULL group is NULL |
-| `ST_3DExtent(geom)` **aggregate** | TEXT / NULL | ✅ | ❌ | ❌ | ⚠️ returns **text** — `BOX3D(minx miny minz,maxx maxy maxz)` — see [3D affine transforms](3d.md#3d-affine-transforms) for why, and what to use instead |
+| `ST_3DExtent(geom)` **aggregate** | TEXT / NULL | ✅ | ❌ | ❌ | ⚠️ returns **text** — `BOX3D(minx miny minz,maxx maxy maxz)` — because SQLite has no `box3d`. The six box accessors read it back; see [`ST_3DExtent`](3d.md#st_3dextent) |
 
 ## GML 2/3 I/O
 

@@ -1,0 +1,99 @@
+{"_generated_by":"PostGIS 3.5.2 dea6d0a (postgis/postgis:17-3.5)","_script":"scripts/golden/box_text.sql"}
+{"id":"box3d_2d:xmax","a":"BOX3D(1 2,4 5)","fn":"xmax","expected":4}
+{"id":"box3d_2d:xmin","a":"BOX3D(1 2,4 5)","fn":"xmin","expected":1}
+{"id":"box3d_2d:ymax","a":"BOX3D(1 2,4 5)","fn":"ymax","expected":5}
+{"id":"box3d_2d:ymin","a":"BOX3D(1 2,4 5)","fn":"ymin","expected":2}
+{"id":"box3d_2d:zmax","a":"BOX3D(1 2,4 5)","fn":"zmax","expected":0}
+{"id":"box3d_2d:zmin","a":"BOX3D(1 2,4 5)","fn":"zmin","expected":0}
+{"id":"box3d_3d:xmax","a":"BOX3D(1 2 3,4 5 6)","fn":"xmax","expected":4}
+{"id":"box3d_3d:xmin","a":"BOX3D(1 2 3,4 5 6)","fn":"xmin","expected":1}
+{"id":"box3d_3d:ymax","a":"BOX3D(1 2 3,4 5 6)","fn":"ymax","expected":5}
+{"id":"box3d_3d:ymin","a":"BOX3D(1 2 3,4 5 6)","fn":"ymin","expected":2}
+{"id":"box3d_3d:zmax","a":"BOX3D(1 2 3,4 5 6)","fn":"zmax","expected":6}
+{"id":"box3d_3d:zmin","a":"BOX3D(1 2 3,4 5 6)","fn":"zmin","expected":3}
+{"id":"box3d_bigsmall:xmax","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"xmax","expected":1000000000}
+{"id":"box3d_bigsmall:xmin","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"xmin","expected":0.000000001}
+{"id":"box3d_bigsmall:ymax","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"ymax","expected":5}
+{"id":"box3d_bigsmall:ymin","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"ymin","expected":2}
+{"id":"box3d_bigsmall:zmax","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"zmax","expected":6}
+{"id":"box3d_bigsmall:zmin","a":"BOX3D(1e-9 2 3,1e9 5 6)","fn":"zmin","expected":3}
+{"id":"box3d_degenerate:xmax","a":"BOX3D(1 2 3,1 2 3)","fn":"xmax","expected":1}
+{"id":"box3d_degenerate:xmin","a":"BOX3D(1 2 3,1 2 3)","fn":"xmin","expected":1}
+{"id":"box3d_degenerate:ymax","a":"BOX3D(1 2 3,1 2 3)","fn":"ymax","expected":2}
+{"id":"box3d_degenerate:ymin","a":"BOX3D(1 2 3,1 2 3)","fn":"ymin","expected":2}
+{"id":"box3d_degenerate:zmax","a":"BOX3D(1 2 3,1 2 3)","fn":"zmax","expected":3}
+{"id":"box3d_degenerate:zmin","a":"BOX3D(1 2 3,1 2 3)","fn":"zmin","expected":3}
+{"id":"box3d_from_extent:xmax","a":"BOX3D(1 2 3,7 8 9)","fn":"xmax","expected":7}
+{"id":"box3d_from_extent:xmin","a":"BOX3D(1 2 3,7 8 9)","fn":"xmin","expected":1}
+{"id":"box3d_from_extent:ymax","a":"BOX3D(1 2 3,7 8 9)","fn":"ymax","expected":8}
+{"id":"box3d_from_extent:ymin","a":"BOX3D(1 2 3,7 8 9)","fn":"ymin","expected":2}
+{"id":"box3d_from_extent:zmax","a":"BOX3D(1 2 3,7 8 9)","fn":"zmax","expected":9}
+{"id":"box3d_from_extent:zmin","a":"BOX3D(1 2 3,7 8 9)","fn":"zmin","expected":3}
+{"id":"box3d_inner_ws:xmax","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"xmax","expected":4}
+{"id":"box3d_inner_ws:xmin","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"xmin","expected":1}
+{"id":"box3d_inner_ws:ymax","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"ymax","expected":5}
+{"id":"box3d_inner_ws:ymin","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"ymin","expected":2}
+{"id":"box3d_inner_ws:zmax","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"zmax","expected":6}
+{"id":"box3d_inner_ws:zmin","a":"BOX3D( 1 2 3 , 4 5 6 )","fn":"zmin","expected":3}
+{"id":"box3d_leadingdot:xmax","a":"BOX3D(.5 2 3,4 5 6)","fn":"xmax","expected":4}
+{"id":"box3d_leadingdot:xmin","a":"BOX3D(.5 2 3,4 5 6)","fn":"xmin","expected":0.5}
+{"id":"box3d_leadingdot:ymax","a":"BOX3D(.5 2 3,4 5 6)","fn":"ymax","expected":5}
+{"id":"box3d_leadingdot:ymin","a":"BOX3D(.5 2 3,4 5 6)","fn":"ymin","expected":2}
+{"id":"box3d_leadingdot:zmax","a":"BOX3D(.5 2 3,4 5 6)","fn":"zmax","expected":6}
+{"id":"box3d_leadingdot:zmin","a":"BOX3D(.5 2 3,4 5 6)","fn":"zmin","expected":3}
+{"id":"box3d_negative:xmax","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"xmax","expected":4}
+{"id":"box3d_negative:xmin","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"xmin","expected":-98765.4321}
+{"id":"box3d_negative:ymax","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"ymax","expected":5.5}
+{"id":"box3d_negative:ymin","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"ymin","expected":-2.5}
+{"id":"box3d_negative:zmax","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"zmax","expected":6}
+{"id":"box3d_negative:zmin","a":"BOX3D(-98765.4321 -2.5 -3,4 5.5 6)","fn":"zmin","expected":-3}
+{"id":"box3d_plus:xmax","a":"BOX3D(+1 2 3,4 5 6)","fn":"xmax","expected":4}
+{"id":"box3d_plus:xmin","a":"BOX3D(+1 2 3,4 5 6)","fn":"xmin","expected":1}
+{"id":"box3d_plus:ymax","a":"BOX3D(+1 2 3,4 5 6)","fn":"ymax","expected":5}
+{"id":"box3d_plus:ymin","a":"BOX3D(+1 2 3,4 5 6)","fn":"ymin","expected":2}
+{"id":"box3d_plus:zmax","a":"BOX3D(+1 2 3,4 5 6)","fn":"zmax","expected":6}
+{"id":"box3d_plus:zmin","a":"BOX3D(+1 2 3,4 5 6)","fn":"zmin","expected":3}
+{"id":"box3d_sci:xmax","a":"BOX3D(1e2 2 3,4 5 6)","fn":"xmax","expected":100}
+{"id":"box3d_sci:xmin","a":"BOX3D(1e2 2 3,4 5 6)","fn":"xmin","expected":4}
+{"id":"box3d_sci:ymax","a":"BOX3D(1e2 2 3,4 5 6)","fn":"ymax","expected":5}
+{"id":"box3d_sci:ymin","a":"BOX3D(1e2 2 3,4 5 6)","fn":"ymin","expected":2}
+{"id":"box3d_sci:zmax","a":"BOX3D(1e2 2 3,4 5 6)","fn":"zmax","expected":6}
+{"id":"box3d_sci:zmin","a":"BOX3D(1e2 2 3,4 5 6)","fn":"zmin","expected":3}
+{"id":"box3d_swapped:xmax","a":"BOX3D(4 5 6,1 2 3)","fn":"xmax","expected":4}
+{"id":"box3d_swapped:xmin","a":"BOX3D(4 5 6,1 2 3)","fn":"xmin","expected":1}
+{"id":"box3d_swapped:ymax","a":"BOX3D(4 5 6,1 2 3)","fn":"ymax","expected":5}
+{"id":"box3d_swapped:ymin","a":"BOX3D(4 5 6,1 2 3)","fn":"ymin","expected":2}
+{"id":"box3d_swapped:zmax","a":"BOX3D(4 5 6,1 2 3)","fn":"zmax","expected":6}
+{"id":"box3d_swapped:zmin","a":"BOX3D(4 5 6,1 2 3)","fn":"zmin","expected":3}
+{"id":"box3d_trail_ws:xmax","a":"BOX3D(1 2 3,4 5 6)   ","fn":"xmax","expected":4}
+{"id":"box3d_trail_ws:xmin","a":"BOX3D(1 2 3,4 5 6)   ","fn":"xmin","expected":1}
+{"id":"box3d_trail_ws:ymax","a":"BOX3D(1 2 3,4 5 6)   ","fn":"ymax","expected":5}
+{"id":"box3d_trail_ws:ymin","a":"BOX3D(1 2 3,4 5 6)   ","fn":"ymin","expected":2}
+{"id":"box3d_trail_ws:zmax","a":"BOX3D(1 2 3,4 5 6)   ","fn":"zmax","expected":6}
+{"id":"box3d_trail_ws:zmin","a":"BOX3D(1 2 3,4 5 6)   ","fn":"zmin","expected":3}
+{"id":"box3d_wide_z:xmax","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"xmax","expected":10}
+{"id":"box3d_wide_z:xmin","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"xmin","expected":0}
+{"id":"box3d_wide_z:ymax","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"ymax","expected":10}
+{"id":"box3d_wide_z:ymin","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"ymin","expected":0}
+{"id":"box3d_wide_z:zmax","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"zmax","expected":3500.75}
+{"id":"box3d_wide_z:zmin","a":"BOX3D(0 0 -1000.25,10 10 3500.75)","fn":"zmin","expected":-1000.25}
+{"id":"box3d_zeros:xmax","a":"BOX3D(0 0 0,0 0 0)","fn":"xmax","expected":0}
+{"id":"box3d_zeros:xmin","a":"BOX3D(0 0 0,0 0 0)","fn":"xmin","expected":0}
+{"id":"box3d_zeros:ymax","a":"BOX3D(0 0 0,0 0 0)","fn":"ymax","expected":0}
+{"id":"box3d_zeros:ymin","a":"BOX3D(0 0 0,0 0 0)","fn":"ymin","expected":0}
+{"id":"box3d_zeros:zmax","a":"BOX3D(0 0 0,0 0 0)","fn":"zmax","expected":0}
+{"id":"box3d_zeros:zmin","a":"BOX3D(0 0 0,0 0 0)","fn":"zmin","expected":0}
+{"id":"box_2d_spelling:xmin","a":"BOX(1 2,4 5)","fn":"xmin","expected":{"error": true},"kenro_expected":1.0,"note":"PostGIS: \"BOX3D parser - doesn't start with BOX3D(\". kenro accepts it: PostGIS renders ST_Extent as BOX(…) and SQLite has no cast to route the string through"}
+{"id":"lowercase:xmin","a":"box3d(1 2 3,4 5 6)","fn":"xmin","expected":{"error": true},"kenro_expected":1.0,"note":"PostGIS is case-sensitive (sscanf); kenro case-folds the keyword"}
+{"id":"leading_ws:xmin","a":"   BOX3D(1 2 3,4 5 6)","fn":"xmin","expected":{"error": true},"kenro_expected":1.0,"note":"PostGIS rejects leading whitespace; kenro trims it"}
+{"id":"space_before_paren:xmin","a":"BOX3D (1 2 3,4 5 6)","fn":"xmin","expected":{"error": true},"kenro_expected":1.0,"note":"PostGIS rejects a space before the paren; kenro allows it"}
+{"id":"junk_tail:xmin","a":"BOX3D(1 2 3,4 5 6)junk","fn":"xmin","expected":1.0,"kenro_expected":{"error": true},"note":"PostGIS accepts and ignores the tail (sscanf does not anchor); kenro rejects it rather than silently reading a truncated string as a box"}
+{"id":"no_close_paren:xmin","a":"BOX3D(1 2 3,4 5 6","fn":"xmin","expected":1.0,"kenro_expected":{"error": true},"note":"PostGIS accepts a missing close paren (sscanf); kenro rejects it"}
+{"id":"corner_2d_then_3d:zmax","a":"BOX3D(1 2,4 5 6)","fn":"zmax","expected":0.0,"kenro_expected":{"error": true},"note":"PostGIS falls back to the 2D scan and drops the 6, answering zmax 0; kenro rejects the mismatched corners"}
+{"id":"corner_3d_then_2d:xmin","a":"BOX3D(1 2 3,4 5)","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"BOX3D parser - couldn't parse\"; kenro raises too"}
+{"id":"one_corner:xmin","a":"BOX3D(1 2 3)","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"BOX3D parser - couldn't parse\"; kenro raises too"}
+{"id":"too_many_ords:xmin","a":"BOX3D(1 2 3 9,4 5 6 9)","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"BOX3D parser - couldn't parse\"; kenro raises too"}
+{"id":"empty_parens:xmin","a":"BOX3D()","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"BOX3D parser - couldn't parse\"; kenro raises too"}
+{"id":"box3d_empty_kw:xmin","a":"BOX3D EMPTY","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"doesn't start with BOX3D(\"; kenro raises too"}
+{"id":"not_a_box:xmin","a":"POINT(1 2)","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"doesn't start with BOX3D(\"; kenro raises too — and the error names ST_GeomFromText, which is what this caller wanted"}
+{"id":"not_a_number:xmin","a":"BOX3D(a b c,d e f)","fn":"xmin","expected":{"error": true},"kenro_expected":null,"note":"PostGIS: \"BOX3D parser - couldn't parse\"; kenro raises too"}

@@ -608,10 +608,10 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     }
 
     // R-tree helpers (GeoPackage Annex F.3 contract).
-    register_rtree_minmax(conn, "ST_MinX", rtree::st_min_x)?;
-    register_rtree_minmax(conn, "ST_MaxX", rtree::st_max_x)?;
-    register_rtree_minmax(conn, "ST_MinY", rtree::st_min_y)?;
-    register_rtree_minmax(conn, "ST_MaxY", rtree::st_max_y)?;
+    register_box_accessor(conn, "ST_MinX", rtree::st_min_x)?;
+    register_box_accessor(conn, "ST_MaxX", rtree::st_max_x)?;
+    register_box_accessor(conn, "ST_MinY", rtree::st_min_y)?;
+    register_box_accessor(conn, "ST_MaxY", rtree::st_max_y)?;
     conn.create_scalar_function("ST_IsEmpty", 1, FLAGS, |ctx| {
         let Some(b) = blob_or_null(ctx, 0, "ST_IsEmpty")? else {
             return Ok(None);
@@ -965,10 +965,10 @@ fn register_compat(conn: &Connection) -> rusqlite::Result<()> {
     use crate::functions::compat::Expect;
 
     // Same code, PostGIS's spelling.
-    register_rtree_minmax(conn, "ST_XMin", rtree::st_min_x)?;
-    register_rtree_minmax(conn, "ST_XMax", rtree::st_max_x)?;
-    register_rtree_minmax(conn, "ST_YMin", rtree::st_min_y)?;
-    register_rtree_minmax(conn, "ST_YMax", rtree::st_max_y)?;
+    register_box_accessor(conn, "ST_XMin", rtree::st_min_x)?;
+    register_box_accessor(conn, "ST_XMax", rtree::st_max_x)?;
+    register_box_accessor(conn, "ST_YMin", rtree::st_min_y)?;
+    register_box_accessor(conn, "ST_YMax", rtree::st_max_y)?;
     register_geom_to_real(conn, "ST_Area2D", crate::functions::accessors::st_area)?;
     register_geom_to_real(
         conn,
@@ -2035,8 +2035,8 @@ fn register_threed(conn: &Connection) -> rusqlite::Result<()> {
     register_predicate_1(conn, "ST_HasM", threed::st_has_m)?;
     register_rtree_minmax(conn, "ST_Z", threed::st_z)?;
     register_rtree_minmax(conn, "ST_M", threed::st_m)?;
-    register_rtree_minmax(conn, "ST_ZMin", threed::st_zmin)?;
-    register_rtree_minmax(conn, "ST_ZMax", threed::st_zmax)?;
+    register_box_accessor(conn, "ST_ZMin", threed::st_zmin)?;
+    register_box_accessor(conn, "ST_ZMax", threed::st_zmax)?;
     Ok(())
 }
 
@@ -2269,6 +2269,22 @@ fn register_geom_to_opt_blob(
     })
 }
 
+/// The six box accessors (`Kind::BlobOrText`): identical to
+/// `register_rtree_minmax` but for the argument helper, so `BOX3D(…)` text
+/// reaches the pure function as bytes and the geometry path is unchanged.
+fn register_box_accessor(
+    conn: &Connection,
+    name: &'static str,
+    f: fn(&[u8]) -> crate::error::Result<Option<f64>>,
+) -> rusqlite::Result<()> {
+    conn.create_scalar_function(name, 1, FLAGS, move |ctx| {
+        let Some(b) = blob_or_text_or_null(ctx, 0, name)? else {
+            return Ok(None);
+        };
+        f(b).map(|v| v.map(Value::Real)).map_err(sql_err)
+    })
+}
+
 fn register_rtree_minmax(
     conn: &Connection,
     name: &'static str,
@@ -2306,6 +2322,35 @@ fn blob_or_null<'a>(
         other => Err(sql_err(Error::Unsupported {
             func,
             reason: format!("expected a geometry BLOB, got {}", other.data_type()),
+        })),
+    }
+}
+
+/// `Kind::BlobOrText`: a geometry BLOB, or box text (`BOX3D(…)` / `BOX(…)`)
+/// handed on as its UTF-8 bytes.
+///
+/// There is no discriminator to pass: `functions::box3d::is_box_text` tells
+/// the two apart by content, which is unambiguous because a geometry
+/// encoding never starts with `B`. The BLOB path is byte-identical to
+/// `blob_or_null`'s — the GeoPackage R-tree triggers call `ST_MinX` on every
+/// row and must not notice this exists. What they lose is only the TEXT
+/// *rejection*; `box3d`'s parse error carries the same
+/// "did you mean ST_GeomFromText?" help.
+fn blob_or_text_or_null<'a>(
+    ctx: &'a Context<'_>,
+    i: usize,
+    func: &'static str,
+) -> rusqlite::Result<Option<&'a [u8]>> {
+    match ctx.get_raw(i) {
+        ValueRef::Null => Ok(None),
+        ValueRef::Blob(b) => Ok(Some(b)),
+        ValueRef::Text(t) => Ok(Some(t)),
+        other => Err(sql_err(Error::Unsupported {
+            func,
+            reason: format!(
+                "expected a geometry BLOB or box text, got {}",
+                other.data_type()
+            ),
         })),
     }
 }

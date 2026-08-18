@@ -1786,6 +1786,7 @@ fn kind_str(k: manifest::Kind) -> &'static str {
         Kind::OptText => "opt_text",
         Kind::OptBlob => "opt_blob",
         Kind::TextOrInt => "text_or_int",
+        Kind::BlobOrText => "blob_or_text",
     }
 }
 

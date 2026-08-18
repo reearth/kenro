@@ -567,3 +567,54 @@ func TestConcurrentQueries(t *testing.T) {
 		}
 	}
 }
+
+// Kind::BlobOrText — the box accessors' TEXT argument. The smoke table calls
+// each of the six with a geometry, so the string path needs its own test: it
+// is the one kind where the Go marshaller has to accept a `string` for an
+// argument that crosses as bytes. Every expectation was measured on PostGIS
+// 3.5 (`SELECT ST_XMin('BOX3D(1 2 3,4 5 6)')` and friends).
+func TestBoxTextThroughTheWasmBinding(t *testing.T) {
+	db := open(t)
+	const box = `'BOX3D(1 2 3,4 5 6)'`
+	for _, tc := range []struct {
+		query string
+		want  float64
+	}{
+		{`ST_XMin(` + box + `)`, 1},
+		{`ST_YMin(` + box + `)`, 2},
+		{`ST_ZMin(` + box + `)`, 3},
+		{`ST_XMax(` + box + `)`, 4},
+		{`ST_YMax(` + box + `)`, 5},
+		{`ST_ZMax(` + box + `)`, 6},
+		{`ST_MinX(` + box + `)`, 1},
+		{`ST_MaxY(` + box + `)`, 5},
+		// PostGIS refuses the 2D spelling in its box3d parser; kenro takes it
+		// because ST_Extent renders it and SQLite has no cast to route it
+		// through. Z is 0, as it is for `BOX3D(1 2,4 5)` on PostGIS.
+		{`ST_XMin('BOX(1 2,4 5)')`, 1},
+		{`ST_ZMax('BOX(1 2,4 5)')`, 0},
+		// ST_3DExtent's own output, read straight back.
+		{`ST_XMax(ST_3DExtent(ST_GeomFromText('LINESTRING(1 2,7 8)')))`, 7},
+	} {
+		var got float64
+		if err := db.QueryRow("SELECT " + tc.query).Scan(&got); err != nil {
+			t.Errorf("%s: %v", tc.query, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.query, got, tc.want)
+		}
+	}
+	// Unparseable text is an error that names both ways in — the help the
+	// blob-only path used to give as "did you mean ST_GeomFromText?".
+	var v any
+	err := db.QueryRow(`SELECT ST_MinX('LINESTRING(0 0,1 1)')`).Scan(&v)
+	if err == nil {
+		t.Fatalf("expected an error, got %v", v)
+	}
+	for _, want := range []string{"BOX3D(minx miny minz", "ST_GeomFromText"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	}
+}

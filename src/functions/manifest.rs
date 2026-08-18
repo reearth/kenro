@@ -34,6 +34,22 @@ pub enum Kind {
     /// TEXT accepted as-is; INTEGER n normalized to `quad_segs=n` by the
     /// binding layer (ST_Buffer's third argument). Argument-only.
     TextOrInt,
+    /// BLOB **or** TEXT, the box accessors' argument (`ST_MinX` … `ST_ZMax`).
+    ///
+    /// - **BLOB** — a geometry, exactly as `Blob` means everywhere else.
+    /// - **TEXT** — a box literal: `BOX3D(minx miny minz,maxx maxy maxz)`,
+    ///   `BOX3D(minx miny,maxx maxy)` or `BOX(minx miny,maxx maxy)`, the
+    ///   spellings PostGIS prints a `box3d`/`box2d` as and the one
+    ///   `ST_3DExtent` returns. This is what PostGIS's own accessors take:
+    ///   their single overload's argument type *is* `box3d`, and a geometry
+    ///   only reaches it through an implicit cast SQLite cannot offer.
+    ///
+    /// Both cross every binding as bytes — TEXT as its UTF-8 — because they
+    /// are told apart by content, not by a tag: a geometry encoding starts
+    /// with `GP` or a WKB byte-order byte, never with `B`. So the export
+    /// signatures are the plain `Blob` ones, and the BLOB path (which the
+    /// GeoPackage R-tree triggers depend on) is unchanged. Argument-only.
+    BlobOrText,
 }
 
 pub struct FnEntry {
@@ -107,17 +123,17 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_Distance", "stDistance", [Blob, Blob], OptReal, None),
     entry!("ST_DWithin", "stDwithin", [Blob, Blob, Real], Bool, None),
     // GeoPackage R-tree.
-    entry!("ST_MinX", "stMinX", [Blob], OptReal, None),
-    entry!("ST_MaxX", "stMaxX", [Blob], OptReal, None),
-    entry!("ST_MinY", "stMinY", [Blob], OptReal, None),
-    entry!("ST_MaxY", "stMaxY", [Blob], OptReal, None),
+    entry!("ST_MinX", "stMinX", [BlobOrText], OptReal, None),
+    entry!("ST_MaxX", "stMaxX", [BlobOrText], OptReal, None),
+    entry!("ST_MinY", "stMinY", [BlobOrText], OptReal, None),
+    entry!("ST_MaxY", "stMaxY", [BlobOrText], OptReal, None),
     entry!("ST_IsEmpty", "stIsEmpty", [Blob], Bool, None),
     // PostGIS spellings for the same code. Aliases reuse the wasm export, so
     // they cost nothing beyond a registration.
-    entry!("ST_XMin", "stMinX", [Blob], OptReal, None),
-    entry!("ST_XMax", "stMaxX", [Blob], OptReal, None),
-    entry!("ST_YMin", "stMinY", [Blob], OptReal, None),
-    entry!("ST_YMax", "stMaxY", [Blob], OptReal, None),
+    entry!("ST_XMin", "stMinX", [BlobOrText], OptReal, None),
+    entry!("ST_XMax", "stMaxX", [BlobOrText], OptReal, None),
+    entry!("ST_YMin", "stMinY", [BlobOrText], OptReal, None),
+    entry!("ST_YMax", "stMaxY", [BlobOrText], OptReal, None),
     entry!("ST_GeometryFromText", "stGeomFromText", [Text], Blob, None),
     entry!(
         "ST_GeometryFromText",
@@ -486,8 +502,8 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_HasM", "stHasM", [Blob], Bool, None),
     entry!("ST_Z", "stZ", [Blob], OptReal, None),
     entry!("ST_M", "stM", [Blob], OptReal, None),
-    entry!("ST_ZMin", "stZMin", [Blob], OptReal, None),
-    entry!("ST_ZMax", "stZMax", [Blob], OptReal, None),
+    entry!("ST_ZMin", "stZMin", [BlobOrText], OptReal, None),
+    entry!("ST_ZMax", "stZMax", [BlobOrText], OptReal, None),
     entry!("ST_IsValidReason", "stIsValidReason", [Blob], Text, None),
     // Ring orientation.
     entry!("ST_ForcePolygonCW", "stForcePolygonCw", [Blob], Blob, None),

@@ -27,6 +27,7 @@ pub(crate) fn num(v: f64, digits: usize) -> String {
 
 pub mod accessors;
 pub mod affine;
+pub mod box3d;
 // Operand-class helpers shared by the overlay engine and the MVT encoder,
 // and used by nothing else — a minimal build carries neither.
 #[cfg(any(feature = "overlay", feature = "mvt"))]
