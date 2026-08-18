@@ -146,6 +146,10 @@ geo-types = "0.7"
 name = "accuracy_report"
 required-features = ["transform"]
 
+[[example]]
+name = "routing_bench"
+required-features = ["rusqlite", "routing"]
+
 [[test]]
 name = "manifest_consistency"
 required-features = ["rusqlite"]
