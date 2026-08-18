@@ -16,8 +16,16 @@ import { gzipSync } from "node:zlib";
 // number moved: the **wire** size is what a browser downloads and it still
 // has headroom, so the gzip cap is deliberately left where it was. If a
 // change ever needs the gzip cap raised, that is the one to argue about.
-const MAX_RAW_BYTES = 2_300_000;
-const MAX_GZIP_BYTES = 700_000;
+//
+// 2026-08-19: the gzip cap raised, and here is the argument. What crossed it
+// is not a gated feature anyone can decline: ST_3DArea/kenro_volume, box3d
+// text in the box accessors, and ST_QuantizeCoordinates are ungated
+// PostGIS-parity surface, ~5 KB of wire between them against a 700 KB cap.
+// CI's toolchain also gzips ~3 KB larger than the local builds the old caps
+// were calibrated on (701,810 measured in CI where 699,114 measured
+// locally), so the caps now carry CI-vs-local headroom explicitly.
+const MAX_RAW_BYTES = 2_350_000;
+const MAX_GZIP_BYTES = 715_000;
 
 const wasmPath = new URL("../pkg/kenro_wasm_bg.wasm", import.meta.url);
 const raw = readFileSync(wasmPath);
