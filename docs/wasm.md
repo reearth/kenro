@@ -32,6 +32,13 @@ naming the missing feature:
 | standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 793 KB | 314 KB |
 | full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`/`ST_Split` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`; `ST_TriangulatePolygon` rides along on the same crate), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading), `text-encodings` (`ST_AsKML`/`ST_AsSVG`, no library of their own), and `voronoi` (+52 KB raw / +11 KB wire — it needs both `delaunay` for the triangulation and `overlay` to clip the cells), and `routing` (+21 KB raw / +9 KB wire for the Dijkstra aggregates — pure code, no new dependency) | 2218 KB | 678 KB |
 
+Every tier carries the 3D family ungated — the metric functions
+(`ST_3DDistance` and the predicates, closest/shortest/longest line,
+`ST_3DLineInterpolatePoint`) and the surface reader they share with
+`ST_NumPatches`, `ST_Area` and the envelope. Measured by stubbing both out of
+a full build: **+29 KB raw / +13 KB wire**, the same class as `gml`. No feature
+gates it, so a build that never touches a Z pays it.
+
 The full tier carries `crs-full`, so `ST_Transform` reaches every EPSG code
 in the registry — Japan's plane rectangular systems, the British National
 Grid, state planes — rather than only kenro's curated table (WGS84, Web
