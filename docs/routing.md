@@ -98,8 +98,14 @@ FROM   roads WHERE kind <> 'service';
 ```
 
 This is not a compromise on memory: pgRouting also materializes every row its
-query returns before it searches. And because it is an ordinary aggregate,
-`GROUP BY` gives one route per group for free:
+query returns before it searches. It does mean every query is O(E) in the
+rows it is fed, however short the route — `scripts/bench/routing/` measures
+that on real OpenStreetMap extracts from a thousand to 1.5 million edges,
+including what a bounding-box `WHERE` clause buys (3x on the largest) and
+what it costs in answers a too-narrow box can no longer find.
+
+And because it is an ordinary aggregate, `GROUP BY` gives one route per group
+for free:
 
 ```sql
 SELECT region, kenro_dijkstra_cost(source, target, cost, 1, 42)
