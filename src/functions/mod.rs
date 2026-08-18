@@ -57,6 +57,8 @@ pub mod mvt;
 pub mod overlay;
 pub mod predicates;
 pub mod processing;
+#[cfg(feature = "routing")]
+pub mod routing;
 pub mod rtree;
 pub mod stubs;
 pub mod surface;

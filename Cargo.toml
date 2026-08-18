@@ -56,6 +56,7 @@ full = [
     "gml",
     "text-encodings",
     "voronoi",
+    "routing",
 ]
 rusqlite = ["dep:rusqlite"]
 transform = ["dep:proj4rs"]
@@ -102,6 +103,12 @@ gml = ["dep:quick-xml"]
 # cost is measured in docs/wasm.md. Codes are u16, so EPSG > 65535 is still
 # out of reach.
 crs-full = ["transform", "proj4rs/crs-definitions"]
+# pgRouting-style shortest paths: the kenro_dijkstra / kenro_dijkstra_cost /
+# kenro_drivingdistance aggregates. Pure code — a hand-rolled binary-heap
+# Dijkstra over the rows the aggregate collects, no new dependencies, and the
+# JSON result rides serde_json, which is already unconditional. Off by default
+# because a spatial build does not automatically want a graph engine.
+routing = []
 
 [dependencies]
 geo = "0.33"
@@ -194,6 +201,10 @@ required-features = ["rusqlite", "overlay"]
 [[test]]
 name = "golden_mvt"
 required-features = ["rusqlite", "mvt"]
+
+[[test]]
+name = "golden_routing"
+required-features = ["rusqlite", "routing"]
 
 [[test]]
 name = "proptests"

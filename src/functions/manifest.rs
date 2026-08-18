@@ -1258,6 +1258,60 @@ pub const AGGREGATES: &[AggEntry] = &[
         args: &[Kind::Blob, Kind::Text, Kind::Int, Kind::Text],
         feature: Some("mvt"),
     },
+    // Routing aggregates. The signatures deliberately diverge from
+    // pgRouting's column order: `reverse_cost` is the TRAILING argument
+    // because every kenro host treats trailing arguments as the optional
+    // ones (the same accommodation ST_AsMVT makes above). Node and edge ids
+    // are Int, not I64 — kenro keeps 64-bit integers to the h3 family.
+    AggEntry {
+        // kenro_dijkstra(id, source, target, cost, start_vid, end_vid)
+        sql_name: "kenro_dijkstra",
+        ctor_export: "DijkstraAgg",
+        args: &[
+            Kind::Int,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+            Kind::Int,
+            Kind::Int,
+        ],
+        feature: Some("routing"),
+    },
+    AggEntry {
+        // … plus a trailing reverse_cost (target→source; negative = closed).
+        sql_name: "kenro_dijkstra",
+        ctor_export: "DijkstraAgg",
+        args: &[
+            Kind::Int,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+        ],
+        feature: Some("routing"),
+    },
+    AggEntry {
+        // kenro_dijkstra_cost(source, target, cost, start_vid, end_vid)
+        sql_name: "kenro_dijkstra_cost",
+        ctor_export: "DijkstraCostAgg",
+        args: &[Kind::Int, Kind::Int, Kind::Real, Kind::Int, Kind::Int],
+        feature: Some("routing"),
+    },
+    AggEntry {
+        sql_name: "kenro_dijkstra_cost",
+        ctor_export: "DijkstraCostAgg",
+        args: &[
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+            Kind::Int,
+            Kind::Int,
+            Kind::Real,
+        ],
+        feature: Some("routing"),
+    },
 ];
 
 /// The aggregate entries active under the current feature set.
@@ -1275,6 +1329,7 @@ pub fn active_aggregates() -> impl Iterator<Item = &'static AggEntry> {
         Some("gml") => cfg!(feature = "gml"),
         Some("text-encodings") => cfg!(feature = "text-encodings"),
         Some("voronoi") => cfg!(feature = "voronoi"),
+        Some("routing") => cfg!(feature = "routing"),
         // An unrecognized name disables the function everywhere at once,
         // which is the safe direction but easy to do by accident — see
         // `every_feature_name_is_known` for the guard that makes a typo loud.
@@ -1324,6 +1379,8 @@ pub const STUB_ARITIES: &[(&str, &[i32])] = &[
     ("h3_cell_to_parent", &[2]),
     ("h3_cell_to_string", &[1]),
     ("h3_string_to_cell", &[1]),
+    ("kenro_dijkstra", &[6, 7]),
+    ("kenro_dijkstra_cost", &[5, 6]),
 ];
 
 pub const DEFAULT_STUB_ARITIES: &[i32] = &[1, 2];
@@ -1351,6 +1408,7 @@ pub fn active_functions() -> impl Iterator<Item = &'static FnEntry> {
         Some("gml") => cfg!(feature = "gml"),
         Some("text-encodings") => cfg!(feature = "text-encodings"),
         Some("voronoi") => cfg!(feature = "voronoi"),
+        Some("routing") => cfg!(feature = "routing"),
         // An unrecognized name disables the function everywhere at once,
         // which is the safe direction but easy to do by accident — see
         // `every_feature_name_is_known` for the guard that makes a typo loud.
@@ -1373,6 +1431,7 @@ const KNOWN_FEATURES: &[&str] = &[
     "gml",
     "text-encodings",
     "voronoi",
+    "routing",
 ];
 
 /// The stub entries active under the current feature set: the permanent
@@ -1411,6 +1470,9 @@ pub fn active_stubs() -> Vec<&'static super::stubs::Stub> {
     }
     if !cfg!(feature = "mvt") {
         stubs.extend(super::stubs::MVT_OFF.iter());
+    }
+    if !cfg!(feature = "routing") {
+        stubs.extend(super::stubs::ROUTING_OFF.iter());
     }
     stubs
 }
@@ -1494,5 +1556,15 @@ mod tests {
                 "h3_string_to_cell"
             ]
         );
+        // Aggregates never cross 64 bits at all — sql.js registers any
+        // aggregate whose args need an int64 path as a loud error, so an
+        // I64 arg here would silently kill the function on that host.
+        for e in AGGREGATES {
+            assert!(
+                !e.args.contains(&Kind::I64),
+                "{}: aggregate args must not use Kind::I64",
+                e.sql_name
+            );
+        }
     }
 }

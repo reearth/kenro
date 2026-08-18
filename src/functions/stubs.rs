@@ -108,6 +108,17 @@ pub const MVT_OFF: &[Stub] = &[
     },
 ];
 
+pub const ROUTING_OFF: &[Stub] = &[
+    Stub {
+        name: "kenro_dijkstra",
+        hint: "kenro was built without the `routing` cargo feature.",
+    },
+    Stub {
+        name: "kenro_dijkstra_cost",
+        hint: "kenro was built without the `routing` cargo feature.",
+    },
+];
+
 pub const GEOJSON_OFF: &[Stub] = &[
     Stub {
         name: "ST_AsGeoJSON",

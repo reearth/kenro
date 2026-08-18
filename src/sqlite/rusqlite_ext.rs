@@ -366,6 +366,114 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
         }
     }
 
+    // Routing aggregates: kenro_dijkstra(id, source, target, cost,
+    // start_vid, end_vid [, reverse_cost]) and kenro_dijkstra_cost without
+    // the id column. reverse_cost trails deliberately — see
+    // functions::routing's module doc.
+    #[cfg(feature = "routing")]
+    {
+        use crate::functions::routing;
+        struct DijkstraAgg;
+        impl rusqlite::functions::Aggregate<routing::DijkstraAggregate, Option<Value>> for DijkstraAgg {
+            fn init(&self, _: &mut Context<'_>) -> rusqlite::Result<routing::DijkstraAggregate> {
+                Ok(routing::DijkstraAggregate::new())
+            }
+            fn step(
+                &self,
+                ctx: &mut Context<'_>,
+                acc: &mut routing::DijkstraAggregate,
+            ) -> rusqlite::Result<()> {
+                const NAME: &str = "kenro_dijkstra";
+                // Any NULL argument skips the row (aggregate convention,
+                // identical across all bindings).
+                let (Some(id), Some(source), Some(target), Some(cost), Some(start), Some(end)) = (
+                    int_or_null(ctx, 0, NAME)?,
+                    int_or_null(ctx, 1, NAME)?,
+                    int_or_null(ctx, 2, NAME)?,
+                    real_or_null(ctx, 3, NAME)?,
+                    int_or_null(ctx, 4, NAME)?,
+                    int_or_null(ctx, 5, NAME)?,
+                ) else {
+                    return Ok(());
+                };
+                let reverse = if ctx.len() > 6 {
+                    match real_or_null(ctx, 6, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                acc.step(id, source, target, cost, start, end, reverse)
+                    .map_err(sql_err)
+            }
+            fn finalize(
+                &self,
+                _: &mut Context<'_>,
+                acc: Option<routing::DijkstraAggregate>,
+            ) -> rusqlite::Result<Option<Value>> {
+                match acc {
+                    None => Ok(None),
+                    Some(agg) => agg.finish().map(|o| o.map(Value::Text)).map_err(sql_err),
+                }
+            }
+        }
+        for arity in 6..=7 {
+            conn.create_aggregate_function("kenro_dijkstra", arity, FLAGS, DijkstraAgg)?;
+        }
+
+        struct DijkstraCostAgg;
+        impl rusqlite::functions::Aggregate<routing::DijkstraCostAggregate, Option<Value>>
+            for DijkstraCostAgg
+        {
+            fn init(
+                &self,
+                _: &mut Context<'_>,
+            ) -> rusqlite::Result<routing::DijkstraCostAggregate> {
+                Ok(routing::DijkstraCostAggregate::new())
+            }
+            fn step(
+                &self,
+                ctx: &mut Context<'_>,
+                acc: &mut routing::DijkstraCostAggregate,
+            ) -> rusqlite::Result<()> {
+                const NAME: &str = "kenro_dijkstra_cost";
+                let (Some(source), Some(target), Some(cost), Some(start), Some(end)) = (
+                    int_or_null(ctx, 0, NAME)?,
+                    int_or_null(ctx, 1, NAME)?,
+                    real_or_null(ctx, 2, NAME)?,
+                    int_or_null(ctx, 3, NAME)?,
+                    int_or_null(ctx, 4, NAME)?,
+                ) else {
+                    return Ok(());
+                };
+                let reverse = if ctx.len() > 5 {
+                    match real_or_null(ctx, 5, NAME)? {
+                        None => return Ok(()),
+                        some => some,
+                    }
+                } else {
+                    None
+                };
+                acc.step(source, target, cost, start, end, reverse)
+                    .map_err(sql_err)
+            }
+            fn finalize(
+                &self,
+                _: &mut Context<'_>,
+                acc: Option<routing::DijkstraCostAggregate>,
+            ) -> rusqlite::Result<Option<Value>> {
+                match acc {
+                    None => Ok(None),
+                    Some(agg) => agg.finish().map(|o| o.map(Value::Real)).map_err(sql_err),
+                }
+            }
+        }
+        for arity in 5..=6 {
+            conn.create_aggregate_function("kenro_dijkstra_cost", arity, FLAGS, DijkstraCostAgg)?;
+        }
+    }
+
     // Processing + affine.
     {
         use crate::functions::{affine, processing};
@@ -520,6 +628,8 @@ pub fn register(conn: &Connection) -> rusqlite::Result<()> {
     register_stubs(conn, stubs::DELAUNAY_OFF)?;
     #[cfg(not(feature = "gml"))]
     register_stubs(conn, stubs::GML_OFF)?;
+    #[cfg(not(feature = "routing"))]
+    register_stubs(conn, stubs::ROUTING_OFF)?;
 
     Ok(())
 }
