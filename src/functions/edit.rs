@@ -445,6 +445,97 @@ pub fn st_flip_coordinates(bytes: &[u8]) -> Result<Vec<u8>> {
     crate::coords::map_coords(bytes, &mut |p| std::mem::swap(&mut p.x, &mut p.y))
 }
 
+/// Zero the low mantissa bits of `d` that `decimal_digits` decimal places
+/// cannot distinguish — PostGIS's `trim_preserve_decimal_digits`, reproduced.
+///
+/// This is the whole of `ST_QuantizeCoordinates`, and it is worth spelling
+/// out because it is not the rounding rule anyone would guess:
+///
+/// ```text
+/// exponent    = (bits >> 52 & 2047) - 1023          // floor(log2(|d|))
+/// bits_needed = 1 + exponent + (dd * 851 + 255) / 256   // C division, toward zero
+/// if dd < 0 { bits_needed -= 1 }
+/// if bits_needed >= 52 { return d }                 // also catches NaN/Inf
+/// bits &= !0u64 << (52 - bits_needed.max(1))
+/// ```
+///
+/// `(dd * 851 + 255) / 256` is PostGIS's integer stand-in for
+/// `1 + (int)(dd * log2(10))` over `dd` in `[0, 30]`; for negative `dd` the
+/// same expression truncates the other way, which is what the `-= 1` fixes
+/// up. `docs/scope.md` used to exclude this function because the rule
+/// "could not be reproduced (its results for prec 2 and 3 are identical)" —
+/// that observation is real but is not the rule: `bits_needed` genuinely
+/// differs between 2 and 3, and the *results* coincide whenever the bits the
+/// wider mask would have kept were already zero. Verified bit-exactly
+/// against PostGIS 3.5.2 over 30 sentinel values × `prec` −30…40 (2201
+/// pairs), subnormals, ±0, `f64::MIN_POSITIVE`, `f64::MAX`, NaN and Inf
+/// included; `tests/golden/quantize.jsonl` carries the vectors as hex.
+///
+/// Note what it is *not*: a grid. The result is the input with bits removed,
+/// so it stays close to the input and compresses well, but it is not on any
+/// round decimal. `ST_SnapToGrid` and `ST_ReducePrecision` are the grid.
+fn trim_preserve_decimal_digits(d: f64, decimal_digits: i32) -> f64 {
+    let bits = d.to_bits();
+    let exponent = ((bits >> 52) & 2047) as i32 - 1023;
+    // Rust's `/` on integers truncates toward zero, exactly like C's.
+    let mut bits_needed = 1 + exponent + (decimal_digits * 851 + 255) / 256;
+    if decimal_digits < 0 {
+        bits_needed -= 1;
+    }
+    // NaN and Inf have exponent 1024, so this returns them untouched for any
+    // sane `decimal_digits` — PostGIS relies on the same accident.
+    if bits_needed >= 52 {
+        return d;
+    }
+    let shift = 52 - bits_needed.max(1);
+    f64::from_bits(bits & (u64::MAX << shift))
+}
+
+/// `ST_QuantizeCoordinates(geom, prec_x [, prec_y [, prec_z]])` — zero the
+/// coordinate bits that `prec` decimal places cannot distinguish, so the
+/// geometry compresses better while every ordinate stays within its stated
+/// precision of the original.
+///
+/// A NULL `prec_y` or `prec_z` falls back to **`prec_x`**, not to the
+/// argument before it (measured: `ST_QuantizeCoordinates(POINT Z(…), 2, 15)`
+/// leaves y alone and still quantizes z at 2). kenro spells that as separate
+/// arities rather than SQL defaults, which SQLite has no syntax for.
+///
+/// ⚠️ **A geometry carrying M is refused.** PostGIS quantizes M too, with
+/// `prec_m` defaulting to `prec_x`; kenro's coordinate walker has an X, a Y
+/// and an optional Z and no M slot, so the alternative to raising would be
+/// returning a geometry whose M is silently un-quantized while its name
+/// promises otherwise. There is no `prec_m` arity for the same reason.
+///
+/// Everything else rides through untouched, because this walks the encoding
+/// rather than decoding: the SRID, empty geometries, and surface collections
+/// (PostGIS quantizes a POLYHEDRALSURFACE too — measured).
+pub fn st_quantize_coordinates(
+    bytes: &[u8],
+    prec_x: i32,
+    prec_y: Option<i32>,
+    prec_z: Option<i32>,
+) -> Result<Vec<u8>> {
+    const FUNC: &str = "ST_QuantizeCoordinates";
+    if crate::coords::has_m(bytes)? {
+        return Err(Error::Unsupported {
+            func: FUNC,
+            reason: "a geometry with M is refused rather than returned with its M \
+                     un-quantized — PostGIS quantizes M at prec_x by default, and kenro's \
+                     coordinate walker has no M slot. Drop the M first"
+                .into(),
+        });
+    }
+    let (py, pz) = (prec_y.unwrap_or(prec_x), prec_z.unwrap_or(prec_x));
+    crate::coords::map_coords(bytes, &mut |c| {
+        c.x = trim_preserve_decimal_digits(c.x, prec_x);
+        c.y = trim_preserve_decimal_digits(c.y, py);
+        if let Some(z) = c.z {
+            c.z = Some(trim_preserve_decimal_digits(z, pz));
+        }
+    })
+}
+
 /// `ST_ShiftLongitude(geom)` — move x from [-180,180) into [0,360).
 ///
 /// Z and M ride through, and a surface collection shifts (measured on 3.5:

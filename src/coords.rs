@@ -67,6 +67,22 @@ pub fn map_coords(bytes: &[u8], f: &mut dyn FnMut(&mut Coord3)) -> Result<Vec<u8
     rewrite_blob(bytes, None, &mut |c, _first, _base, _ring| f(c))
 }
 
+/// Does any part of this encoded geometry carry an M ordinate?
+///
+/// Answered from the type codes the coordinate walker decodes anyway, which
+/// makes it right for EWKB's flag bits (`0x4000_0000`) as well as ISO's
+/// `+2000`/`+3000` codes — `functions::threed::st_has_m` reads through
+/// geozero instead and only understands the ISO spelling.
+pub fn has_m(bytes: &[u8]) -> Result<bool> {
+    let mut buf = if gpb::is_gpb(bytes) {
+        let header = GpbHeader::parse(bytes)?;
+        bytes[header.wkb_offset..].to_vec()
+    } else {
+        bytes.to_vec()
+    };
+    Ok(rewrite(&mut buf, &mut |_, _, _, _| {})?.has_m)
+}
+
 /// As [`map_coords`], but labelling the result with a different SRID.
 ///
 /// That is what a reprojection is: every coordinate moves *and* the CRS it is
@@ -573,6 +589,11 @@ struct Scan {
     /// A top-level point with NaN ordinates: the GeoPackage spec's own
     /// `POINT EMPTY`.
     nan_point: bool,
+    /// Any part of the geometry carries an M ordinate. Set from the type
+    /// codes the walker has already decoded, so it costs nothing and — unlike
+    /// re-reading the blob with geozero — it is right for EWKB flag bits as
+    /// well as ISO `+2000`/`+3000` codes.
+    has_m: bool,
 }
 
 impl Scan {
@@ -595,6 +616,7 @@ fn rewrite(buf: &mut [u8], f: &mut Visitor<'_>) -> Result<Scan> {
         srid: 0,
         coords: 0,
         nan_point: false,
+        has_m: false,
     };
     let mut pos = 0usize;
     walk(buf, &mut pos, 0, f, &mut scan)?;
@@ -635,6 +657,7 @@ fn walk(
         _ => (ty & 0x8000_0000 != 0, ty & 0x4000_0000 != 0),
     };
     let dims = 2 + usize::from(has_z) + usize::from(has_m);
+    scan.has_m |= has_m;
     let top_level = depth == 0;
     let base = (ty & 0x0000_FFFF) % 1000;
     match base {

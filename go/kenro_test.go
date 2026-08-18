@@ -267,6 +267,9 @@ var smokeCases = []smokeCase{
 	{"ST_SetPoint", `ST_AsText(ST_SetPoint(ST_GeomFromText('LINESTRING(0 0,1 1)'), 0, ST_GeomFromText('POINT(9 9)')))`, "LINESTRING(9 9,1 1)"},
 	{"ST_ShiftLongitude", `ST_AsText(ST_ShiftLongitude(ST_GeomFromText('POINT(-10 5)')))`, "POINT(350 5)"},
 	{"ST_ShortestLine", `ST_AsText(ST_ShortestLine(ST_GeomFromText('POINT(0 0)'), ST_GeomFromText('LINESTRING(2 -1,2 1)')))`, "LINESTRING(0 0,2 0)"},
+	// Bit trimming, not a grid: 1.23456789 at prec 2 keeps the mantissa bits
+	// two decimals can distinguish, which lands on 1.234375.
+	{"ST_QuantizeCoordinates", `ST_AsText(ST_QuantizeCoordinates(ST_GeomFromText('POINT(1.23456789 9.87654321)'), 2))`, "POINT(1.234375 9.875)"},
 	{"ST_SnapToGrid", `ST_AsText(ST_SnapToGrid(ST_GeomFromText('POINT(1.23 4.57)'), 0.5))`, "POINT(1 4.5)"},
 	{"ST_Subdivide", `ST_Area(ST_Subdivide(ST_Segmentize(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), 2), 8))`, nil},
 	{"ST_SymmetricDifference", `ST_Area(ST_SymmetricDifference(ST_GeomFromText('POLYGON((0 0,10 0,10 10,0 10,0 0))'), ST_GeomFromText('POLYGON((5 5,15 5,15 15,5 15,5 5))')))`, nil},

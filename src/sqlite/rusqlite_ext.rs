@@ -1288,6 +1288,36 @@ fn register_edit(conn: &Connection) -> rusqlite::Result<()> {
         };
         blob(edit::st_make_line(a, b))
     })?;
+    conn.create_scalar_function("ST_QuantizeCoordinates", 2, FLAGS, |ctx| {
+        let (Some(b), Some(px)) = (
+            blob_or_null(ctx, 0, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 1, "ST_QuantizeCoordinates")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_quantize_coordinates(b, px, None, None))
+    })?;
+    conn.create_scalar_function("ST_QuantizeCoordinates", 3, FLAGS, |ctx| {
+        let (Some(b), Some(px), Some(py)) = (
+            blob_or_null(ctx, 0, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 1, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 2, "ST_QuantizeCoordinates")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_quantize_coordinates(b, px, Some(py), None))
+    })?;
+    conn.create_scalar_function("ST_QuantizeCoordinates", 4, FLAGS, |ctx| {
+        let (Some(b), Some(px), Some(py), Some(pz)) = (
+            blob_or_null(ctx, 0, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 1, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 2, "ST_QuantizeCoordinates")?,
+            int_or_null(ctx, 3, "ST_QuantizeCoordinates")?,
+        ) else {
+            return Ok(None);
+        };
+        blob(edit::st_quantize_coordinates(b, px, Some(py), Some(pz)))
+    })?;
     conn.create_scalar_function("ST_SnapToGrid", 2, FLAGS, |ctx| {
         let (Some(b), Some(size)) = (
             blob_or_null(ctx, 0, "ST_SnapToGrid")?,

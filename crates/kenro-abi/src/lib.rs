@@ -1226,6 +1226,47 @@ pub extern "C" fn k_stMulti(geom_p: *const u8, geom_l: u32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn k_stQuantizeCoordinates(geom_p: *const u8, geom_l: u32, prec_x: i32) -> i32 {
+    blob(edit::st_quantize_coordinates(
+        s(geom_p, geom_l),
+        prec_x,
+        None,
+        None,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stQuantizeCoordinatesXy(
+    geom_p: *const u8,
+    geom_l: u32,
+    prec_x: i32,
+    prec_y: i32,
+) -> i32 {
+    blob(edit::st_quantize_coordinates(
+        s(geom_p, geom_l),
+        prec_x,
+        Some(prec_y),
+        None,
+    ))
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn k_stQuantizeCoordinatesXyz(
+    geom_p: *const u8,
+    geom_l: u32,
+    prec_x: i32,
+    prec_y: i32,
+    prec_z: i32,
+) -> i32 {
+    blob(edit::st_quantize_coordinates(
+        s(geom_p, geom_l),
+        prec_x,
+        Some(prec_y),
+        Some(prec_z),
+    ))
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn k_stSnapToGrid(geom_p: *const u8, geom_l: u32, size: f64) -> i32 {
     blob(edit::st_snap_to_grid(s(geom_p, geom_l), size, size))
 }

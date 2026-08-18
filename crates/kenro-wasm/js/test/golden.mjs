@@ -741,6 +741,21 @@ export const SMOKE_SQL = {
     sql: "SELECT ST_AsText(ST_Multi(ST_GeomFromText('POINT(1 2)')))",
     check: (v) => v === "MULTIPOINT((1 2))",
   },
+  // The bit-trimming rule, not a grid: 1.23456789 at prec 2 is 1.234375,
+  // which is the input with its low mantissa bits zeroed.
+  "ST_QuantizeCoordinates/2": {
+    sql: "SELECT ST_AsText(ST_QuantizeCoordinates(ST_GeomFromText('POINT(1.23456789 9.87654321)'), 2))",
+    check: (v) => v === "POINT(1.234375 9.875)",
+  },
+  "ST_QuantizeCoordinates/3": {
+    sql: "SELECT ST_AsText(ST_QuantizeCoordinates(ST_GeomFromText('POINT(1.23456789 9.87654321)'), 2, 15))",
+    check: (v) => v === "POINT(1.234375 9.87654321)",
+  },
+  "ST_QuantizeCoordinates/4": {
+    sql: "SELECT ST_AsText(ST_QuantizeCoordinates(ST_GeomFromText('POINT(1.23456789 9.87654321)'), 15, 2, 2))",
+    // prec 15 still trims one bit off x here — the rule is bits, not digits.
+    check: (v) => v === "POINT(1.2345678899999997 9.875)",
+  },
   "ST_SnapToGrid/2": {
     sql: "SELECT ST_AsText(ST_SnapToGrid(ST_GeomFromText('POINT(1.23 4.57)'), 0.5))",
     check: (v) => v === "POINT(1 4.5)",

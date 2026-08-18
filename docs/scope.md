@@ -25,10 +25,14 @@ question of behaviour.
 - **The `geography` type** — no `ST_GeogFromText` and friends; kenro has one
   geometry type. Measurements on the ellipsoid are `ST_DistanceSphere`,
   `ST_DistanceSpheroid` and `ST_LengthSpheroid` instead.
-- **`ST_QuantizeCoordinates`** — PostGIS's `prec` maps to mantissa bits by an
-  internal rule we could not reproduce (its results for `prec` 2 and 3 are
-  identical), and a same-named function that rounds differently is worse than
-  none. `ST_ReducePrecision` and `ST_SnapToGrid` give a predictable grid.
+- **Nothing about coordinate precision.** `ST_QuantizeCoordinates` was on
+  this list, excluded because PostGIS's `prec` → mantissa-bits rule "could
+  not be reproduced (its results for `prec` 2 and 3 are identical)". The
+  observation was real and the conclusion was wrong: `prec` 2 and 3 ask for
+  different masks, and the results coincide only when the bits the wider mask
+  would have kept were already zero. The rule is now reproduced bit-exactly
+  and the function is [implemented](functions.md), alongside
+  `ST_SnapToGrid` and `ST_ReducePrecision`.
 - **PostGIS's Topology extension** — none of the ~18 `ST_AddEdge*` /
   `ST_CreateTopoGeo` / `ST_ModEdge*` family: that is a topology store, not a
   function set.

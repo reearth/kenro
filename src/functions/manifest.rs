@@ -310,6 +310,31 @@ pub const FUNCTIONS: &[FnEntry] = &[
     entry!("ST_MakeLine", "stMakeLine", [Blob, Blob], Blob, None),
     entry!("ST_MakePolygon", "stMakePolygon", [Blob], Blob, None),
     entry!("ST_Multi", "stMulti", [Blob], Blob, None),
+    // ST_QuantizeCoordinates's PostGIS signature has SQL defaults
+    // (prec_y/prec_z DEFAULT NULL, each falling back to prec_x); SQLite has
+    // no syntax for those, so the fallbacks become arities. There is no
+    // prec_m form — see `edit::st_quantize_coordinates`.
+    entry!(
+        "ST_QuantizeCoordinates",
+        "stQuantizeCoordinates",
+        [Blob, Int],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_QuantizeCoordinates",
+        "stQuantizeCoordinatesXy",
+        [Blob, Int, Int],
+        Blob,
+        None
+    ),
+    entry!(
+        "ST_QuantizeCoordinates",
+        "stQuantizeCoordinatesXyz",
+        [Blob, Int, Int, Int],
+        Blob,
+        None
+    ),
     entry!("ST_SnapToGrid", "stSnapToGrid", [Blob, Real], Blob, None),
     entry!(
         "ST_SnapToGrid",

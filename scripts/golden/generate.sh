@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 
 IMAGE=postgis/postgis:17-3.5
 CONTAINER=kenro-golden-postgis
-ALL_SUITES=(predicates transform geojson accessors processing bool_ops buffer threed threed_sfcgal box_text)
+ALL_SUITES=(predicates transform geojson accessors processing bool_ops buffer threed threed_sfcgal box_text quantize)
 if [ $# -gt 0 ]; then
   SUITES=("$@")
   for s in "${SUITES[@]}"; do

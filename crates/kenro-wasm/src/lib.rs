@@ -398,6 +398,26 @@ pub fn st_multi(geom: &[u8]) -> R<Vec<u8>> {
     edit::st_multi(geom).map_err(err)
 }
 
+#[wasm_bindgen(js_name = stQuantizeCoordinates)]
+pub fn st_quantize_coordinates(geom: &[u8], prec_x: i32) -> R<Vec<u8>> {
+    edit::st_quantize_coordinates(geom, prec_x, None, None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stQuantizeCoordinatesXy)]
+pub fn st_quantize_coordinates_xy(geom: &[u8], prec_x: i32, prec_y: i32) -> R<Vec<u8>> {
+    edit::st_quantize_coordinates(geom, prec_x, Some(prec_y), None).map_err(err)
+}
+
+#[wasm_bindgen(js_name = stQuantizeCoordinatesXyz)]
+pub fn st_quantize_coordinates_xyz(
+    geom: &[u8],
+    prec_x: i32,
+    prec_y: i32,
+    prec_z: i32,
+) -> R<Vec<u8>> {
+    edit::st_quantize_coordinates(geom, prec_x, Some(prec_y), Some(prec_z)).map_err(err)
+}
+
 #[wasm_bindgen(js_name = stSnapToGrid)]
 pub fn st_snap_to_grid(geom: &[u8], size: f64) -> R<Vec<u8>> {
     edit::st_snap_to_grid(geom, size, size).map_err(err)
@@ -1969,6 +1989,9 @@ mod tests {
             "stMakeLine",
             "stMakePolygon",
             "stMulti",
+            "stQuantizeCoordinates",
+            "stQuantizeCoordinatesXy",
+            "stQuantizeCoordinatesXyz",
             "stSnapToGrid",
             "stSnapToGridXy",
             "stFlipCoordinates",
