@@ -211,5 +211,17 @@ name = "golden_routing"
 required-features = ["rusqlite", "routing"]
 
 [[test]]
+name = "golden_box_text"
+required-features = ["rusqlite"]
+
+[[test]]
+name = "golden_quantize"
+required-features = ["rusqlite"]
+
+[[test]]
+name = "gpkg_polyhedralsurface"
+required-features = ["rusqlite"]
+
+[[test]]
 name = "proptests"
 required-features = ["overlay", "mvt"]
