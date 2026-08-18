@@ -1,10 +1,183 @@
-//! Routing tests: SQL-level semantics of the routing aggregates.
+//! Routing tests: the golden vectors generated against real pgRouting (see
+//! `scripts/golden/routing_generate.sh`), plus the SQL-level semantics that
+//! have no pgRouting counterpart — NULL rows, zero rows, GROUP BY, and the
+//! constant-argument rule.
 //!
-//! The golden vectors generated against pgRouting land here too (see
-//! `scripts/golden/routing_generate.sh`).
+//! Every vector is self-contained: `rows` is the whole edge table, `args` is
+//! `[start_vid, end_vid]`, and `expected` is what pgRouting answered (an
+//! empty result set becomes `null`, which is the aggregate's NULL). Vectors
+//! run twice, once against the accumulator directly and once through SQL.
+//!
+//! `seq`/`node`/`edge` are compared exactly; `cost`/`agg_cost` go through
+//! `common::assert_number`, because both sides accumulate the same additions
+//! in the same order but neither promises the same last bit.
 
+mod common;
+
+use common::Vector;
+use kenro::functions::routing::{DijkstraAggregate, DijkstraCostAggregate};
 use rusqlite::Connection;
 use rusqlite::types::Value as SqlValue;
+use serde_json::Value;
+
+// ---- vector plumbing ----
+
+/// `[id, source, target, cost]` or `[id, source, target, cost, reverse_cost]`
+/// — four elements means the 6-argument call form, five the 7-argument one.
+struct EdgeRow {
+    id: i32,
+    source: i32,
+    target: i32,
+    cost: f64,
+    reverse_cost: Option<f64>,
+}
+
+fn edge_rows(v: &Vector) -> Vec<EdgeRow> {
+    v.rows
+        .as_ref()
+        .unwrap_or_else(|| panic!("{}: no rows", v.id))
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| {
+            let r = r.as_array().unwrap();
+            let num = |i: usize| r[i].as_f64().unwrap();
+            EdgeRow {
+                id: num(0) as i32,
+                source: num(1) as i32,
+                target: num(2) as i32,
+                cost: num(3),
+                reverse_cost: r.get(4).map(|c| c.as_f64().unwrap()),
+            }
+        })
+        .collect()
+}
+
+fn endpoints(v: &Vector) -> (i32, i32) {
+    let a = v
+        .args
+        .as_ref()
+        .unwrap_or_else(|| panic!("{}: no args", v.id));
+    (a[0] as i32, a[1] as i32)
+}
+
+fn has_reverse(rows: &[EdgeRow]) -> bool {
+    rows.first().is_some_and(|r| r.reverse_cost.is_some())
+}
+
+/// Compare a produced path against the pgRouting rows the vector recorded.
+fn check_path(id: &str, got: Option<&str>, want: &Value) {
+    match (got, want) {
+        (None, Value::Null) => {}
+        (Some(g), Value::Array(rows)) => {
+            let got: Value = serde_json::from_str(g).unwrap();
+            let got = got.as_array().unwrap();
+            assert_eq!(got.len(), rows.len(), "{id}: row count: {g} vs {want}");
+            for (i, (g, w)) in got.iter().zip(rows).enumerate() {
+                for key in ["seq", "node", "edge"] {
+                    assert_eq!(
+                        g[key].as_i64(),
+                        w[key].as_i64(),
+                        "{id}[{i}]: {key}: {g} vs {w}"
+                    );
+                }
+                for key in ["cost", "agg_cost"] {
+                    common::assert_number(
+                        &format!("{id}[{i}].{key}"),
+                        g[key].as_f64().unwrap(),
+                        w[key].as_f64().unwrap(),
+                    );
+                }
+            }
+        }
+        (got, want) => panic!("{id}: got {got:?}, want {want}"),
+    }
+}
+
+fn check_cost(id: &str, got: Option<f64>, want: &Value) {
+    match (got, want) {
+        (None, Value::Null) => {}
+        (Some(g), w) if w.is_number() => common::assert_number(id, g, w.as_f64().unwrap()),
+        (got, want) => panic!("{id}: got {got:?}, want {want}"),
+    }
+}
+
+// ---- harnesses ----
+
+#[test]
+fn golden_routing_through_pure_functions() {
+    for v in common::load("routing") {
+        let rows = edge_rows(&v);
+        let (start, end) = endpoints(&v);
+        match v.func.as_str() {
+            "dijkstra" => {
+                let mut acc = DijkstraAggregate::new();
+                for r in &rows {
+                    acc.step(r.id, r.source, r.target, r.cost, start, end, r.reverse_cost)
+                        .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                }
+                let got = acc.finish().unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_path(&v.id, got.as_deref(), v.effective());
+            }
+            "dijkstra_cost" => {
+                let mut acc = DijkstraCostAggregate::new();
+                for r in &rows {
+                    acc.step(r.source, r.target, r.cost, start, end, r.reverse_cost)
+                        .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                }
+                let got = acc.finish().unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_cost(&v.id, got, v.effective());
+            }
+            other => panic!("{}: unknown fn {other}", v.id),
+        }
+    }
+}
+
+#[test]
+fn golden_routing_through_sql() {
+    let conn = Connection::open_in_memory().unwrap();
+    kenro::register(&conn).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE e (id INTEGER, source INTEGER, target INTEGER, cost REAL, rcost REAL);",
+    )
+    .unwrap();
+    for v in common::load("routing") {
+        let rows = edge_rows(&v);
+        let (start, end) = endpoints(&v);
+        conn.execute("DELETE FROM e", []).unwrap();
+        for r in &rows {
+            conn.execute(
+                "INSERT INTO e VALUES (?1, ?2, ?3, ?4, ?5)",
+                rusqlite::params![r.id, r.source, r.target, r.cost, r.reverse_cost],
+            )
+            .unwrap();
+        }
+        let rev = if has_reverse(&rows) { ", rcost" } else { "" };
+        match v.func.as_str() {
+            "dijkstra" => {
+                let sql = format!(
+                    "SELECT kenro_dijkstra(id, source, target, cost, {start}, {end}{rev}) FROM e"
+                );
+                let got: Option<String> = conn
+                    .query_row(&sql, [], |r| r.get(0))
+                    .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_path(&v.id, got.as_deref(), v.effective());
+            }
+            "dijkstra_cost" => {
+                let sql = format!(
+                    "SELECT kenro_dijkstra_cost(source, target, cost, {start}, {end}{rev}) FROM e"
+                );
+                let got: Option<f64> = conn
+                    .query_row(&sql, [], |r| r.get(0))
+                    .unwrap_or_else(|e| panic!("{}: {e}", v.id));
+                check_cost(&v.id, got, v.effective());
+            }
+            other => panic!("{}: unknown fn {other}", v.id),
+        }
+    }
+}
+
+// ---- semantics with no pgRouting counterpart ----
 
 fn conn_with_edges(rows: &[(Option<i32>, i32, i32, Option<f64>)]) -> Connection {
     let conn = Connection::open_in_memory().unwrap();
