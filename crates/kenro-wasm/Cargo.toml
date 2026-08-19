@@ -1,6 +1,6 @@
 [package]
 name = "kenro-wasm"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.85"
 description = "kenro spatial functions for browser SQLite (sql.js / wa-sqlite / official SQLite WASM)"

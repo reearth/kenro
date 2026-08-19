@@ -28,8 +28,8 @@ naming the missing feature:
 
 | tier | cargo flags | adds | raw | gzipped (wire) |
 |---|---|---|---|---|
-| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 595 KB | 232 KB |
-| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 793 KB | 314 KB |
+| minimal | `--no-default-features` | I/O, predicates, R-tree, accessors, measures, processing, affine, constructors, PostGIS-compat spellings | 611 KB | 238 KB |
+| standard (default) | — | + `ST_Transform`, H3, GeoJSON, MVT (`ST_AsMVTGeom` clips with dedicated rectangle algorithms, so tiles cost almost nothing) | 809 KB | 321 KB |
 | full | `--features full` | + overlay/`ST_MakeValid`/`ST_Buffer`/`ST_Split` (i_overlay's mesh is the single largest contributor), `ST_AsMVTGeom` gains PostGIS-grade validity repair, the `spheroid` measures pull geographiclib (~17 KB), and the two size-gated algorithms `ST_ConcaveHull` (+41 KB) and `ST_DelaunayTriangles` (+81 KB, pulling `spade`; `ST_TriangulatePolygon` rides along on the same crate), and `crs-full` — the whole EPSG registry, so a national or local grid transforms without a rebuild (+777 KB raw / +155 KB wire), `gml` (+31 KB raw / +13 KB wire, pulling `quick-xml` for reading), `text-encodings` (`ST_AsKML`/`ST_AsSVG`, no library of their own), and `voronoi` (+52 KB raw / +11 KB wire — it needs both `delaunay` for the triangulation and `overlay` to clip the cells), and `routing` (+21 KB raw / +9 KB wire for the Dijkstra aggregates — pure code, no new dependency) | 2232 KB | 683 KB |
 
 Every tier carries the 3D family ungated — the metric functions
@@ -55,7 +55,7 @@ classes kenro doesn't cover.
 
 | | [@sqlite.org/sqlite-wasm] (primary) | [wa-sqlite] | [sql.js] |
 |---|---|---|---|
-| All 220 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
+| All 221 scalar functions | ✅ | ✅ | ⚠️ h3 family excluded |
 | Aggregates (`ST_Union(geom)`, `ST_AsMVT(…)`, `ST_Extent(geom)`, `ST_3DExtent(geom)`) | ✅ xStep/xFinal keyed by `sqlite3_aggregate_context` (pass the `sqlite3` namespace as `registerKenro`'s 3rd argument) | ✅ finals matched FIFO in first-step order (the host exposes no aggregate context; verified empirically) | ✅ via `create_aggregate` through the registry shim |
 | 64-bit H3 cell ids | ✅ BigInt | ✅ BigInt | ❌ no int64 path — the four `h3_*` functions register as **loud errors** (never silently-lossy doubles) |
 | GeoPackage R-tree maintenance | ✅ incl. `trusted_schema=off` (UDFs registered innocuous) | ❌ **neither wa-sqlite build carries the rtree module** (sync and async, both SQLite 3.44.0) — measured, after this cell said ✅ for a long time with no test behind it | ❌ the stock sql.js build ships **without SQLite's R-tree module** |
