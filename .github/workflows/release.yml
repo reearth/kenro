@@ -134,7 +134,7 @@ jobs:
         with:
           key: release-wasm
       - name: Install wasm-pack
-        uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2
         with:
           tool: wasm-pack
       # Three tiers (sizes in docs/wasm.md); each bundle = pkg + adapters.
@@ -241,7 +241,7 @@ jobs:
           version=$(node -p "require('./package.json').version")
           test "$tag" = "$version" || { echo "tag v$tag != package.json $version"; exit 1; }
       - name: Install wasm-pack
-        uses: taiki-e/install-action@6cd13508893c0e7eab5f273c2575d3859bd7229a # v2
+        uses: taiki-e/install-action@1ed6d7be6168f6c9046541087ff549b6bc581fdf # v2
         with:
           tool: wasm-pack
       - name: Build (full tier)
