@@ -115,7 +115,7 @@ jobs:
       - name: Docs do not claim a registered function is missing
         run: cargo test --all-features --test docs_not_stale
       - name: Install wasm-pack
-        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
         with:
           tool: wasm-pack
       - name: Build (wasm-pack, release, full)
